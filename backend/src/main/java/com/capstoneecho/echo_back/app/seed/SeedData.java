@@ -31,8 +31,7 @@ final class SeedData {
             int orderIndex,
             String kind,
             String prompt,
-            String targetText,
-            String canonicalPhonemes
+            String targetText
     ) {}
 
     record DemoRankingFile(List<DemoEntry> entries) {}

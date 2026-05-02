@@ -7,7 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 // 한 Script(학습 unit) 안의 순서 있는 단계. INTRO 단계는 안내문만,
-// RECORD 단계는 사용자가 발음할 단어/문장과 그 canonical 음소 시퀀스를 보유한다.
+// RECORD 단계는 사용자가 발음할 단어/문장을 함께 보유한다. 정답 음소는 도메인이 보관하지 않고
+// 녹음 시점에 모델 서버 G2P 로 즉석 산출된다.
 @Entity
 @Table(name = "learning_steps")
 @Getter
@@ -36,22 +37,12 @@ public class LearningStep {
     @Column(name = "target_text", columnDefinition = "TEXT")
     private String targetText;
 
-    // 공백으로 분리된 canonical 음소 시퀀스. 모델 서버에 그대로 canonical 폼으로 전송된다.
-    @Column(name = "canonical_phonemes", columnDefinition = "TEXT")
-    private String canonicalPhonemes;
-
     public static LearningStep intro(Script script, int orderIndex, String prompt) {
-        return create(script, orderIndex, StepKind.INTRO, prompt, null, null);
+        return create(script, orderIndex, StepKind.INTRO, prompt, null);
     }
 
-    public static LearningStep record(
-            Script script,
-            int orderIndex,
-            String prompt,
-            String targetText,
-            String canonicalPhonemes
-    ) {
-        return create(script, orderIndex, StepKind.RECORD, prompt, targetText, canonicalPhonemes);
+    public static LearningStep record(Script script, int orderIndex, String prompt, String targetText) {
+        return create(script, orderIndex, StepKind.RECORD, prompt, targetText);
     }
 
     private static LearningStep create(
@@ -59,8 +50,7 @@ public class LearningStep {
             int orderIndex,
             StepKind kind,
             String prompt,
-            String targetText,
-            String canonicalPhonemes
+            String targetText
     ) {
         var step = new LearningStep();
         step.script = script;
@@ -68,7 +58,6 @@ public class LearningStep {
         step.kind = kind;
         step.prompt = prompt;
         step.targetText = targetText;
-        step.canonicalPhonemes = canonicalPhonemes;
         return step;
     }
 }

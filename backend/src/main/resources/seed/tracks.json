@@ -17,8 +17,7 @@
               "orderIndex": 0,
               "kind": "RECORD",
               "prompt": "오늘의 잰말놀이에요. 아래 문장을 빠르게 따라 읽어보세요.",
-              "targetText": "I slit the sheet, the sheet I slit, and on the slitted sheet I sit.",
-              "canonicalPhonemes": "ay s l ih t dh ah sh iy t dh ah sh iy t ay s l ih t ae n d aa n dh ah s l ih t ah d sh iy t ay s ih t"
+              "targetText": "I slit the sheet, the sheet I slit, and on the slitted sheet I sit."
             }
           ]
         },
@@ -30,15 +29,15 @@
           "practiceWord": "light",
           "masteryBadgeName": "R vs L 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "R과 L을 각각 발음해 볼 겁니다.",                       "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 R을 발음해 보세요.",                "targetText": "R",     "canonicalPhonemes": "r" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 L을 발음해 보세요.",                "targetText": "L",     "canonicalPhonemes": "l" },
-            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Right와 Light를 각각 발음해 볼 겁니다.",               "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Right를 발음해 보세요.",            "targetText": "Right", "canonicalPhonemes": "r ay t" },
-            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Light를 발음해 보세요.",            "targetText": "Light", "canonicalPhonemes": "l ay t" },
-            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Store와 Stole을 각각 발음해 볼 겁니다.",               "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Store를 발음해 보세요.",            "targetText": "Store", "canonicalPhonemes": "s t ao r" },
-            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Stole을 발음해 보세요.",            "targetText": "Stole", "canonicalPhonemes": "s t ow l" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "R과 L을 각각 발음해 볼 겁니다.",                       "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 R을 발음해 보세요.",                "targetText": "R" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 L을 발음해 보세요.",                "targetText": "L" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Right와 Light를 각각 발음해 볼 겁니다.",               "targetText": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Right를 발음해 보세요.",            "targetText": "Right" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Light를 발음해 보세요.",            "targetText": "Light" },
+            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Store와 Stole을 각각 발음해 볼 겁니다.",               "targetText": null },
+            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Store를 발음해 보세요.",            "targetText": "Store" },
+            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Stole을 발음해 보세요.",            "targetText": "Stole" }
           ]
         },
         {
@@ -49,15 +48,15 @@
           "practiceWord": "vest",
           "masteryBadgeName": "V vs B 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "V와 B를 각각 발음해 볼 겁니다.",                       "targetText": null,   "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 V를 발음해 보세요.",                "targetText": "V",    "canonicalPhonemes": "v" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 B를 발음해 보세요.",                "targetText": "B",    "canonicalPhonemes": "b" },
-            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Vest와 Best를 각각 발음해 볼 겁니다.",                 "targetText": null,   "canonicalPhonemes": null },
-            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Vest를 발음해 보세요.",             "targetText": "Vest", "canonicalPhonemes": "v eh s t" },
-            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Best를 발음해 보세요.",             "targetText": "Best", "canonicalPhonemes": "b eh s t" },
-            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Vine와 Bine을 각각 발음해 볼 겁니다.",                 "targetText": null,   "canonicalPhonemes": null },
-            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Vine을 발음해 보세요.",             "targetText": "Vine", "canonicalPhonemes": "v ay n" },
-            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bine을 발음해 보세요.",             "targetText": "Bine", "canonicalPhonemes": "b ay n" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "V와 B를 각각 발음해 볼 겁니다.",                       "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 V를 발음해 보세요.",                "targetText": "V" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 B를 발음해 보세요.",                "targetText": "B" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Vest와 Best를 각각 발음해 볼 겁니다.",                 "targetText": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Vest를 발음해 보세요.",             "targetText": "Vest" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Best를 발음해 보세요.",             "targetText": "Best" },
+            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Vine와 Bine을 각각 발음해 볼 겁니다.",                 "targetText": null },
+            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Vine을 발음해 보세요.",             "targetText": "Vine" },
+            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bine을 발음해 보세요.",             "targetText": "Bine" }
           ]
         },
         {
@@ -68,15 +67,15 @@
           "practiceWord": "fine",
           "masteryBadgeName": "F vs P 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "F와 P를 각각 발음해 볼 겁니다.",                        "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 F를 발음해 보세요.",                 "targetText": "F",     "canonicalPhonemes": "f" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 P를 발음해 보세요.",                 "targetText": "P",     "canonicalPhonemes": "p" },
-            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Fine과 Pine을 각각 발음해 볼 겁니다.",                  "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Fine을 발음해 보세요.",              "targetText": "Fine",  "canonicalPhonemes": "f ay n" },
-            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Pine을 발음해 보세요.",              "targetText": "Pine",  "canonicalPhonemes": "p ay n" },
-            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Coffee와 Copy를 각각 발음해 볼 겁니다.",                "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Coffee를 발음해 보세요.",            "targetText": "Coffee","canonicalPhonemes": "k ao f iy" },
-            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Copy를 발음해 보세요.",              "targetText": "Copy",  "canonicalPhonemes": "k aa p iy" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "F와 P를 각각 발음해 볼 겁니다.",                        "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 F를 발음해 보세요.",                 "targetText": "F" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 P를 발음해 보세요.",                 "targetText": "P" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Fine과 Pine을 각각 발음해 볼 겁니다.",                  "targetText": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Fine을 발음해 보세요.",              "targetText": "Fine" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Pine을 발음해 보세요.",              "targetText": "Pine" },
+            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Coffee와 Copy를 각각 발음해 볼 겁니다.",                "targetText": null },
+            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Coffee를 발음해 보세요.",            "targetText": "Coffee" },
+            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Copy를 발음해 보세요.",              "targetText": "Copy" }
           ]
         },
         {
@@ -87,15 +86,15 @@
           "practiceWord": "think",
           "masteryBadgeName": "TH 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "무성 TH 와 유성 DH 를 각각 발음해 볼 겁니다.",                          "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 무성 TH (혀끝 윗니 사이) 를 발음해 보세요.",        "targetText": "TH",    "canonicalPhonemes": "th" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 유성 DH (성대 울림) 를 발음해 보세요.",             "targetText": "DH",    "canonicalPhonemes": "dh" },
-            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Think 와 This 를 각각 발음해 볼 겁니다.",                                "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Think 를 발음해 보세요.",                             "targetText": "Think", "canonicalPhonemes": "th ih ng k" },
-            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 This 를 발음해 보세요.",                              "targetText": "This",  "canonicalPhonemes": "dh ih s" },
-            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Three 와 Free 를 각각 발음해 볼 겁니다.",                                "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Three 를 발음해 보세요.",                             "targetText": "Three", "canonicalPhonemes": "th r iy" },
-            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Free 를 발음해 보세요.",                              "targetText": "Free",  "canonicalPhonemes": "f r iy" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "무성 TH 와 유성 DH 를 각각 발음해 볼 겁니다.",                          "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 무성 TH (혀끝 윗니 사이) 를 발음해 보세요.",        "targetText": "TH" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 유성 DH (성대 울림) 를 발음해 보세요.",             "targetText": "DH" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Think 와 This 를 각각 발음해 볼 겁니다.",                                "targetText": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Think 를 발음해 보세요.",                             "targetText": "Think" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 This 를 발음해 보세요.",                              "targetText": "This" },
+            { "orderIndex": 6, "kind": "INTRO",  "prompt": "Three 와 Free 를 각각 발음해 볼 겁니다.",                                "targetText": null },
+            { "orderIndex": 7, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Three 를 발음해 보세요.",                             "targetText": "Three" },
+            { "orderIndex": 8, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Free 를 발음해 보세요.",                              "targetText": "Free" }
           ]
         }
       ]
@@ -113,12 +112,12 @@
           "practiceWord": "cat",
           "masteryBadgeName": "A vs E 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "A 와 E 를 각각 발음해 볼 겁니다.",                       "targetText": null,   "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Cat 을 발음해 보세요.",              "targetText": "Cat",  "canonicalPhonemes": "k ae t" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bed 를 발음해 보세요.",              "targetText": "Bed",  "canonicalPhonemes": "b eh d" },
-            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Bad 와 Bed 를 비교해 볼 겁니다.",                        "targetText": null,   "canonicalPhonemes": null },
-            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bad 를 발음해 보세요.",              "targetText": "Bad",  "canonicalPhonemes": "b ae d" },
-            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bed 를 발음해 보세요.",              "targetText": "Bed",  "canonicalPhonemes": "b eh d" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "A 와 E 를 각각 발음해 볼 겁니다.",                       "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Cat 을 발음해 보세요.",              "targetText": "Cat" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bed 를 발음해 보세요.",              "targetText": "Bed" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Bad 와 Bed 를 비교해 볼 겁니다.",                        "targetText": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bad 를 발음해 보세요.",              "targetText": "Bad" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bed 를 발음해 보세요.",              "targetText": "Bed" }
           ]
         },
         {
@@ -129,12 +128,12 @@
           "practiceWord": "beat",
           "masteryBadgeName": "I vs EE 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "I 와 EE 를 각각 발음해 볼 겁니다.",                      "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bit 을 발음해 보세요.",              "targetText": "Bit",   "canonicalPhonemes": "b ih t" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Beat 을 발음해 보세요.",             "targetText": "Beat",  "canonicalPhonemes": "b iy t" },
-            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Sit 과 Seat 을 비교해 볼 겁니다.",                       "targetText": null,    "canonicalPhonemes": null },
-            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Sit 을 발음해 보세요.",               "targetText": "Sit",   "canonicalPhonemes": "s ih t" },
-            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Seat 를 발음해 보세요.",              "targetText": "Seat",  "canonicalPhonemes": "s iy t" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "I 와 EE 를 각각 발음해 볼 겁니다.",                      "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bit 을 발음해 보세요.",              "targetText": "Bit" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Beat 을 발음해 보세요.",             "targetText": "Beat" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Sit 과 Seat 을 비교해 볼 겁니다.",                       "targetText": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Sit 을 발음해 보세요.",               "targetText": "Sit" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Seat 를 발음해 보세요.",              "targetText": "Seat" }
           ]
         }
       ]
@@ -152,10 +151,10 @@
           "practiceWord": "hello",
           "masteryBadgeName": "인사말 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "기본 인사 표현을 한 문장씩 따라 읽어 봅니다.",          "targetText": null,                "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Hello 를 발음해 보세요.",            "targetText": "Hello",             "canonicalPhonemes": "hh ah l ow" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Nice to meet you 를 발음해 보세요.", "targetText": "Nice to meet you",  "canonicalPhonemes": "n ay s t uw m iy t y uw" },
-            { "orderIndex": 3, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 How are you 를 발음해 보세요.",       "targetText": "How are you",       "canonicalPhonemes": "hh aw aa r y uw" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "기본 인사 표현을 한 문장씩 따라 읽어 봅니다.",          "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Hello 를 발음해 보세요.",            "targetText": "Hello" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Nice to meet you 를 발음해 보세요.", "targetText": "Nice to meet you" },
+            { "orderIndex": 3, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 How are you 를 발음해 보세요.",       "targetText": "How are you" }
           ]
         },
         {
@@ -166,10 +165,10 @@
           "practiceWord": "name",
           "masteryBadgeName": "자기소개 마스터",
           "steps": [
-            { "orderIndex": 0, "kind": "INTRO",  "prompt": "자기소개 표현을 한 문장씩 따라 읽어 봅니다.",            "targetText": null,                  "canonicalPhonemes": null },
-            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 My name is Echo 를 발음해 보세요.",   "targetText": "My name is Echo",     "canonicalPhonemes": "m ay n ey m ih z eh k ow" },
-            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 I'm from Seoul 을 발음해 보세요.",     "targetText": "I'm from Seoul",      "canonicalPhonemes": "ay m f r ah m s ow l" },
-            { "orderIndex": 3, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 I'm a student 를 발음해 보세요.",      "targetText": "I'm a student",       "canonicalPhonemes": "ay m ah s t uw d ah n t" }
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "자기소개 표현을 한 문장씩 따라 읽어 봅니다.",            "targetText": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 My name is Echo 를 발음해 보세요.",   "targetText": "My name is Echo" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 I'm from Seoul 을 발음해 보세요.",     "targetText": "I'm from Seoul" },
+            { "orderIndex": 3, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 I'm a student 를 발음해 보세요.",      "targetText": "I'm a student" }
           ]
         }
       ]

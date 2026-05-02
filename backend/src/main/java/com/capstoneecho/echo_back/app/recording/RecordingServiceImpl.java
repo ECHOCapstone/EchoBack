@@ -6,7 +6,6 @@ import com.capstoneecho.echo_back.app.feedback.LlmFeedbackGenerator;
 import com.capstoneecho.echo_back.app.feedback.ModelServerClient;
 import com.capstoneecho.echo_back.app.feedback.PhonemeErrorMapper;
 import com.capstoneecho.echo_back.app.feedback.ScoringPolicy;
-import com.capstoneecho.echo_back.app.learning.LearningStep;
 import com.capstoneecho.echo_back.app.recording.dto.RecordingResponse;
 import com.capstoneecho.echo_back.app.script.ScriptService;
 import com.capstoneecho.echo_back.app.session.SessionService;
@@ -64,7 +63,7 @@ class RecordingServiceImpl implements RecordingService {
         validateTarget(scriptId, sessionId);
         validateAudio(audio);
 
-        var target = resolveTarget(userId, scriptId, sessionId, stepId, sessionSentenceId);
+        var targetText = resolveTargetText(userId, scriptId, sessionId, stepId, sessionSentenceId);
 
         byte[] bytes;
         try {
@@ -77,16 +76,20 @@ class RecordingServiceImpl implements RecordingService {
         // 학습 종류에 맞는 팩토리로 Recording 을 만든다 (forScriptStep / forSessionSentence / forSessionFreeForm).
         var entity = repository.save(buildRecording(userId, scriptId, sessionId, stepId, sessionSentenceId, stored.path()));
 
+        // 정답 음소는 도메인이 보관하지 않고, targetText 가 있을 때 모델 서버 G2P 로 즉석 산출한다.
+        // targetText 가 없는 자유 발화는 null 로 남겨 정렬·오류 비교 자체를 생략한다.
+        var canonical = canonicalFor(targetText);
+
         var analysis = modelClient.analyze(
                 bytes,
                 stored.filename() != null ? stored.filename() : "audio.wav",
                 resolveContentType(audio),
-                target.canonical()
+                canonical
         );
         var score = scoringPolicy.scoreOf(analysis);
         var errorList = errorMapper.toResponses(analysis.errors());
         var step = llmGenerator.stepGuidance(
-                target.targetText(),
+                targetText,
                 score,
                 analysis.perceived(),
                 analysis.canonical(),
@@ -104,12 +107,12 @@ class RecordingServiceImpl implements RecordingService {
         return RecordingResponse.from(entity, errorList, step.wrongWords());
     }
 
-    // 학습 종류에 따라 정답 음소(canonical) 와 사용자가 발음할 텍스트(targetText) 를 골라낸다.
+    // 학습 종류에 따라 사용자가 발음할 영문 원문을 골라낸다.
     //   - script + step : 추천 학습의 한 step
-    //   - script 만     : 추천 학습 자유 녹음 (canonical 없이)
+    //   - script 만     : 추천 학습 자유 녹음 (원문 없음)
     //   - sentenceId    : 맞춤 학습의 한 문장
     //   - session 만    : 맞춤 학습을 통째로
-    private TargetResolution resolveTarget(
+    private String resolveTargetText(
             Long userId,
             Long scriptId,
             Long sessionId,
@@ -119,20 +122,23 @@ class RecordingServiceImpl implements RecordingService {
         if (scriptId != null) {
             scriptService.getEntity(scriptId);
             if (stepId != null) {
-                LearningStep step = scriptService.getStep(scriptId, stepId);
-                return new TargetResolution(step.getCanonicalPhonemes(), step.getTargetText());
+                return scriptService.getStep(scriptId, stepId).getTargetText();
             }
-            return new TargetResolution(null, null);
+            return null;
         }
         if (sessionSentenceId != null) {
-            var sentence = sessionService.getSentence(userId, sessionSentenceId);
-            return new TargetResolution(null, sentence.getText());
+            return sessionService.getSentence(userId, sessionSentenceId).getText();
         }
-        var session = sessionService.getEntity(userId, sessionId);
-        return new TargetResolution(null, session.getScriptText());
+        return sessionService.getEntity(userId, sessionId).getScriptText();
     }
 
-    private record TargetResolution(String canonical, String targetText) {}
+    // 텍스트가 없으면 null, 있으면 모델 서버 G2P 결과를 그대로 사용한다.
+    private String canonicalFor(String targetText) {
+        if (targetText == null || targetText.isBlank()) {
+            return null;
+        }
+        return modelClient.g2p(targetText);
+    }
 
     @Override
     @Transactional(readOnly = true)

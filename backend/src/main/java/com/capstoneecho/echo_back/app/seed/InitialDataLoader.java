@@ -102,8 +102,7 @@ class InitialDataLoader implements ApplicationRunner {
                     chapter,
                     stepData.orderIndex(),
                     stepData.prompt(),
-                    stepData.targetText(),
-                    stepData.canonicalPhonemes()
+                    stepData.targetText()
             );
         };
     }
