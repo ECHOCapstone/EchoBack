@@ -2,7 +2,6 @@ package com.capstoneecho.echo_back.app.feedback;
 
 import com.capstoneecho.echo_back.app.common.ApiResponse;
 import com.capstoneecho.echo_back.app.feedback.dto.FeedbackResponse;
-import com.capstoneecho.echo_back.app.feedback.dto.FeedbackSummaryResponse;
 import com.capstoneecho.echo_back.app.feedback.dto.GenerateFeedbackRequest;
 import com.capstoneecho.echo_back.app.feedback.dto.RetryWordResponse;
 import com.capstoneecho.echo_back.app.jwt.CurrentUser;
@@ -13,8 +12,8 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
+// 피드백을 새로 만들거나 보상으로 마무리하는 쓰기 계열 엔드포인트.
+// 동일 도메인의 조회는 FeedbacksReadController 가 /api/feedbacks 경로로 분리해서 담당한다.
 @RestController
 @RequestMapping("/api/feedback")
 public class FeedbackController {
@@ -48,29 +47,5 @@ public class FeedbackController {
             @PathVariable Long feedbackId
     ) {
         return ApiResponse.ok(feedbackService.complete(principal.userId(), feedbackId));
-    }
-}
-
-@RestController
-@RequestMapping("/api/feedbacks")
-class FeedbacksReadController {
-
-    private final FeedbackService feedbackService;
-
-    FeedbacksReadController(FeedbackService feedbackService) {
-        this.feedbackService = feedbackService;
-    }
-
-    @GetMapping
-    public ApiResponse<List<FeedbackSummaryResponse>> list(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.ok(feedbackService.listMine(principal.userId()));
-    }
-
-    @GetMapping("/{feedbackId}")
-    public ApiResponse<FeedbackResponse> get(
-            @CurrentUser JwtPrincipal principal,
-            @PathVariable Long feedbackId
-    ) {
-        return ApiResponse.ok(feedbackService.get(principal.userId(), feedbackId));
     }
 }
