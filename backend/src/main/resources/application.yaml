@@ -52,3 +52,13 @@ app:
     session-master-goal: ${BADGE_SESSION_MASTER_GOAL:5}
   time:
     zone-id: ${APP_TIME_ZONE_ID:Asia/Seoul}
+  auth:
+    demo-google:
+      username: ${DEMO_GOOGLE_USERNAME:google_demo}
+      email: ${DEMO_GOOGLE_EMAIL:demo@google.example}
+      nickname: ${DEMO_GOOGLE_NICKNAME:구글 데모}
+      password: ${DEMO_GOOGLE_PASSWORD:demo-oauth}
+  feedback:
+    step-threshold:
+      pass: ${STEP_PASS_THRESHOLD:80}
+      ok: ${STEP_OK_THRESHOLD:60}

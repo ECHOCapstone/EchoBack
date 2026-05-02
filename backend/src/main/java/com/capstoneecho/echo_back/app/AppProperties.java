@@ -15,7 +15,9 @@ public record AppProperties(
         Llm llm,
         Reward reward,
         Badge badge,
-        Time time
+        Time time,
+        Auth auth,
+        Feedback feedback
 ) {
 
     public record Jwt(String secret, long expireMs) {}
@@ -46,4 +48,16 @@ public record AppProperties(
     // streak / 출석 캘린더 계산의 기준 시간대. 한국 사용자가 자정을 넘기는 순간이 streak 갱신
     // 시점이 되도록 KST 를 기본값으로 잡는다.
     public record Time(String zoneId) {}
+
+    // 시연용 구글 OAuth 가짜 계정. 실제 OAuth 가 붙기 전까지 한정된 임시 데이터라 코드가 아닌
+    // 외부 설정으로 두어 운영 환경마다 다른 식별자를 쓸 수 있게 한다.
+    public record Auth(DemoGoogle demoGoogle) {}
+
+    public record DemoGoogle(String username, String email, String nickname, String password) {}
+
+    // 한 step 녹음 직후 한국어 안내 문장의 분기 임계값. step 점수가 pass 이상이면 칭찬,
+    // ok 이상이면 살짝 더 다듬으라는 톤, 그 미만이면 약점 음소를 짚어 다시 시도 권유.
+    public record Feedback(StepThreshold stepThreshold) {}
+
+    public record StepThreshold(double pass, double ok) {}
 }

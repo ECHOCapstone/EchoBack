@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.app.feedback;
 
+import com.capstoneecho.echo_back.app.AppProperties;
 import com.capstoneecho.echo_back.app.feedback.dto.PhonemeErrorResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,8 +21,14 @@ import java.util.Map;
 )
 class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
 
-    private static final double STEP_PASS_THRESHOLD = 80.0;
-    private static final double STEP_OK_THRESHOLD = 60.0;
+    private final double stepPassThreshold;
+    private final double stepOkThreshold;
+
+    RuleBasedLlmFeedbackGenerator(AppProperties properties) {
+        var threshold = properties.feedback().stepThreshold();
+        this.stepPassThreshold = threshold.pass();
+        this.stepOkThreshold = threshold.ok();
+    }
 
     // 음소 → 한국어 라벨 + 코칭 한 줄. 키는 ARPAbet 소문자 표기.
     private static final Map<String, Hint> HINTS = Map.ofEntries(
@@ -47,11 +54,11 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
             List<PhonemeErrorResponse> errors
     ) {
         var label = targetText != null && !targetText.isBlank() ? "\"" + targetText + "\"" : "이번";
-        if (stepScore >= STEP_PASS_THRESHOLD) {
+        if (stepScore >= stepPassThreshold) {
             return label + " 발음이 정확해요. 다음으로 넘어가 볼까요?";
         }
         var hint = lookup(pickWeakest(errors));
-        if (stepScore >= STEP_OK_THRESHOLD) {
+        if (stepScore >= stepOkThreshold) {
             if (hint != null) {
                 return label + " 발음 좋아요. " + hint.label() + " 부분만 조금 더 또렷하게 해보세요.";
             }

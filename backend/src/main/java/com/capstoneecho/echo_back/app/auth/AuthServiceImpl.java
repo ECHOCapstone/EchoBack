@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.app.auth;
 
+import com.capstoneecho.echo_back.app.AppProperties;
 import com.capstoneecho.echo_back.app.auth.dto.LoginRequest;
 import com.capstoneecho.echo_back.app.auth.dto.SignupRequest;
 import com.capstoneecho.echo_back.app.auth.dto.TokenResponse;
@@ -9,6 +10,7 @@ import com.capstoneecho.echo_back.app.jwt.JwtProvider;
 import com.capstoneecho.echo_back.app.member.User;
 import com.capstoneecho.echo_back.app.member.UserRepository;
 import com.capstoneecho.echo_back.app.member.dto.UserResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,19 +19,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class AuthServiceImpl implements AuthService {
 
-    // 시연용 OAuth 가짜 사용자. 실제 구글 OAuth 흐름은 백엔드 개발자가 추후 구현한다.
-    private static final String DEMO_GOOGLE_USERNAME = "google_demo";
-    private static final String DEMO_GOOGLE_EMAIL = "demo@google.example";
-    private static final String DEMO_GOOGLE_NICKNAME = "구글 데모";
-
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final AppProperties.DemoGoogle demoGoogle;
 
-    AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+    AuthServiceImpl(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtProvider jwtProvider,
+            AppProperties properties
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtProvider = jwtProvider;
+        this.demoGoogle = properties.auth().demoGoogle();
     }
 
     @Override
@@ -40,13 +44,19 @@ class AuthServiceImpl implements AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
-        var saved = userRepository.save(User.create(
-                request.username(),
-                request.email(),
-                passwordEncoder.encode(request.password()),
-                request.nickname()
-        ));
-        return issue(saved);
+        // exists 체크와 save 사이에 동시 가입이 들어오면 UNIQUE 제약 위반이 발생하는데,
+        // 그것도 도메인이 의미하는 "중복" 으로 일관 응답하기 위해 명시적으로 변환한다.
+        try {
+            var saved = userRepository.save(User.create(
+                    request.username(),
+                    request.email(),
+                    passwordEncoder.encode(request.password()),
+                    request.nickname()
+            ));
+            return issue(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.USERNAME_DUPLICATED, "이미 사용 중인 아이디 또는 이메일입니다.");
+        }
     }
 
     @Override
@@ -61,12 +71,12 @@ class AuthServiceImpl implements AuthService {
 
     @Override
     public TokenResponse demoGoogleLogin() {
-        var user = userRepository.findByUsername(DEMO_GOOGLE_USERNAME)
+        var user = userRepository.findByUsername(demoGoogle.username())
                 .orElseGet(() -> userRepository.save(User.create(
-                        DEMO_GOOGLE_USERNAME,
-                        DEMO_GOOGLE_EMAIL,
-                        passwordEncoder.encode("demo-oauth"),
-                        DEMO_GOOGLE_NICKNAME
+                        demoGoogle.username(),
+                        demoGoogle.email(),
+                        passwordEncoder.encode(demoGoogle.password()),
+                        demoGoogle.nickname()
                 )));
         return issue(user);
     }
