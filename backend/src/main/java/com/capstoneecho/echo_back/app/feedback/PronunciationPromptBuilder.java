@@ -5,12 +5,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// LLM 에 보낼 한국어 발음 코칭 프롬프트의 단일 진입점.
-//   buildStepPrompt   - 한 step 녹음 직후 채팅에 노출되는 한 줄 가이드용 프롬프트
-//   buildUnitPrompt   - 학습 unit 종료 후 종합 피드백용 프롬프트
-//   buildRetryPrompt  - 종합 피드백의 재연습 단어 평가용 프롬프트
-//
-// 프롬프트는 영문/음소를 포함하더라도 출력은 항상 한국어 한두 문장이 되도록 가이드한다.
+// LLM 에 보낼 발음 코칭 프롬프트를 만든다. 입력에 영문/음소가 섞여 있어도 출력은 한국어
+// 한두 문장이 되도록 directive 로 묶어 둔다.
 @Component
 public class PronunciationPromptBuilder {
 

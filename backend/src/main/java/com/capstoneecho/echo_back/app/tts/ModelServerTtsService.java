@@ -10,8 +10,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-// 모델 서버 /tts 엔드포인트로 form-urlencoded 요청을 보내는 TtsService 구현.
-// 컨트롤러가 직접 RestClient 를 다루지 않도록 외부 호출을 도메인 서비스로 흡수한다 (SRP).
+// 모델 서버 /tts 로 form-urlencoded 요청을 보내 합성된 음성 바이트를 받아온다.
 @Service
 class ModelServerTtsService implements TtsService {
 

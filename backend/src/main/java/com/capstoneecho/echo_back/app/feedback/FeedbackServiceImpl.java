@@ -28,21 +28,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// 학습 unit 종합 피드백 + 재연습 단어 평가의 단일 진입점.
-//
-// generate 흐름
-//   1. 요청 검증 (scriptId XOR sessionId, recordingIds 소유 확인)
-//   2. recording 의 stepScore 평균 → unit 정확도
-//   3. 각 recording 의 errorsJson 을 모아 가장 빈번한 canonical 음소 → weakPhoneme
-//   4. LlmFeedbackGenerator 로 한국어 가이드 문장 생성
-//   5. PracticeWordResolver 로 재연습 단어 결정 (Script.practiceWord → 음소매핑 → 제목 → default)
-//   6. PronunciationFeedback + PhonemeError 영속화
-//
-// retryWord 흐름
-//   1. feedbackId 소유 확인 + practiceWord 가져오기
-//   2. 모델 서버 /analyze 직접 호출 (canonical 미전송 — 단어 1개의 정답을 알 수는 없으니
-//      클라이언트가 재연습 단어 발음 결과만 보고 정/오를 판단)
-//   3. perceived 와 단어 자체의 단순 매칭으로 correct 판정 + LLM 가이드 생성
+// 한 챕터 / 세션을 끝낸 뒤 종합 피드백을 만들고, 그 피드백의 권장 단어를 다시 발음했을 때
+// 평가까지 처리한다. recording 들의 평균 점수를 정확도로 잡고, 가장 자주 틀린 음소를 약점으로
+// 추출한 뒤 LlmFeedbackGenerator 가 한국어 안내문을 만든다.
 @Service
 @Transactional
 class FeedbackServiceImpl implements FeedbackService {
@@ -60,8 +48,6 @@ class FeedbackServiceImpl implements FeedbackService {
     private final ModelServerClient modelClient;
     private final MemberService memberService;
     private final ObjectMapper objectMapper;
-    // 학습 완료 시 지급할 EXP 양은 application.yaml 의 app.reward.completion-exp 로부터 주입된다.
-    // 게임 밸런싱 변경 시 코드 재배포 없이 환경 변수 / 설정 파일만 갱신하면 된다.
     private final int completionExpReward;
 
     FeedbackServiceImpl(
@@ -177,8 +163,7 @@ class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public UserResponse complete(Long userId, Long feedbackId) {
-        // feedback 소유 확인 + 도메인 가드: markCompleted 가 false 를 돌려주면 이미 보상이 적용된 상태이므로
-        // 같은 피드백으로 호출이 반복돼도 EXP 가 중복 가산되지 않는다 (idempotent).
+        // 같은 피드백을 두 번 complete 해도 EXP 가 두 번 더해지지 않도록 markCompleted 로 막는다.
         var feedback = feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
         var user = feedback.markCompleted()

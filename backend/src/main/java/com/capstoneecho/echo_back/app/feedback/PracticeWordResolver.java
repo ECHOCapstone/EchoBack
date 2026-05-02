@@ -6,22 +6,16 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.Optional;
 
-// 챕터 종합 피드백의 재연습 단어를 결정하는 단일 정책. 3-tier fallback 으로 동작한다.
-//
-//   1) Script.practiceWord  : 어드민/시드가 챕터에 명시한 값. 모든 시드 챕터가 채우는 SSOT.
-//   2) 음소 → 단어 매핑       : Script 가 없는 자유 스크립트 (사용자 맞춤) 에서 weakPhoneme 만으로
-//                              결정해야 하는 경우의 발음 영역 도메인 지식.
-//   3) DEFAULT_WORD          : 어떤 단서도 없을 때의 마지막 기본값.
-//
-// 챕터 제목 키워드 매칭은 의도적으로 두지 않는다. 시드 챕터는 모두 (1) 에서 결정되고,
-// 사용자 자유 스크립트는 chapter title 자체가 의미를 가지지 않으므로 (2)/(3) 만으로 충분하다.
+// 종합 피드백 화면에서 다시 연습할 단어를 고른다.
+// 시드 챕터는 Script.practiceWord 가 정답이고, 사용자가 직접 만든 세션처럼 챕터가 없을 때만
+// 약점 음소로 단어를 추정한다. 그것도 못하면 기본값.
 @Component
 public class PracticeWordResolver {
 
     static final String DEFAULT_WORD = "rabbit";
 
-    // ARPAbet 자음 키 → 그 음소를 대표하는 학습 단어. 발음 영역의 도메인 지식이라 코드에 둔다.
-    // 시드 챕터들의 practiceWord 와 의도적으로 일치시켜 두 경로의 결과가 같은 단어로 수렴한다.
+    // ARPAbet 자음 → 대표 연습 단어. 시드 챕터의 practiceWord 와 같은 값을 일부러 맞춰 둬서
+    // 두 경로 결과가 같은 단어로 수렴한다.
     private static final Map<String, String> PHONEME_TO_WORD = Map.ofEntries(
             Map.entry("r", "rabbit"),
             Map.entry("l", "light"),

@@ -8,11 +8,8 @@ import org.springframework.web.client.RestClient;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
-// 외부 HTTP 호출용 RestClient 빈을 정의하는 단일 진입점.
-//
-// 모델 서버(uvicorn) 는 HTTP/1.1 만 지원한다. JDK HttpClient 의 기본값은 HTTP/2 + h2c upgrade
-// 시도라 multipart 본문이 모델 서버에서 정상 파싱되지 않을 수 있어 (Transfer-Encoding: chunked +
-// Upgrade: h2c 헤더 조합), HTTP/1.1 로 못박아 보낸다.
+// 모델 서버(uvicorn) 가 HTTP/1.1 만 지원해서 JDK HttpClient 의 기본값(HTTP/2 + h2c upgrade)
+// 으로 보내면 multipart 본문이 깨진다. 그래서 HTTP/1.1 로 박아 둔 RestClient 를 만들어 둔다.
 @Configuration
 public class HttpClientConfig {
 

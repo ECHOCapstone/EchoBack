@@ -2,10 +2,8 @@ package com.capstoneecho.echo_back.app.seed;
 
 import java.util.List;
 
-// 시드 JSON 파일과 1:1 로 매핑되는 값 객체. 도메인 엔티티(Track/Script/LearningStep) 와는
-// 분리되어 있어 JSON 스키마 변경이 도메인을 침범하지 않는다 (DIP/SSOT).
-//
-// 로더(InitialDataLoader) 가 본 record 들을 읽어 도메인 엔티티로 변환·영속화한다.
+// seed/*.json 파일과 1:1 로 매핑되는 값 객체. 도메인 엔티티와 분리되어 있어서 JSON 스키마가
+// 바뀌어도 Track/Script/LearningStep 쪽은 영향이 없다.
 final class SeedData {
 
     private SeedData() {}

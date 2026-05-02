@@ -8,12 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-// Track 안의 한 챕터를 표현한다. title/content 가 학습 단위 메타이고, track + chapterOrder 가
-// 같은 트랙 내 순서를 결정한다. isPreset=true 인 스크립트는 시드 데이터 (트랙 자체의 일부),
-// false 는 사용자 맞춤 학습 또는 외부 입력에서 만들어진 자유 스크립트다.
-//
-// practiceWord 는 이 챕터를 끝낸 사용자에게 권장할 한 단어. 챕터마다 의도를 가지고 지정되며
-// (R/L 챕터 → light, V/B → vest …), null 이면 LLM/RuleBased 가 자체 규칙으로 결정한다.
+// 트랙 안의 한 챕터. preset=true 면 시드 챕터, false 면 사용자가 만든 자유 스크립트.
 @Entity
 @Table(name = "scripts", indexes = @Index(name = "ix_scripts_track", columnList = "track_id, chapter_order"))
 @Getter
@@ -41,17 +36,15 @@ public class Script {
     @Column(length = 16)
     private Difficulty difficulty;
 
-    // 시드 챕터 vs 사용자 자유 스크립트를 구분. primitive boolean 으로 두어 null 가능성을 차단한다.
     @Column(name = "is_preset", nullable = false)
     private boolean preset;
 
-    // 챕터 종합 피드백 시 권장할 재연습 단어. nullable 이며 비어 있으면 LlmFeedbackGenerator 가 결정한다.
+    // 종합 피드백에서 권장할 재연습 단어. 비어 있으면 PracticeWordResolver 가 약점 음소로 추정한다.
     @Column(name = "practice_word", length = 100)
     private String practiceWord;
 
-    // 이 챕터를 마스터했을 때 사용자에게 부여할 배지의 표시명.
-    // 채워져 있으면 BadgePolicy 가 자동으로 "X 마스터" 배지를 만든다 (챕터 = 배지 SSOT).
-    // null 이면 마스터 배지 대상이 아님 — 잰말놀이처럼 빈도형 챌린지 챕터는 채우지 않는다.
+    // 이 챕터를 마스터했을 때 부여할 배지명. 채워져 있으면 BadgePolicy 가 자동으로 마스터 배지를 만든다.
+    // 잰말놀이처럼 횟수로 평가하는 챕터는 비워 둔다.
     @Column(name = "mastery_badge_name", length = 50)
     private String masteryBadgeName;
 

@@ -5,13 +5,10 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-// 사용자가 입력한 자유 대본을 학습 단위(문장) 로 쪼개는 정책의 단일 진입점.
-//
-// 규칙
-//   - 마침표(.) / 물음표(?) / 느낌표(!) 가 종결 부호. 종결 부호 자체는 문장 끝에 붙여 보존한다.
-//   - 줄바꿈은 종결 부호와 동등하게 취급해 의도된 단락 분리를 존중한다.
-//   - 너무 짧은 조각(<MIN_LENGTH 글자) 은 다음 조각과 합쳐 너무 잘게 쪼개지지 않게 한다.
-//   - 결과 리스트가 비어 있다면 입력 전체를 하나의 문장으로 돌려준다 (정책 fallback).
+// 사용자가 입력한 대본을 문장 단위로 쪼갠다.
+//   - .  ?  !  줄바꿈을 문장 끝으로 본다 (종결 부호 자체는 보존).
+//   - MIN_LENGTH 보다 짧은 조각은 앞 조각에 합쳐서 너무 잘게 쪼개지지 않게 한다.
+//   - 종결 부호가 하나도 없으면 통째로 하나의 문장으로 돌려준다.
 @Component
 public class SentenceSplitter {
 
@@ -51,7 +48,7 @@ public class SentenceSplitter {
         buffer.setLength(0);
     }
 
-    // 짧은 조각을 인접 조각에 흡수시켜 사용자가 한 호흡으로 발음할 만한 길이를 보장한다.
+    // 한 호흡으로 읽을 만한 길이가 되도록 짧은 조각을 앞 조각에 붙인다.
     private static List<String> mergeShortFragments(List<String> fragments) {
         var merged = new ArrayList<String>();
         for (var fragment : fragments) {

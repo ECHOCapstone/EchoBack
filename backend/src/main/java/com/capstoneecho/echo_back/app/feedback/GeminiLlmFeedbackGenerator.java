@@ -9,12 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// LlmFeedbackGenerator 의 외부 LLM 기반 구현체.
-// PromptBuilder 가 만든 한국어 코칭 프롬프트를 LlmClient 에 전달하고, 호출 실패·빈 응답·예외 상황은
-// 정적 fallback 문장으로 안전하게 흡수한다. 재연습 단어 결정은 PracticeWordResolver 가 책임지므로
-// 본 구현은 음소→단어 매핑을 가지지 않는다 (SRP).
-//
-// 빈 등록은 app.llm.provider=gemini 일 때만 일어나며, RuleBased 와 양립 불가.
+// Gemini API 로 한국어 안내 문장을 생성한다. 호출이 실패하거나 빈 응답이 오면 미리 준비한
+// 정적 문장으로 떨어진다. app.llm.provider=gemini 일 때만 빈으로 등록된다.
 @Component
 @ConditionalOnProperty(prefix = "app.llm", name = "provider", havingValue = "gemini")
 class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {

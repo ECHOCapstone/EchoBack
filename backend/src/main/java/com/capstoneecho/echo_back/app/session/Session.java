@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-// 사용자가 직접 대본을 입력해 학습하는 맞춤 세션. scriptText 가 채워지면 녹음/피드백 단계로 진입할 수 있다.
+// 사용자가 직접 대본을 입력해 만드는 맞춤 학습 세션. scriptText 가 채워지면 녹음/피드백으로 넘어간다.
 @Entity
 @Table(name = "sessions", indexes = @Index(name = "ix_sessions_user", columnList = "user_id"))
 @Getter
@@ -29,12 +29,11 @@ public class Session {
     @Column(name = "script_text", columnDefinition = "TEXT", nullable = false)
     private String scriptText;
 
-    // 사용자 학습 목록 정렬 시 즐겨찾기를 먼저 노출하기 위한 플래그.
+    // 목록을 즐겨찾기 우선으로 정렬할 때 쓰는 플래그.
     @Column(nullable = false)
     private boolean favorite;
 
-    // 사용자가 한 호흡으로 발음할 학습 단위. 분할 정책 자체는 외부(SessionService + SentenceSplitter)
-    // 가 결정하고, 본 컬렉션은 그 결과를 영속화한다. orphanRemoval 로 갱신 시 이전 항목을 청소한다.
+    // 분할된 문장들. SentenceSplitter 결과를 그대로 받아 보관하고, 갱신 시 이전 항목은 orphanRemoval 로 정리된다.
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sentenceIndex ASC")
     private List<SessionSentence> sentences = new ArrayList<>();
@@ -72,13 +71,11 @@ public class Session {
         }
     }
 
-    // 즐겨찾기 토글의 단일 진입점. SessionUpdateRequest 에서 favorite 필드가 들어올 때만 호출된다.
     public void setFavorite(boolean favorite) {
         this.favorite = favorite;
     }
 
-    // 새 대본 텍스트 + 분할된 문장 리스트를 한 번에 반영한다. 도메인 자신은 분할 정책을 모르고
-    // 단지 결과만 받는다 (DIP). 입력이 null 이면 변경하지 않는다.
+    // 새 대본과 분할된 문장 리스트를 한 번에 반영한다. scriptText 가 null 이면 그대로 둔다.
     public void updateScript(String scriptText, List<String> sentenceTexts) {
         if (scriptText == null) return;
         this.scriptText = scriptText;
