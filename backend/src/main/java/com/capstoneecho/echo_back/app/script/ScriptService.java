@@ -17,4 +17,8 @@ public interface ScriptService {
     Script getEntity(Long scriptId);
 
     LearningStep getStep(Long scriptId, Long stepId);
+
+    // BadgePolicy 가 챕터 단위 마스터 배지 (master_<scriptId>) 를 동적 생성할 때 사용한다.
+    // 어드민/시드가 masteryBadgeName 을 채운 시드 챕터만 반환된다.
+    List<Script> listMasteryChapters();
 }

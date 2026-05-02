@@ -49,4 +49,9 @@ class ScriptServiceImpl implements ScriptService {
         return stepRepository.findByIdAndScript_Id(stepId, scriptId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STEP_NOT_FOUND));
     }
+
+    @Override
+    public List<Script> listMasteryChapters() {
+        return scriptRepository.findByPresetTrueAndMasteryBadgeNameIsNotNullOrderByIdAsc();
+    }
 }

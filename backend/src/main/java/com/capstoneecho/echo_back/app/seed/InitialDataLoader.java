@@ -90,13 +90,15 @@ class InitialDataLoader implements ApplicationRunner {
     }
 
     private void seedTongueTwisterChapter(Track track) {
+        // 잰말놀이는 빈도형 챌린지(N회 완료) 로 평가하기 때문에 마스터 배지를 부여하지 않는다.
         var chapter = scriptRepository.save(Script.createChapter(
                 track,
                 0,
                 "영어 잰말놀이",
                 "I slit the sheet, the sheet I slit, and on the slitted sheet I sit.",
                 Difficulty.MEDIUM,
-                "sheet"
+                "sheet",
+                null
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.record(
@@ -116,7 +118,8 @@ class InitialDataLoader implements ApplicationRunner {
                 "발음 연습: R vs L",
                 "헷갈리는 R 과 L 발음을 단계적으로 구별해 봅니다.",
                 Difficulty.MEDIUM,
-                "light"
+                "light",
+                "R vs L 마스터"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "R과 L을 각각 발음해 볼 겁니다."));
@@ -138,7 +141,8 @@ class InitialDataLoader implements ApplicationRunner {
                 "발음 연습: V vs B",
                 "헷갈리는 V 와 B 발음을 단계적으로 구별해 봅니다.",
                 Difficulty.MEDIUM,
-                "vest"
+                "vest",
+                "V vs B 마스터"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "V와 B를 각각 발음해 볼 겁니다."));
@@ -160,7 +164,8 @@ class InitialDataLoader implements ApplicationRunner {
                 "발음 연습: F vs P",
                 "헷갈리는 F 와 P 발음을 단계적으로 구별해 봅니다.",
                 Difficulty.MEDIUM,
-                "fine"
+                "fine",
+                "F vs P 마스터"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "F와 P를 각각 발음해 볼 겁니다."));
@@ -182,7 +187,8 @@ class InitialDataLoader implements ApplicationRunner {
                 "발음 연습: TH vs DH",
                 "무성음 TH (think) 와 유성음 DH (this) 의 차이를 단계적으로 익힙니다.",
                 Difficulty.HARD,
-                "think"
+                "think",
+                "TH 마스터"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "무성 TH 와 유성 DH 를 각각 발음해 볼 겁니다."));

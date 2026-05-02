@@ -11,4 +11,8 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
     List<Script> findByPresetTrueOrderByIdAsc();
 
     List<Script> findByTrack_IdOrderByChapterOrderAscIdAsc(Long trackId);
+
+    // 마스터 배지 대상 챕터만 추린 결과. masteryBadgeName 이 채워진 시드 챕터들이며,
+    // BadgePolicy 가 한 사용자의 누적 피드백에 대해 챕터별 마스터 여부를 평가할 때의 입력이 된다.
+    List<Script> findByPresetTrueAndMasteryBadgeNameIsNotNullOrderByIdAsc();
 }

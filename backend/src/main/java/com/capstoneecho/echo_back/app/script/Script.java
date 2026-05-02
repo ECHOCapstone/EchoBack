@@ -49,6 +49,12 @@ public class Script {
     @Column(name = "practice_word", length = 100)
     private String practiceWord;
 
+    // 이 챕터를 마스터했을 때 사용자에게 부여할 배지의 표시명.
+    // 채워져 있으면 BadgePolicy 가 자동으로 "X 마스터" 배지를 만든다 (챕터 = 배지 SSOT).
+    // null 이면 마스터 배지 대상이 아님 — 잰말놀이처럼 빈도형 챌린지 챕터는 채우지 않는다.
+    @Column(name = "mastery_badge_name", length = 50)
+    private String masteryBadgeName;
+
     @Column(name = "created_at", insertable = true, updatable = false)
     private Instant createdAt;
 
@@ -58,7 +64,8 @@ public class Script {
             String title,
             String content,
             Difficulty difficulty,
-            String practiceWord
+            String practiceWord,
+            String masteryBadgeName
     ) {
         var s = new Script();
         s.track = track;
@@ -68,6 +75,7 @@ public class Script {
         s.difficulty = difficulty;
         s.preset = true;
         s.practiceWord = practiceWord;
+        s.masteryBadgeName = masteryBadgeName;
         return s;
     }
 
