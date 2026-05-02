@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 // 인증 + 학습 통계 캐시를 보유하는 사용자. password 는 BCrypt 해시 형태로만 저장한다.
 // streak/exp 는 학습 기록 변경 시 갱신되며, 학습 메인 화면 헤더에서 즉시 노출된다.
@@ -40,6 +42,11 @@ public class User {
     @Column(nullable = false)
     private int exp;
 
+    // 마지막으로 학습 완료가 기록된 시각. streak 정책 계산의 기준점이 된다.
+    // 한 번도 학습한 적 없는 사용자는 null.
+    @Column(name = "last_study_at")
+    private Instant lastStudyAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -69,15 +76,21 @@ public class User {
         this.updatedAt = Instant.now();
     }
 
-    public void addExp(int amount) {
-        this.exp += amount;
-    }
-
-    public void increaseStreak() {
-        this.streak += 1;
-    }
-
-    public void resetStreak() {
-        this.streak = 0;
+    // 한 학습 단위(=챕터) 를 완료했을 때 호출되는 단일 진입점.
+    // streak 은 마지막 학습 일자(lastStudyAt) 와 오늘을 비교해 결정된다.
+    //   - 같은 날 다시 완료: streak 그대로 (중복 가산 방지)
+    //   - 어제 완료 + 오늘 완료: streak += 1
+    //   - 그 외 (이틀 이상 공백 또는 첫 학습): streak = 1 로 새 시작
+    public void recordCompletion(int expReward) {
+        var zone = ZoneId.systemDefault();
+        var today = LocalDate.now(zone);
+        var lastDate = lastStudyAt != null ? lastStudyAt.atZone(zone).toLocalDate() : null;
+        if (lastDate == null || lastDate.isBefore(today.minusDays(1))) {
+            this.streak = 1;
+        } else if (lastDate.isEqual(today.minusDays(1))) {
+            this.streak += 1;
+        }
+        this.lastStudyAt = Instant.now();
+        this.exp += expReward;
     }
 }

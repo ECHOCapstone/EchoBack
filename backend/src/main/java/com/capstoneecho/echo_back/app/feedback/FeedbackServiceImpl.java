@@ -8,6 +8,8 @@ import com.capstoneecho.echo_back.app.feedback.dto.GenerateFeedbackRequest;
 import com.capstoneecho.echo_back.app.feedback.dto.ModelAnalyzeResponse;
 import com.capstoneecho.echo_back.app.feedback.dto.PhonemeErrorResponse;
 import com.capstoneecho.echo_back.app.feedback.dto.RetryWordResponse;
+import com.capstoneecho.echo_back.app.member.MemberService;
+import com.capstoneecho.echo_back.app.member.dto.UserResponse;
 import com.capstoneecho.echo_back.app.recording.Recording;
 import com.capstoneecho.echo_back.app.recording.RecordingRepository;
 import com.capstoneecho.echo_back.app.script.ScriptService;
@@ -45,6 +47,9 @@ class FeedbackServiceImpl implements FeedbackService {
     private static final TypeReference<List<ModelAnalyzeResponse.AlignmentItem>> ALIGNMENT_LIST =
             new TypeReference<>() {};
 
+    // 챕터 학습 완료 시 사용자에게 지급되는 기본 EXP. 추후 정확도/난이도별 차등을 줄 수 있다.
+    private static final int COMPLETION_EXP_REWARD = 1000;
+
     private final FeedbackRepository feedbackRepository;
     private final RecordingRepository recordingRepository;
     private final ScriptService scriptService;
@@ -52,6 +57,7 @@ class FeedbackServiceImpl implements FeedbackService {
     private final ScoringPolicy scoringPolicy;
     private final LlmFeedbackGenerator llmGenerator;
     private final ModelServerClient modelClient;
+    private final MemberService memberService;
     private final ObjectMapper objectMapper;
 
     FeedbackServiceImpl(
@@ -62,6 +68,7 @@ class FeedbackServiceImpl implements FeedbackService {
             ScoringPolicy scoringPolicy,
             LlmFeedbackGenerator llmGenerator,
             ModelServerClient modelClient,
+            MemberService memberService,
             ObjectMapper objectMapper
     ) {
         this.feedbackRepository = feedbackRepository;
@@ -71,6 +78,7 @@ class FeedbackServiceImpl implements FeedbackService {
         this.scoringPolicy = scoringPolicy;
         this.llmGenerator = llmGenerator;
         this.modelClient = modelClient;
+        this.memberService = memberService;
         this.objectMapper = objectMapper;
     }
 
@@ -155,6 +163,15 @@ class FeedbackServiceImpl implements FeedbackService {
         var feedback = feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
         return FeedbackResponse.from(feedback);
+    }
+
+    @Override
+    public UserResponse complete(Long userId, Long feedbackId) {
+        // feedback 소유 확인만 검증으로 사용. 보상 지급 자체는 MemberService 에 위임해 SRP 를 지킨다.
+        feedbackRepository.findByIdAndUserId(feedbackId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
+        var user = memberService.awardCompletionRewards(userId, COMPLETION_EXP_REWARD);
+        return UserResponse.from(user);
     }
 
     private void validateTarget(GenerateFeedbackRequest request) {

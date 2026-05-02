@@ -4,4 +4,8 @@ package com.capstoneecho.echo_back.app.member;
 public interface MemberService {
 
     User getById(Long userId);
+
+    // 한 학습 단위 완료 시 EXP 보상과 streak 갱신을 한 번에 적용하고 갱신된 사용자를 돌려준다.
+    // 정책 자체는 User.recordCompletion 안에 캡슐화되어 있다.
+    User awardCompletionRewards(Long userId, int expReward);
 }

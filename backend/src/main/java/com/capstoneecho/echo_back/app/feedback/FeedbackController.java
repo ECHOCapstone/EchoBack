@@ -7,6 +7,7 @@ import com.capstoneecho.echo_back.app.feedback.dto.GenerateFeedbackRequest;
 import com.capstoneecho.echo_back.app.feedback.dto.RetryWordResponse;
 import com.capstoneecho.echo_back.app.jwt.CurrentUser;
 import com.capstoneecho.echo_back.app.jwt.JwtPrincipal;
+import com.capstoneecho.echo_back.app.member.dto.UserResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +40,14 @@ public class FeedbackController {
             @RequestPart("audio") MultipartFile audio
     ) {
         return ApiResponse.ok(feedbackService.retryWord(principal.userId(), feedbackId, audio));
+    }
+
+    @PostMapping("/{feedbackId}/complete")
+    public ApiResponse<UserResponse> complete(
+            @CurrentUser JwtPrincipal principal,
+            @PathVariable Long feedbackId
+    ) {
+        return ApiResponse.ok(feedbackService.complete(principal.userId(), feedbackId));
     }
 }
 

@@ -20,4 +20,13 @@ class MemberServiceImpl implements MemberService {
         return repository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
+
+    @Override
+    @Transactional
+    public User awardCompletionRewards(Long userId, int expReward) {
+        var user = repository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        user.recordCompletion(expReward);
+        return user;
+    }
 }
