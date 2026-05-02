@@ -38,6 +38,10 @@ public class Recording {
     @Column(name = "step_id")
     private Long stepId;
 
+    // 추천 학습의 step_id 와 동등 위치의 식별자. 사용자 맞춤 세션의 한 문장에 대한 녹음일 때 채워진다.
+    @Column(name = "session_sentence_id")
+    private Long sessionSentenceId;
+
     @Column(name = "audio_path", length = 500, nullable = false)
     private String audioPath;
 
@@ -72,6 +76,7 @@ public class Recording {
             Long scriptId,
             Long sessionId,
             Long stepId,
+            Long sessionSentenceId,
             String audioPath
     ) {
         var r = new Recording();
@@ -79,6 +84,7 @@ public class Recording {
         r.scriptId = scriptId;
         r.sessionId = sessionId;
         r.stepId = stepId;
+        r.sessionSentenceId = sessionSentenceId;
         r.audioPath = audioPath;
         return r;
     }

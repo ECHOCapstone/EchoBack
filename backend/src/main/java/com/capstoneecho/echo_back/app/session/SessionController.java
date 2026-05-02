@@ -52,4 +52,13 @@ public class SessionController {
     ) {
         return ApiResponse.ok(sessionService.update(principal.userId(), sessionId, request));
     }
+
+    @DeleteMapping("/{sessionId}")
+    public ApiResponse<Void> delete(
+            @CurrentUser JwtPrincipal principal,
+            @PathVariable Long sessionId
+    ) {
+        sessionService.delete(principal.userId(), sessionId);
+        return ApiResponse.ok();
+    }
 }

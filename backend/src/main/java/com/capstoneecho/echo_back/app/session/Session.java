@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 // 사용자가 직접 대본을 입력해 학습하는 맞춤 세션. scriptText 가 채워지면 녹음/피드백 단계로 진입할 수 있다.
 @Entity
@@ -26,6 +28,12 @@ public class Session {
 
     @Column(name = "script_text", columnDefinition = "TEXT", nullable = false)
     private String scriptText;
+
+    // 사용자가 한 호흡으로 발음할 학습 단위. 분할 정책 자체는 외부(SessionService + SentenceSplitter)
+    // 가 결정하고, 본 컬렉션은 그 결과를 영속화한다. orphanRemoval 로 갱신 시 이전 항목을 청소한다.
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sentenceIndex ASC")
+    private List<SessionSentence> sentences = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -59,9 +67,17 @@ public class Session {
         }
     }
 
-    public void updateScript(String scriptText) {
-        if (scriptText != null) {
-            this.scriptText = scriptText;
+    // 새 대본 텍스트 + 분할된 문장 리스트를 한 번에 반영한다. 도메인 자신은 분할 정책을 모르고
+    // 단지 결과만 받는다 (DIP). 입력이 null 이면 변경하지 않는다.
+    public void updateScript(String scriptText, List<String> sentenceTexts) {
+        if (scriptText == null) return;
+        this.scriptText = scriptText;
+        this.sentences.clear();
+        if (sentenceTexts != null) {
+            int idx = 0;
+            for (var text : sentenceTexts) {
+                this.sentences.add(SessionSentence.of(this, idx++, text));
+            }
         }
     }
 }

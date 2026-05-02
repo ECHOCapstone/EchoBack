@@ -21,6 +21,7 @@ public enum ErrorCode {
     SCRIPT_NOT_FOUND(HttpStatus.NOT_FOUND, "스크립트를 찾을 수 없습니다."),
     STEP_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 단계를 찾을 수 없습니다."),
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션을 찾을 수 없습니다."),
+    SESSION_SENTENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "세션의 학습 문장을 찾을 수 없습니다."),
     RECORDING_NOT_FOUND(HttpStatus.NOT_FOUND, "녹음을 찾을 수 없습니다."),
     FEEDBACK_NOT_FOUND(HttpStatus.NOT_FOUND, "피드백을 찾을 수 없습니다."),
 

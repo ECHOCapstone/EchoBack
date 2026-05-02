@@ -26,10 +26,11 @@ public class RecordingController {
             @RequestPart("audio") MultipartFile audio,
             @RequestParam(value = "scriptId", required = false) Long scriptId,
             @RequestParam(value = "sessionId", required = false) Long sessionId,
-            @RequestParam(value = "stepId", required = false) Long stepId
+            @RequestParam(value = "stepId", required = false) Long stepId,
+            @RequestParam(value = "sessionSentenceId", required = false) Long sessionSentenceId
     ) {
         return ApiResponse.ok(recordingService.upload(
-                principal.userId(), scriptId, sessionId, stepId, audio
+                principal.userId(), scriptId, sessionId, stepId, sessionSentenceId, audio
         ));
     }
 }

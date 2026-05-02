@@ -60,13 +60,15 @@ class RecordingServiceImpl implements RecordingService {
             Long scriptId,
             Long sessionId,
             Long stepId,
+            Long sessionSentenceId,
             MultipartFile audio
     ) {
         validateTarget(scriptId, sessionId);
         validateAudio(audio);
 
         // 추천 학습 흐름이면 step 의 canonical 음소와 targetText 를 사용해 채팅 가이드를 만든다.
-        // 맞춤 학습(session) 은 사용자가 입력한 scriptText 가 그 자리의 targetText 가 된다.
+        // 맞춤 학습(session) 은 sessionSentenceId 가 들어온 한 문장 텍스트를 targetText 로 쓰고,
+        // sentenceId 가 없으면 세션 전체 scriptText 를 fallback 으로 사용한다.
         String canonical = null;
         String targetText = null;
         if (scriptId != null) {
@@ -76,6 +78,9 @@ class RecordingServiceImpl implements RecordingService {
                 canonical = step.getCanonicalPhonemes();
                 targetText = step.getTargetText();
             }
+        } else if (sessionSentenceId != null) {
+            var sentence = sessionService.getSentence(userId, sessionSentenceId);
+            targetText = sentence.getText();
         } else {
             var session = sessionService.getEntity(userId, sessionId);
             targetText = session.getScriptText();
@@ -89,7 +94,9 @@ class RecordingServiceImpl implements RecordingService {
         }
 
         var stored = storage.save(userId, audio.getOriginalFilename(), bytes);
-        var entity = repository.save(Recording.create(userId, scriptId, sessionId, stepId, stored.path()));
+        var entity = repository.save(Recording.create(
+                userId, scriptId, sessionId, stepId, sessionSentenceId, stored.path()
+        ));
 
         var analysis = modelClient.analyze(
                 bytes,

@@ -10,6 +10,7 @@ public interface RecordingService {
             Long scriptId,
             Long sessionId,
             Long stepId,
+            Long sessionSentenceId,
             MultipartFile audio
     );
 
