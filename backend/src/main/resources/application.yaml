@@ -50,3 +50,5 @@ app:
     perfect-threshold: ${BADGE_PERFECT_THRESHOLD:95}
     tongue-twister-goal: ${BADGE_TONGUE_TWISTER_GOAL:5}
     session-master-goal: ${BADGE_SESSION_MASTER_GOAL:5}
+  time:
+    zone-id: ${APP_TIME_ZONE_ID:Asia/Seoul}

@@ -5,14 +5,18 @@ import com.capstoneecho.echo_back.app.common.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
+
 @Service
 @Transactional(readOnly = true)
 class MemberServiceImpl implements MemberService {
 
     private final UserRepository repository;
+    private final ZoneId learningZone;
 
-    MemberServiceImpl(UserRepository repository) {
+    MemberServiceImpl(UserRepository repository, ZoneId learningZoneId) {
         this.repository = repository;
+        this.learningZone = learningZoneId;
     }
 
     @Override
@@ -26,7 +30,7 @@ class MemberServiceImpl implements MemberService {
     public User awardCompletionRewards(Long userId, int expReward) {
         var user = repository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        user.recordCompletion(expReward);
+        user.recordCompletion(expReward, learningZone);
         return user;
     }
 

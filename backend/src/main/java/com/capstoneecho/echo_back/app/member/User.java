@@ -76,7 +76,7 @@ public class User {
         this.updatedAt = Instant.now();
     }
 
-    // 사용자가 직접 닉네임을 바꿀 때의 단일 진입점. 빈 입력은 무시하고 경계 값을 도메인이 책임진다.
+    // 빈 입력은 무시하고, 30자를 넘으면 잘라서 저장한다.
     public void changeNickname(String nickname) {
         if (nickname == null) return;
         var trimmed = nickname.trim();
@@ -84,13 +84,12 @@ public class User {
         this.nickname = trimmed.length() > 30 ? trimmed.substring(0, 30) : trimmed;
     }
 
-    // 한 학습 단위(=챕터) 를 완료했을 때 호출되는 단일 진입점.
-    // streak 은 마지막 학습 일자(lastStudyAt) 와 오늘을 비교해 결정된다.
-    //   - 같은 날 다시 완료: streak 그대로 (중복 가산 방지)
-    //   - 어제 완료 + 오늘 완료: streak += 1
-    //   - 그 외 (이틀 이상 공백 또는 첫 학습): streak = 1 로 새 시작
-    public void recordCompletion(int expReward) {
-        var zone = ZoneId.systemDefault();
+    // 한 챕터 학습을 끝냈을 때의 streak 갱신 + EXP 가산.
+    //   - 같은 날 다시 완료하면 streak 은 그대로 (중복 가산 방지)
+    //   - 어제 완료 + 오늘 완료면 streak +1
+    //   - 이틀 이상 비었거나 첫 학습이면 streak 을 1 로 리셋
+    // 자정 경계는 호출자가 넘겨준 zone 을 기준으로 본다.
+    public void recordCompletion(int expReward, ZoneId zone) {
         var today = LocalDate.now(zone);
         var lastDate = lastStudyAt != null ? lastStudyAt.atZone(zone).toLocalDate() : null;
         if (lastDate == null || lastDate.isBefore(today.minusDays(1))) {

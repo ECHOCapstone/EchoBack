@@ -4,8 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 
-// application.yaml 의 app.* 설정을 타입-세이프로 한곳에 묶는 단일 진입점.
-// 새로운 app 설정 추가 시 여기에만 필드를 정의하면 다른 컴포넌트가 안전하게 주입받는다.
+// application.yaml 의 app.* 설정을 타입 세이프하게 매핑한다.
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(
         Jwt jwt,
@@ -15,7 +14,8 @@ public record AppProperties(
         Storage storage,
         Llm llm,
         Reward reward,
-        Badge badge
+        Badge badge,
+        Time time
 ) {
 
     public record Jwt(String secret, long expireMs) {}
@@ -29,24 +29,21 @@ public record AppProperties(
 
     public record Storage(String recordingDir) {}
 
-    // provider 는 LlmFeedbackGenerator 구현체 선택 키. apiKey 가 비어 있으면
-    // gemini 를 골라도 빈이 등록되지 않아 자동으로 rule-based 로 떨어진다.
+    // provider 가 gemini 일 때만 외부 LLM 클라이언트가 등록되고, 그 외에는 규칙 기반으로 떨어진다.
     public record Llm(String provider, String apiKey, String model) {}
 
-    // 학습 완료 시 지급되는 보상 정책. 게임 밸런싱이라 운영 환경에서 자주 조정될 가능성이 높아
-    // 코드 상수가 아닌 외부 설정으로 노출한다.
+    // 한 챕터 학습을 끝냈을 때 사용자에게 지급할 EXP.
     public record Reward(int completionExp) {}
 
-    // 배지 평가 임계값 정책. 게임 밸런싱이라 운영 환경에서 자주 조정될 가능성이 높아
-    // BadgePolicy 의 코드 상수 대신 외부 설정으로 노출한다.
-    //   masterThreshold     - 챕터 마스터 배지 합격 정확도
-    //   perfectThreshold    - "완벽한 한 판" 배지 합격 정확도
-    //   tongueTwisterGoal   - 잰말놀이 N회 완료 배지 임계 횟수
-    //   sessionMasterGoal   - 맞춤 학습 마스터 배지 임계 세션 수
+    // 배지 합격 임계값. 운영 중 밸런싱을 자주 만지므로 코드 상수 대신 yaml 로 노출한다.
     public record Badge(
             double masterThreshold,
             double perfectThreshold,
             int tongueTwisterGoal,
             int sessionMasterGoal
     ) {}
+
+    // streak / 출석 캘린더 계산의 기준 시간대. 한국 사용자가 자정을 넘기는 순간이 streak 갱신
+    // 시점이 되도록 KST 를 기본값으로 잡는다.
+    public record Time(String zoneId) {}
 }

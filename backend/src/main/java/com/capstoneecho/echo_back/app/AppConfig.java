@@ -1,12 +1,20 @@
 package com.capstoneecho.echo_back.app;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// 앱 전반의 횡단 설정 모음. 책임이 큰 영역(보안 / HTTP 클라이언트 / MVC)은 각각
-// SecurityConfig / HttpClientConfig / WebMvcConfig 로 분리되어 있고, 본 클래스는 AppProperties
-// 활성화만 담당한다.
+import java.time.ZoneId;
+
+// AppProperties 활성화 + 학습 시간대 빈 등록.
+// 보안 / HTTP / MVC 같은 큰 영역은 각각의 *Config 로 따로 빠져 있다.
 @Configuration
 @EnableConfigurationProperties(AppProperties.class)
 public class AppConfig {
+
+    // streak 와 출석 캘린더가 같은 시간대를 보도록 한 곳에서 ZoneId 를 만들어 공유한다.
+    @Bean
+    public ZoneId learningZoneId(AppProperties properties) {
+        return ZoneId.of(properties.time().zoneId());
+    }
 }

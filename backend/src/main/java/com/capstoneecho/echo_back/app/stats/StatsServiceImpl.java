@@ -15,33 +15,34 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-// 통계 화면을 채울 응답을 한곳에서 조립한다.
-//
-//   attendance   : 사용자의 PronunciationFeedback 일자별 누적 → 같은 달 day → 그 시점 streak
-//   weeklyErrors : 최근 7일 PronunciationFeedback 의 PhonemeError canonical 음소 빈도 top 5
-//   badges       : BadgePolicy 가 단일 정책으로 평가 (출석/마스터/맞춤 학습 등)
+// 통계 화면 응답을 한 곳에서 조립한다.
+//   attendance   : 일자별 출석 + 그 시점 streak
+//   weeklyErrors : 최근 7일 동안 가장 많이 틀린 음소 top 5
+//   badges       : BadgePolicy 결과
 @Service
 @Transactional(readOnly = true)
 class StatsServiceImpl implements StatsService {
 
-    private static final ZoneId ZONE = ZoneId.systemDefault();
     private static final int WEEKLY_TOP_N = 5;
 
     private final MemberService memberService;
     private final FeedbackRepository feedbackRepository;
     private final SessionService sessionService;
     private final BadgePolicy badgePolicy;
+    private final ZoneId zone;
 
     StatsServiceImpl(
             MemberService memberService,
             FeedbackRepository feedbackRepository,
             SessionService sessionService,
-            BadgePolicy badgePolicy
+            BadgePolicy badgePolicy,
+            ZoneId learningZoneId
     ) {
         this.memberService = memberService;
         this.feedbackRepository = feedbackRepository;
         this.sessionService = sessionService;
         this.badgePolicy = badgePolicy;
+        this.zone = learningZoneId;
     }
 
     @Override
@@ -49,8 +50,8 @@ class StatsServiceImpl implements StatsService {
         var user = memberService.getById(userId);
         var feedbacks = feedbackRepository.findByUserIdOrderByCreatedAtDesc(userId);
         var totalSessions = sessionService.countMine(userId);
-        var today = LocalDate.now(ZONE);
-        // year/month 가 명시되면 그 월의 출석을, 아니면 오늘이 속한 월의 출석을 집계한다.
+        var today = LocalDate.now(zone);
+        // year/month 가 명시되면 그 월의 출석을, 아니면 오늘이 속한 월의 출석을 본다.
         var calendarTarget = (year != null && month != null)
                 ? LocalDate.of(year, month, 1)
                 : today;
@@ -71,7 +72,7 @@ class StatsServiceImpl implements StatsService {
         var prevDay = -1;
         var streak = 0;
         for (var f : feedbacks.reversed()) {
-            var date = f.getCreatedAt().atZone(ZONE).toLocalDate();
+            var date = f.getCreatedAt().atZone(zone).toLocalDate();
             if (date.getYear() != year || date.getMonthValue() != month) continue;
             var day = date.getDayOfMonth();
             if (prevDay == day) continue;
@@ -89,7 +90,7 @@ class StatsServiceImpl implements StatsService {
         var weekAgo = today.minusDays(7);
         Map<String, Integer> counter = new HashMap<>();
         for (var f : feedbacks) {
-            var date = f.getCreatedAt().atZone(ZONE).toLocalDate();
+            var date = f.getCreatedAt().atZone(zone).toLocalDate();
             if (date.isBefore(weekAgo)) continue;
             for (var err : f.getErrors()) {
                 var key = err.getCanonical() != null ? err.getCanonical() : err.getPerceived();
