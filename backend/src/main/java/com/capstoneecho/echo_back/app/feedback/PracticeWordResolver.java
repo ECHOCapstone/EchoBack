@@ -6,20 +6,22 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.Optional;
 
-// 챕터 종합 피드백의 재연습 단어를 결정하는 단일 정책. 4-tier fallback 으로 동작한다.
+// 챕터 종합 피드백의 재연습 단어를 결정하는 단일 정책. 3-tier fallback 으로 동작한다.
 //
-//   1) Script.practiceWord  : 시드/어드민이 챕터에 명시한 값 (DB 데이터, 가장 강한 SSOT)
-//   2) 음소 → 단어 매핑       : weakPhoneme 가 식별되면 그 음소의 대표 연습 단어
-//   3) 챕터 제목 키워드 매칭 : 음소 매핑도 실패한 경우의 사람 친화적 폴백 (R/L → light 등)
-//   4) DEFAULT_WORD          : 어떤 단서도 없을 때의 마지막 기본값
+//   1) Script.practiceWord  : 어드민/시드가 챕터에 명시한 값. 모든 시드 챕터가 채우는 SSOT.
+//   2) 음소 → 단어 매핑       : Script 가 없는 자유 스크립트 (사용자 맞춤) 에서 weakPhoneme 만으로
+//                              결정해야 하는 경우의 발음 영역 도메인 지식.
+//   3) DEFAULT_WORD          : 어떤 단서도 없을 때의 마지막 기본값.
 //
-// 정책이 한 곳에 모여 있어 챕터 추가 / LLM 교체 / 규칙 변경 시 단일 진입점만 수정하면 된다.
+// 챕터 제목 키워드 매칭은 의도적으로 두지 않는다. 시드 챕터는 모두 (1) 에서 결정되고,
+// 사용자 자유 스크립트는 chapter title 자체가 의미를 가지지 않으므로 (2)/(3) 만으로 충분하다.
 @Component
 public class PracticeWordResolver {
 
     static final String DEFAULT_WORD = "rabbit";
 
-    // ARPAbet 자음 키 → 그 음소를 대표하는 학습 단어. 두 generator 가 공유하던 매핑을 여기로 흡수.
+    // ARPAbet 자음 키 → 그 음소를 대표하는 학습 단어. 발음 영역의 도메인 지식이라 코드에 둔다.
+    // 시드 챕터들의 practiceWord 와 의도적으로 일치시켜 두 경로의 결과가 같은 단어로 수렴한다.
     private static final Map<String, String> PHONEME_TO_WORD = Map.ofEntries(
             Map.entry("r", "rabbit"),
             Map.entry("l", "light"),
@@ -34,11 +36,10 @@ public class PracticeWordResolver {
             Map.entry("ng", "song")
     );
 
-    public String resolve(Script script, String weakPhoneme, String unitTitle) {
+    public String resolve(Script script, String weakPhoneme) {
         return Optional.<String>empty()
                 .or(() -> fromScript(script))
                 .or(() -> fromPhoneme(weakPhoneme))
-                .or(() -> fromTitle(unitTitle))
                 .orElse(DEFAULT_WORD);
     }
 
@@ -51,17 +52,5 @@ public class PracticeWordResolver {
     private Optional<String> fromPhoneme(String weakPhoneme) {
         if (weakPhoneme == null || weakPhoneme.isBlank()) return Optional.empty();
         return Optional.ofNullable(PHONEME_TO_WORD.get(weakPhoneme.toLowerCase()));
-    }
-
-    private Optional<String> fromTitle(String unitTitle) {
-        if (unitTitle == null) return Optional.empty();
-        var lower = unitTitle.toLowerCase();
-        if (lower.contains("r vs l") || lower.contains("r/l")) return Optional.of("light");
-        if (lower.contains("v vs b") || lower.contains("v/b")) return Optional.of("vest");
-        if (lower.contains("f vs p") || lower.contains("f/p")) return Optional.of("fine");
-        if (lower.contains("th") || lower.contains("dh")) return Optional.of("think");
-        if (lower.contains("sh") || lower.contains("zh")) return Optional.of("shoes");
-        if (lower.contains("잰말") || lower.contains("tongue")) return Optional.of("sheet");
-        return Optional.empty();
     }
 }

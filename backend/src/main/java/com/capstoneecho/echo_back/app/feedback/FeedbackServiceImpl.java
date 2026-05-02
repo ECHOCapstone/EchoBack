@@ -105,7 +105,7 @@ class FeedbackServiceImpl implements FeedbackService {
         var aggregatedErrors = aggregateErrors(recordings);
         var weakPhoneme = pickWeakPhoneme(aggregatedErrors);
         var guidance = llmGenerator.unitGuidance(title, accuracy, weakPhoneme, aggregatedErrors);
-        var practiceWord = practiceWordResolver.resolve(script, weakPhoneme, title);
+        var practiceWord = practiceWordResolver.resolve(script, weakPhoneme);
 
         var feedback = PronunciationFeedback.create(
                 userId,
