@@ -108,6 +108,13 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
         return new RetryEvaluation(correct, guidance);
     }
 
+    // RuleBased 는 LLM 이 아니므로 추천 책임을 가지지 않는다. 빈 문자열을 돌려 호출자(PracticeWordResolver)
+    // 가 자체 fallback (시드 챕터 단어 → 음소 매핑 → default) 으로 떨어지게 한다.
+    @Override
+    public String recommendPracticeWord(String unitTitle, String weakPhoneme) {
+        return "";
+    }
+
     private static boolean matchesFirstLetter(List<String> perceived, String practiceWord) {
         if (perceived == null || perceived.isEmpty() || practiceWord == null || practiceWord.isBlank()) {
             return false;

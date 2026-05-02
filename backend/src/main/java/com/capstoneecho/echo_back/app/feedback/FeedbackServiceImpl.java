@@ -81,7 +81,7 @@ class FeedbackServiceImpl implements FeedbackService {
         double accuracy = scoringPolicy.averageScore(stepScoresOf(recordings));
         var weakness = weakPhonemeAnalyzer.analyze(recordings);
         var guidance = llmGenerator.unitGuidance(title, accuracy, weakness.weakPhoneme(), weakness.errors());
-        var practiceWord = practiceWordResolver.resolve(script, weakness.weakPhoneme());
+        var practiceWord = practiceWordResolver.resolve(script, weakness.weakPhoneme(), title);
 
         var feedback = PronunciationFeedback.create(
                 userId,

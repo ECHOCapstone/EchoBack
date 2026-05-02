@@ -92,6 +92,28 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
                 : practiceWord + " 발음을 한 번 더 또렷하게 굴려 보세요.";
     }
 
+    // 응답에서 a-z 가 아닌 문자를 모두 공백으로 치환한 뒤 첫 토큰을 단어로 사용한다.
+    // 호출이 실패하거나 응답이 비면 빈 문자열을 돌려 PracticeWordResolver 가 자체 fallback 으로 떨어진다.
+    @Override
+    public String recommendPracticeWord(String unitTitle, String weakPhoneme) {
+        if (weakPhoneme == null || weakPhoneme.isBlank()) return "";
+        var prompt = promptBuilder.buildPracticeWordPrompt(unitTitle, weakPhoneme);
+        try {
+            var response = llmClient.generate(prompt);
+            if (response == null || response.content() == null) return "";
+            return extractWord(response.content());
+        } catch (Exception e) {
+            log.warn("LLM 호출 실패, 기본 응답으로 대체합니다: {}", e.getMessage());
+            return "";
+        }
+    }
+
+    private static String extractWord(String raw) {
+        var cleaned = raw.toLowerCase(Locale.ROOT).replaceAll("[^a-z]", " ").trim();
+        if (cleaned.isEmpty()) return "";
+        return cleaned.split("\\s+")[0];
+    }
+
     private String invoke(String prompt, String fallback) {
         try {
             var response = llmClient.generate(prompt);

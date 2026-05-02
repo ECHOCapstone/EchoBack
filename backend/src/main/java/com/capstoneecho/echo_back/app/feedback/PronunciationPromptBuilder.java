@@ -23,6 +23,10 @@ public class PronunciationPromptBuilder {
                     "출력은 정확히 두 줄. " +
                     "첫 줄: PASS 또는 FAIL (영어 그대로). " +
                     "둘째 줄: 한국어 한 문장 (60자 이내, 이모지 없이). 정답이면 칭찬과 다음 단계 안내, 오답이면 발음 교정 힌트.";
+    private static final String PRACTICE_WORD_DIRECTIVE =
+            "너는 한국인 영어 학습자의 발음 코치다. 사용자가 가장 자주 틀린 음소를 받아 그 음소 연습에 어울리는 " +
+                    "짧고 일상적인 영어 단어 한 개를 추천한다. " +
+                    "출력은 정확히 한 줄, 영어 소문자 단어 하나. 따옴표·설명·구두점 없이.";
 
     public String buildStepPrompt(
             String targetText,
@@ -63,6 +67,13 @@ public class PronunciationPromptBuilder {
         sb.append("- 재연습 단어: ").append(safeText(practiceWord)).append('\n');
         sb.append("- 정답 음소: ").append(joinPhonemes(canonical)).append('\n');
         sb.append("- 인식 음소: ").append(joinPhonemes(perceived));
+        return sb.toString();
+    }
+
+    public String buildPracticeWordPrompt(String unitTitle, String weakPhoneme) {
+        var sb = new StringBuilder(PRACTICE_WORD_DIRECTIVE).append("\n\n[입력]\n");
+        sb.append("- 학습 단원: ").append(safeText(unitTitle)).append('\n');
+        sb.append("- 약점 음소: ").append(safeText(weakPhoneme));
         return sb.toString();
     }
 
