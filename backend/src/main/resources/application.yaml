@@ -45,3 +45,8 @@ app:
     model: ${LLM_MODEL:gemini-1.5-flash}
   reward:
     completion-exp: ${COMPLETION_EXP:1000}
+  badge:
+    master-threshold: ${BADGE_MASTER_THRESHOLD:80}
+    perfect-threshold: ${BADGE_PERFECT_THRESHOLD:95}
+    tongue-twister-goal: ${BADGE_TONGUE_TWISTER_GOAL:5}
+    session-master-goal: ${BADGE_SESSION_MASTER_GOAL:5}

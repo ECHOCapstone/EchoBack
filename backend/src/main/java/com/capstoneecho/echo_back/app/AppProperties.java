@@ -14,7 +14,8 @@ public record AppProperties(
         Scoring scoring,
         Storage storage,
         Llm llm,
-        Reward reward
+        Reward reward,
+        Badge badge
 ) {
 
     public record Jwt(String secret, long expireMs) {}
@@ -35,4 +36,17 @@ public record AppProperties(
     // 학습 완료 시 지급되는 보상 정책. 게임 밸런싱이라 운영 환경에서 자주 조정될 가능성이 높아
     // 코드 상수가 아닌 외부 설정으로 노출한다.
     public record Reward(int completionExp) {}
+
+    // 배지 평가 임계값 정책. 게임 밸런싱이라 운영 환경에서 자주 조정될 가능성이 높아
+    // BadgePolicy 의 코드 상수 대신 외부 설정으로 노출한다.
+    //   masterThreshold     - 챕터 마스터 배지 합격 정확도
+    //   perfectThreshold    - "완벽한 한 판" 배지 합격 정확도
+    //   tongueTwisterGoal   - 잰말놀이 N회 완료 배지 임계 횟수
+    //   sessionMasterGoal   - 맞춤 학습 마스터 배지 임계 세션 수
+    public record Badge(
+            double masterThreshold,
+            double perfectThreshold,
+            int tongueTwisterGoal,
+            int sessionMasterGoal
+    ) {}
 }
