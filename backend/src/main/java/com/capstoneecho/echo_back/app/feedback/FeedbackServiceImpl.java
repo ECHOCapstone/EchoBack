@@ -177,10 +177,13 @@ class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public UserResponse complete(Long userId, Long feedbackId) {
-        // feedback 소유 확인만 검증으로 사용. 보상 지급 자체는 MemberService 에 위임해 SRP 를 지킨다.
-        feedbackRepository.findByIdAndUserId(feedbackId, userId)
+        // feedback 소유 확인 + 도메인 가드: markCompleted 가 false 를 돌려주면 이미 보상이 적용된 상태이므로
+        // 같은 피드백으로 호출이 반복돼도 EXP 가 중복 가산되지 않는다 (idempotent).
+        var feedback = feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-        var user = memberService.awardCompletionRewards(userId, completionExpReward);
+        var user = feedback.markCompleted()
+                ? memberService.awardCompletionRewards(userId, completionExpReward)
+                : memberService.getById(userId);
         return UserResponse.from(user);
     }
 

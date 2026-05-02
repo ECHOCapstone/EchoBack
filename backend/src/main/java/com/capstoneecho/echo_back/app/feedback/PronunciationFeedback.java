@@ -48,6 +48,11 @@ public class PronunciationFeedback {
     @Column(name = "guidance_kr", columnDefinition = "TEXT")
     private String guidanceKr;
 
+    // 학습 완료 보상이 적용되었는지를 표시한다. true 가 되는 순간이 EXP/streak 가산이 일어난 시점이고,
+    // 이후 같은 피드백으로 complete 가 다시 호출돼도 보상이 중복되지 않도록 도메인 가드 역할을 한다.
+    @Column(nullable = false)
+    private boolean completed;
+
     @OneToMany(mappedBy = "feedback", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PhonemeError> errors = new ArrayList<>();
 
@@ -79,6 +84,15 @@ public class PronunciationFeedback {
     public void addError(PhonemeError error) {
         error.attachTo(this);
         this.errors.add(error);
+    }
+
+    // 보상 적용 시점을 기록하는 단일 진입점. 호출자는 반환값으로 실제 적용 여부를 판단한다.
+    //   true  → 첫 호출이라 보상 적용을 진행해야 함
+    //   false → 이미 완료된 피드백이므로 보상 가산 없이 idempotent 응답으로 마무리해야 함
+    public boolean markCompleted() {
+        if (completed) return false;
+        this.completed = true;
+        return true;
     }
 
     @PrePersist
