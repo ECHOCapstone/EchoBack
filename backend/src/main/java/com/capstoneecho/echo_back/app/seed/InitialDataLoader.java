@@ -43,12 +43,14 @@ class InitialDataLoader implements ApplicationRunner {
         }
         var basicTrack = trackRepository.save(Track.create(
                 "기본 발음 트랙",
-                "잰말놀이부터 R/L · V/B 까지, 영어 발음의 기본기를 빠르게 잡는 입문 트랙.",
+                "잰말놀이부터 R/L · V/B · F/P · TH 까지, 영어 발음의 기본기를 빠르게 잡는 입문 트랙.",
                 0
         ));
         seedTongueTwisterChapter(basicTrack);
         seedPronunciationPairRLChapter(basicTrack);
         seedPronunciationPairVBChapter(basicTrack);
+        seedPronunciationPairFPChapter(basicTrack);
+        seedPronunciationPairTHChapter(basicTrack);
     }
 
     private void seedTongueTwisterChapter(Track track) {
@@ -109,6 +111,48 @@ class InitialDataLoader implements ApplicationRunner {
         steps.add(LearningStep.intro(chapter, 6, "Vine와 Bine을 각각 발음해 볼 겁니다."));
         steps.add(LearningStep.record(chapter, 7, "녹음 버튼을 누르고 Vine을 발음해 보세요.", "Vine", "v ay n"));
         steps.add(LearningStep.record(chapter, 8, "녹음 버튼을 누르고 Bine을 발음해 보세요.", "Bine", "b ay n"));
+        stepRepository.saveAll(steps);
+    }
+
+    private void seedPronunciationPairFPChapter(Track track) {
+        var chapter = scriptRepository.save(Script.createChapter(
+                track,
+                3,
+                "발음 연습: F vs P",
+                "헷갈리는 F 와 P 발음을 단계적으로 구별해 봅니다.",
+                Difficulty.MEDIUM
+        ));
+        var steps = new ArrayList<LearningStep>();
+        steps.add(LearningStep.intro(chapter, 0, "F와 P를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 1, "녹음 버튼을 누르고 F를 발음해 보세요.", "F", "f"));
+        steps.add(LearningStep.record(chapter, 2, "녹음 버튼을 누르고 P를 발음해 보세요.", "P", "p"));
+        steps.add(LearningStep.intro(chapter, 3, "Fine과 Pine을 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 4, "녹음 버튼을 누르고 Fine을 발음해 보세요.", "Fine", "f ay n"));
+        steps.add(LearningStep.record(chapter, 5, "녹음 버튼을 누르고 Pine을 발음해 보세요.", "Pine", "p ay n"));
+        steps.add(LearningStep.intro(chapter, 6, "Coffee와 Copy를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 7, "녹음 버튼을 누르고 Coffee를 발음해 보세요.", "Coffee", "k ao f iy"));
+        steps.add(LearningStep.record(chapter, 8, "녹음 버튼을 누르고 Copy를 발음해 보세요.", "Copy", "k aa p iy"));
+        stepRepository.saveAll(steps);
+    }
+
+    private void seedPronunciationPairTHChapter(Track track) {
+        var chapter = scriptRepository.save(Script.createChapter(
+                track,
+                4,
+                "발음 연습: TH vs DH",
+                "무성음 TH (think) 와 유성음 DH (this) 의 차이를 단계적으로 익힙니다.",
+                Difficulty.HARD
+        ));
+        var steps = new ArrayList<LearningStep>();
+        steps.add(LearningStep.intro(chapter, 0, "무성 TH 와 유성 DH 를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 1, "녹음 버튼을 누르고 무성 TH (혀끝 윗니 사이) 를 발음해 보세요.", "TH", "th"));
+        steps.add(LearningStep.record(chapter, 2, "녹음 버튼을 누르고 유성 DH (성대 울림) 를 발음해 보세요.", "DH", "dh"));
+        steps.add(LearningStep.intro(chapter, 3, "Think 와 This 를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 4, "녹음 버튼을 누르고 Think 를 발음해 보세요.", "Think", "th ih ng k"));
+        steps.add(LearningStep.record(chapter, 5, "녹음 버튼을 누르고 This 를 발음해 보세요.", "This", "dh ih s"));
+        steps.add(LearningStep.intro(chapter, 6, "Three 와 Free 를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 7, "녹음 버튼을 누르고 Three 를 발음해 보세요.", "Three", "th r iy"));
+        steps.add(LearningStep.record(chapter, 8, "녹음 버튼을 누르고 Free 를 발음해 보세요.", "Free", "f r iy"));
         stepRepository.saveAll(steps);
     }
 }
