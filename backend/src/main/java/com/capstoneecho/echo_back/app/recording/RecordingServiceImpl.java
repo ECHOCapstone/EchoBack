@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 
 // 녹음 1건 업로드 흐름: 검증 → 디스크 저장 → 모델 서버 분석 → 점수 산출 → DB 영속화.
@@ -30,6 +29,7 @@ class RecordingServiceImpl implements RecordingService {
     private final SessionService sessionService;
     private final LlmFeedbackGenerator llmGenerator;
     private final PhonemeErrorMapper errorMapper;
+    private final MultipartAudioReader audioReader;
 
     RecordingServiceImpl(
             RecordingRepository repository,
@@ -39,7 +39,8 @@ class RecordingServiceImpl implements RecordingService {
             ScriptService scriptService,
             SessionService sessionService,
             LlmFeedbackGenerator llmGenerator,
-            PhonemeErrorMapper errorMapper
+            PhonemeErrorMapper errorMapper,
+            MultipartAudioReader audioReader
     ) {
         this.repository = repository;
         this.storage = storage;
@@ -49,6 +50,7 @@ class RecordingServiceImpl implements RecordingService {
         this.sessionService = sessionService;
         this.llmGenerator = llmGenerator;
         this.errorMapper = errorMapper;
+        this.audioReader = audioReader;
     }
 
     @Override
@@ -61,16 +63,9 @@ class RecordingServiceImpl implements RecordingService {
             MultipartFile audio
     ) {
         validateTarget(scriptId, sessionId);
-        validateAudio(audio);
+        var bytes = audioReader.read(audio);
 
         var targetText = resolveTargetText(userId, scriptId, sessionId, stepId, sessionSentenceId);
-
-        byte[] bytes;
-        try {
-            bytes = audio.getBytes();
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED, e.getMessage());
-        }
 
         var stored = storage.save(userId, audio.getOriginalFilename(), bytes);
         // 학습 종류에 맞는 팩토리로 Recording 을 만든다 (forScriptStep / forSessionSentence / forSessionFreeForm).
@@ -80,12 +75,8 @@ class RecordingServiceImpl implements RecordingService {
         // targetText 가 없는 자유 발화는 null 로 남겨 정렬·오류 비교 자체를 생략한다.
         var canonical = canonicalFor(targetText);
 
-        var analysis = modelClient.analyze(
-                bytes,
-                stored.filename() != null ? stored.filename() : "audio.wav",
-                resolveContentType(audio),
-                canonical
-        );
+        // 파일명/콘텐츠 타입 기본값은 ModelServerClient 가 단독으로 채운다 (SSOT).
+        var analysis = modelClient.analyze(bytes, stored.filename(), audio.getContentType(), canonical);
         var score = scoringPolicy.scoreOf(analysis);
         var errorList = errorMapper.toResponses(analysis.errors());
         var step = llmGenerator.stepGuidance(
@@ -171,17 +162,6 @@ class RecordingServiceImpl implements RecordingService {
             return Recording.forSessionSentence(userId, sessionId, sessionSentenceId, audioPath);
         }
         return Recording.forSessionFreeForm(userId, sessionId, audioPath);
-    }
-
-    private void validateAudio(MultipartFile audio) {
-        if (audio == null || audio.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "audio 파일이 비어 있습니다.");
-        }
-    }
-
-    private String resolveContentType(MultipartFile audio) {
-        var ct = audio.getContentType();
-        return ct != null ? ct : "application/octet-stream";
     }
 
     private static String joinStrings(List<String> values) {

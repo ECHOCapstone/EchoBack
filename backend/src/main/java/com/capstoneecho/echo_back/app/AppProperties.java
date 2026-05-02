@@ -35,7 +35,8 @@ public record AppProperties(
 
     // provider 가 gemini 이고 apiKey 가 채워져 있을 때만 외부 LLM 이 활성화되고, 그 외에는
     // RuleBasedLlmFeedbackGenerator 가 안전망으로 동작한다.
-    public record Llm(String provider, String apiKey, String model) {}
+    // baseUrl 은 Gemini API 게이트웨이 주소. 운영 도중 endpoint 가 바뀌어도 코드 재배포 없이 yaml 만 갱신하면 된다.
+    public record Llm(String provider, String apiKey, String model, String baseUrl) {}
 
     // 한 챕터 학습을 끝냈을 때 사용자에게 지급할 EXP.
     public record Reward(int completionExp) {}

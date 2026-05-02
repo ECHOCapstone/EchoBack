@@ -15,18 +15,17 @@ import java.util.Map;
 // generateJson 은 generationConfig.responseMimeType=application/json + responseSchema 를 같이 보내
 // 모델이 JSON 으로만 응답하도록 강제하고, 그 텍스트를 JsonNode 로 파싱한다. 호출자는 키별로 꺼낸다.
 //
+// baseUrl/model 은 application.yaml 의 app.llm 에서 주입되어 운영 중 교체에 코드 변경이 필요 없다.
 // docs: https://ai.google.dev/api/generate-content
 public class GeminiLlmClient implements LlmClient {
-
-    private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String model;
 
-    public GeminiLlmClient(String apiKey, String model, ObjectMapper objectMapper) {
+    public GeminiLlmClient(String baseUrl, String apiKey, String model, ObjectMapper objectMapper) {
         this.restClient = RestClient.builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(baseUrl)
                 .defaultHeader("x-goog-api-key", apiKey)
                 .build();
         this.objectMapper = objectMapper;

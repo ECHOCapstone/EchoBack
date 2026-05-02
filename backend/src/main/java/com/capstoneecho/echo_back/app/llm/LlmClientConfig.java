@@ -15,6 +15,6 @@ class LlmClientConfig {
     @Bean
     LlmClient llmClient(AppProperties properties, ObjectMapper objectMapper) {
         var llm = properties.llm();
-        return new GeminiLlmClient(llm.apiKey(), llm.model(), objectMapper);
+        return new GeminiLlmClient(llm.baseUrl(), llm.apiKey(), llm.model(), objectMapper);
     }
 }

@@ -9,6 +9,7 @@ import com.capstoneecho.echo_back.app.feedback.dto.GenerateFeedbackRequest;
 import com.capstoneecho.echo_back.app.feedback.dto.RetryWordResponse;
 import com.capstoneecho.echo_back.app.member.MemberService;
 import com.capstoneecho.echo_back.app.member.dto.UserResponse;
+import com.capstoneecho.echo_back.app.recording.MultipartAudioReader;
 import com.capstoneecho.echo_back.app.recording.Recording;
 import com.capstoneecho.echo_back.app.recording.RecordingRepository;
 import com.capstoneecho.echo_back.app.script.Script;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +39,7 @@ class FeedbackServiceImpl implements FeedbackService {
     private final WeakPhonemeAnalyzer weakPhonemeAnalyzer;
     private final ModelServerClient modelClient;
     private final MemberService memberService;
+    private final MultipartAudioReader audioReader;
     private final int completionExpReward;
 
     FeedbackServiceImpl(
@@ -52,6 +53,7 @@ class FeedbackServiceImpl implements FeedbackService {
             WeakPhonemeAnalyzer weakPhonemeAnalyzer,
             ModelServerClient modelClient,
             MemberService memberService,
+            MultipartAudioReader audioReader,
             AppProperties properties
     ) {
         this.feedbackRepository = feedbackRepository;
@@ -64,6 +66,7 @@ class FeedbackServiceImpl implements FeedbackService {
         this.weakPhonemeAnalyzer = weakPhonemeAnalyzer;
         this.modelClient = modelClient;
         this.memberService = memberService;
+        this.audioReader = audioReader;
         this.completionExpReward = properties.reward().completionExp();
     }
 
@@ -103,23 +106,11 @@ class FeedbackServiceImpl implements FeedbackService {
     public RetryWordResponse retryWord(Long userId, Long feedbackId, MultipartFile audio) {
         var feedback = feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-        if (audio == null || audio.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "audio 파일이 비어 있습니다.");
-        }
-        byte[] bytes;
-        try {
-            bytes = audio.getBytes();
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED, e.getMessage());
-        }
+        var bytes = audioReader.read(audio);
 
         var practiceWord = feedback.getPracticeWord();
-        var analysis = modelClient.analyze(
-                bytes,
-                audio.getOriginalFilename() != null ? audio.getOriginalFilename() : "audio.wav",
-                audio.getContentType() != null ? audio.getContentType() : "application/octet-stream",
-                null
-        );
+        // 파일명/콘텐츠 타입 기본값은 ModelServerClient 가 단독으로 채운다 (SSOT).
+        var analysis = modelClient.analyze(bytes, audio.getOriginalFilename(), audio.getContentType(), null);
 
         var evaluation = llmGenerator.evaluateRetry(practiceWord, analysis.perceived(), analysis.canonical());
         var score = scoringPolicy.scoreOf(analysis);
