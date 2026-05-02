@@ -2,6 +2,8 @@ package com.capstoneecho.echo_back.app.seed;
 
 import com.capstoneecho.echo_back.app.learning.LearningStep;
 import com.capstoneecho.echo_back.app.learning.LearningStepRepository;
+import com.capstoneecho.echo_back.app.ranking.DemoRankingEntry;
+import com.capstoneecho.echo_back.app.ranking.DemoRankingEntryRepository;
 import com.capstoneecho.echo_back.app.script.Difficulty;
 import com.capstoneecho.echo_back.app.script.Script;
 import com.capstoneecho.echo_back.app.script.ScriptRepository;
@@ -15,29 +17,38 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
-// 빈 H2 DB 에 시연용 트랙·챕터·스텝을 채워 넣는 단발성 초기화기.
-// 트랙 1개("기본 발음 트랙") 안에 잰말놀이 + R/L + V/B 세 챕터를 순서대로 배치한다.
-// 동일 시드의 중복 삽입을 막기 위해 트랙이 이미 존재하면 건너뛴다.
+// 빈 H2 DB 에 시연용 트랙·챕터·스텝과 데모 랭킹 엔트리를 채워 넣는 단발성 초기화기.
+// 트랙 1개("기본 발음 트랙") 안에 잰말놀이 + R/L + V/B + F/P + TH 다섯 챕터를 순서대로 배치한다.
+// 동일 시드의 중복 삽입을 막기 위해 트랙이 이미 존재하면 트랙 시드는 건너뛴다.
+// 데모 랭킹 엔트리도 동일 정책으로 비어 있을 때만 채운다.
 @Component
 class InitialDataLoader implements ApplicationRunner {
 
     private final TrackRepository trackRepository;
     private final ScriptRepository scriptRepository;
     private final LearningStepRepository stepRepository;
+    private final DemoRankingEntryRepository demoRankingRepository;
 
     InitialDataLoader(
             TrackRepository trackRepository,
             ScriptRepository scriptRepository,
-            LearningStepRepository stepRepository
+            LearningStepRepository stepRepository,
+            DemoRankingEntryRepository demoRankingRepository
     ) {
         this.trackRepository = trackRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
+        this.demoRankingRepository = demoRankingRepository;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        seedTracksIfEmpty();
+        seedDemoRankingIfEmpty();
+    }
+
+    private void seedTracksIfEmpty() {
         if (!trackRepository.findAll().isEmpty()) {
             return;
         }
@@ -51,6 +62,31 @@ class InitialDataLoader implements ApplicationRunner {
         seedPronunciationPairVBChapter(basicTrack);
         seedPronunciationPairFPChapter(basicTrack);
         seedPronunciationPairTHChapter(basicTrack);
+    }
+
+    // 시연 단계의 가짜 사용자 15명. 실제 PronunciationFeedback 누적이 충분해질 때까지의 임시 데이터로,
+    // 운영 전환 시 demo_ranking_entries 테이블을 비우면 자동으로 사라진다.
+    private void seedDemoRankingIfEmpty() {
+        if (demoRankingRepository.count() > 0) {
+            return;
+        }
+        demoRankingRepository.saveAll(List.of(
+                DemoRankingEntry.of("jenny01", 98.4),
+                DemoRankingEntry.of("minsu_kim", 96.1),
+                DemoRankingEntry.of("sarahLee", 94.7),
+                DemoRankingEntry.of("davidPark", 92.3),
+                DemoRankingEntry.of("happyCat", 90.8),
+                DemoRankingEntry.of("tomBrown", 88.5),
+                DemoRankingEntry.of("lily2024", 86.2),
+                DemoRankingEntry.of("jakePhd", 84.0),
+                DemoRankingEntry.of("rosie_h", 81.6),
+                DemoRankingEntry.of("mikeWong", 78.9),
+                DemoRankingEntry.of("annaJung", 76.4),
+                DemoRankingEntry.of("kevin99", 73.1),
+                DemoRankingEntry.of("sunnyDay", 69.8),
+                DemoRankingEntry.of("leoChoi", 65.5),
+                DemoRankingEntry.of("mia_park", 60.2)
+        ));
     }
 
     private void seedTongueTwisterChapter(Track track) {

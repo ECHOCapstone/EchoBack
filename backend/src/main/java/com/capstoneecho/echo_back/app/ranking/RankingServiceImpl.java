@@ -14,47 +14,32 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-// 오늘의 추천 학습 첫 번째 unit 에 대한 정확도 랭킹.
+// 사용자가 막 끝낸 챕터에 대한 정확도 랭킹.
 //
 // 데이터 소스
 //   - 실제 사용자 피드백: 동일 scriptId 의 PronunciationFeedback 중 사용자별 최고 정확도
-//   - 시연용 가짜 사용자: 데이터가 너무 적을 때 시각적 비교를 위해 합성한다
+//   - 시연용 가짜 사용자: demo_ranking_entries 테이블의 행. 운영 전환 시 비우면 자동 제거된다.
 //
 // 닉네임 모자이크는 본인 외 사용자에 대해서만 적용한다 (앞 3글자 + *).
 @Service
 @Transactional(readOnly = true)
 class RankingServiceImpl implements RankingService {
 
-    private static final List<DemoEntry> DEMO_USERS = List.of(
-            new DemoEntry("jenny01", 98.4),
-            new DemoEntry("minsu_kim", 96.1),
-            new DemoEntry("sarahLee", 94.7),
-            new DemoEntry("davidPark", 92.3),
-            new DemoEntry("happyCat", 90.8),
-            new DemoEntry("tomBrown", 88.5),
-            new DemoEntry("lily2024", 86.2),
-            new DemoEntry("jakePhd", 84.0),
-            new DemoEntry("rosie_h", 81.6),
-            new DemoEntry("mikeWong", 78.9),
-            new DemoEntry("annaJung", 76.4),
-            new DemoEntry("kevin99", 73.1),
-            new DemoEntry("sunnyDay", 69.8),
-            new DemoEntry("leoChoi", 65.5),
-            new DemoEntry("mia_park", 60.2)
-    );
-
     private final ScriptRepository scriptRepository;
     private final FeedbackRepository feedbackRepository;
     private final MemberService memberService;
+    private final DemoRankingEntryRepository demoRankingRepository;
 
     RankingServiceImpl(
             ScriptRepository scriptRepository,
             FeedbackRepository feedbackRepository,
-            MemberService memberService
+            MemberService memberService,
+            DemoRankingEntryRepository demoRankingRepository
     ) {
         this.scriptRepository = scriptRepository;
         this.feedbackRepository = feedbackRepository;
         this.memberService = memberService;
+        this.demoRankingRepository = demoRankingRepository;
     }
 
     @Override
@@ -80,8 +65,8 @@ class RankingServiceImpl implements RankingService {
                 .orElse(0.0);
 
         var ranked = new ArrayList<RankingResponse.Entry>();
-        for (var demo : DEMO_USERS) {
-            ranked.add(new RankingResponse.Entry(0, maskNickname(demo.nickname()), demo.accuracy(), false));
+        for (var demo : demoRankingRepository.findAllByOrderByAccuracyDesc()) {
+            ranked.add(new RankingResponse.Entry(0, maskNickname(demo.getNickname()), demo.getAccuracy(), false));
         }
         ranked.add(new RankingResponse.Entry(0, me.getNickname(), myAccuracy, true));
         ranked.sort(Comparator.comparingDouble(RankingResponse.Entry::accuracy).reversed());
@@ -107,6 +92,4 @@ class RankingServiceImpl implements RankingService {
         if (name.length() <= 3) return name;
         return name.substring(0, 3) + "*".repeat(Math.max(2, name.length() - 3));
     }
-
-    private record DemoEntry(String nickname, double accuracy) {}
 }
