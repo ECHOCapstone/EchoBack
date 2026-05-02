@@ -7,7 +7,10 @@ import java.util.Optional;
 
 public interface SessionRepository extends JpaRepository<Session, Long> {
 
-    List<Session> findByUserIdOrderByUpdatedAtDesc(Long userId);
+    // 즐겨찾기를 먼저 노출하고 그 안에서는 최근 갱신 순으로 정렬한다.
+    List<Session> findByUserIdOrderByFavoriteDescUpdatedAtDesc(Long userId);
 
     Optional<Session> findByIdAndUserId(Long id, Long userId);
+
+    long countByUserId(Long userId);
 }

@@ -31,7 +31,7 @@ class SessionServiceImpl implements SessionService {
     @Override
     @Transactional(readOnly = true)
     public List<SessionResponse> listMine(Long userId) {
-        return repository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
+        return repository.findByUserIdOrderByFavoriteDescUpdatedAtDesc(userId).stream()
                 .map(SessionResponse::from)
                 .toList();
     }
@@ -52,6 +52,10 @@ class SessionServiceImpl implements SessionService {
     public SessionResponse update(Long userId, Long sessionId, SessionUpdateRequest request) {
         var session = getEntity(userId, sessionId);
         session.rename(request.title());
+        // favorite 는 명시된 경우에만 반영. null 이면 기존 값 유지 (PATCH 부분 갱신 의미).
+        if (request.favorite() != null) {
+            session.setFavorite(request.favorite());
+        }
         // scriptText 가 들어왔을 때만 분할 정책을 호출해 SessionSentence 컬렉션을 재구성한다.
         // 빈 문자열도 의도된 "대본 비우기" 로 보고 그대로 반영한다.
         if (request.scriptText() != null) {
@@ -68,6 +72,12 @@ class SessionServiceImpl implements SessionService {
     public void delete(Long userId, Long sessionId) {
         var session = getEntity(userId, sessionId);
         repository.delete(session);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countMine(Long userId) {
+        return repository.countByUserId(userId);
     }
 
     @Override

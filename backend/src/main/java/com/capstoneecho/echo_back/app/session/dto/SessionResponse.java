@@ -9,6 +9,7 @@ public record SessionResponse(
         Long id,
         String title,
         String scriptText,
+        boolean favorite,
         List<SessionSentenceResponse> sentences,
         Instant createdAt,
         Instant updatedAt
@@ -19,6 +20,7 @@ public record SessionResponse(
                 session.getId(),
                 session.getTitle(),
                 session.getScriptText(),
+                session.isFavorite(),
                 session.getSentences().stream().map(SessionSentenceResponse::from).toList(),
                 session.getCreatedAt(),
                 session.getUpdatedAt()

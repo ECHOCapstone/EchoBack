@@ -29,6 +29,10 @@ public class Session {
     @Column(name = "script_text", columnDefinition = "TEXT", nullable = false)
     private String scriptText;
 
+    // 사용자 학습 목록 정렬 시 즐겨찾기를 먼저 노출하기 위한 플래그.
+    @Column(nullable = false)
+    private boolean favorite;
+
     // 사용자가 한 호흡으로 발음할 학습 단위. 분할 정책 자체는 외부(SessionService + SentenceSplitter)
     // 가 결정하고, 본 컬렉션은 그 결과를 영속화한다. orphanRemoval 로 갱신 시 이전 항목을 청소한다.
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -46,6 +50,7 @@ public class Session {
         s.userId = userId;
         s.title = title;
         s.scriptText = "";
+        s.favorite = false;
         return s;
     }
 
@@ -65,6 +70,11 @@ public class Session {
         if (title != null && !title.isBlank()) {
             this.title = title;
         }
+    }
+
+    // 즐겨찾기 토글의 단일 진입점. SessionUpdateRequest 에서 favorite 필드가 들어올 때만 호출된다.
+    public void setFavorite(boolean favorite) {
+        this.favorite = favorite;
     }
 
     // 새 대본 텍스트 + 분할된 문장 리스트를 한 번에 반영한다. 도메인 자신은 분할 정책을 모르고

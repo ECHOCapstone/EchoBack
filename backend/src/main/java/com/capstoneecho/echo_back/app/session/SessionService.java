@@ -18,6 +18,9 @@ public interface SessionService {
 
     void delete(Long userId, Long sessionId);
 
+    // 사용자 맞춤 학습 도전 횟수 — Stats 에서 "맞춤 학습 도전자/마스터" 배지 평가 입력으로 사용된다.
+    long countMine(Long userId);
+
     Session getEntity(Long userId, Long sessionId);
 
     // 한 문장 학습 흐름에서 사용자 소유 검증과 함께 SessionSentence 를 돌려준다.
