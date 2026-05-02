@@ -13,7 +13,8 @@ public record AppProperties(
         ModelServer modelServer,
         Scoring scoring,
         Storage storage,
-        Llm llm
+        Llm llm,
+        Reward reward
 ) {
 
     public record Jwt(String secret, long expireMs) {}
@@ -30,4 +31,8 @@ public record AppProperties(
     // provider 는 LlmFeedbackGenerator 구현체 선택 키. apiKey 가 비어 있으면
     // gemini 를 골라도 빈이 등록되지 않아 자동으로 rule-based 로 떨어진다.
     public record Llm(String provider, String apiKey, String model) {}
+
+    // 학습 완료 시 지급되는 보상 정책. 게임 밸런싱이라 운영 환경에서 자주 조정될 가능성이 높아
+    // 코드 상수가 아닌 외부 설정으로 노출한다.
+    public record Reward(int completionExp) {}
 }

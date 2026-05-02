@@ -43,3 +43,5 @@ app:
     provider: ${LLM_PROVIDER:rule-based}
     api-key: ${LLM_API_KEY:}
     model: ${LLM_MODEL:gemini-1.5-flash}
+  reward:
+    completion-exp: ${COMPLETION_EXP:1000}

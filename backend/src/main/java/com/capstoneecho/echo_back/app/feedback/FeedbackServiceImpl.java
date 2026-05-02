@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.app.feedback;
 
+import com.capstoneecho.echo_back.app.AppProperties;
 import com.capstoneecho.echo_back.app.common.BusinessException;
 import com.capstoneecho.echo_back.app.common.ErrorCode;
 import com.capstoneecho.echo_back.app.feedback.dto.FeedbackResponse;
@@ -49,9 +50,6 @@ class FeedbackServiceImpl implements FeedbackService {
     private static final TypeReference<List<ModelAnalyzeResponse.AlignmentItem>> ALIGNMENT_LIST =
             new TypeReference<>() {};
 
-    // 챕터 학습 완료 시 사용자에게 지급되는 기본 EXP. 추후 정확도/난이도별 차등을 줄 수 있다.
-    private static final int COMPLETION_EXP_REWARD = 1000;
-
     private final FeedbackRepository feedbackRepository;
     private final RecordingRepository recordingRepository;
     private final ScriptService scriptService;
@@ -62,6 +60,9 @@ class FeedbackServiceImpl implements FeedbackService {
     private final ModelServerClient modelClient;
     private final MemberService memberService;
     private final ObjectMapper objectMapper;
+    // 학습 완료 시 지급할 EXP 양은 application.yaml 의 app.reward.completion-exp 로부터 주입된다.
+    // 게임 밸런싱 변경 시 코드 재배포 없이 환경 변수 / 설정 파일만 갱신하면 된다.
+    private final int completionExpReward;
 
     FeedbackServiceImpl(
             FeedbackRepository feedbackRepository,
@@ -73,7 +74,8 @@ class FeedbackServiceImpl implements FeedbackService {
             PracticeWordResolver practiceWordResolver,
             ModelServerClient modelClient,
             MemberService memberService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            AppProperties properties
     ) {
         this.feedbackRepository = feedbackRepository;
         this.recordingRepository = recordingRepository;
@@ -85,6 +87,7 @@ class FeedbackServiceImpl implements FeedbackService {
         this.modelClient = modelClient;
         this.memberService = memberService;
         this.objectMapper = objectMapper;
+        this.completionExpReward = properties.reward().completionExp();
     }
 
     @Override
@@ -177,7 +180,7 @@ class FeedbackServiceImpl implements FeedbackService {
         // feedback 소유 확인만 검증으로 사용. 보상 지급 자체는 MemberService 에 위임해 SRP 를 지킨다.
         feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-        var user = memberService.awardCompletionRewards(userId, COMPLETION_EXP_REWARD);
+        var user = memberService.awardCompletionRewards(userId, completionExpReward);
         return UserResponse.from(user);
     }
 
