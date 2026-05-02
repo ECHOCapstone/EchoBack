@@ -104,7 +104,18 @@ public class Recording {
         return r;
     }
 
-    public void applyAnalysis(
+    public void applyAnalysis(AnalysisOutcome outcome) {
+        this.perceived = outcome.perceivedJoined();
+        this.canonical = outcome.canonicalJoined();
+        this.peakSoftmax = outcome.peakSoftmaxJoined();
+        this.errorsJson = outcome.errorsJson();
+        this.guidanceKr = outcome.guidanceKr();
+        this.durationSec = outcome.durationSec();
+        this.stepScore = outcome.stepScore();
+    }
+
+    // 모델 분석 + 점수 + LLM 가이드까지 한 녹음에 반영할 결과를 한 번에 들고 다닌다.
+    public record AnalysisOutcome(
             String perceivedJoined,
             String canonicalJoined,
             String peakSoftmaxJoined,
@@ -112,15 +123,7 @@ public class Recording {
             String guidanceKr,
             Double durationSec,
             Double stepScore
-    ) {
-        this.perceived = perceivedJoined;
-        this.canonical = canonicalJoined;
-        this.peakSoftmax = peakSoftmaxJoined;
-        this.errorsJson = errorsJson;
-        this.guidanceKr = guidanceKr;
-        this.durationSec = durationSec;
-        this.stepScore = stepScore;
-    }
+    ) {}
 
     @PrePersist
     void onCreate() {

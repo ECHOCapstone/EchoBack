@@ -76,8 +76,7 @@ class RecordingServiceImpl implements RecordingService {
         }
 
         var stored = storage.save(userId, audio.getOriginalFilename(), bytes);
-        // 호출 시점에 결정된 학습 종류에 따라 도메인 의도 그대로 저장한다 (SRP).
-        // forScriptStep 추천 학습 / forSessionSentence 한 문장 단위 / forSessionFreeForm 통째 녹음.
+        // 학습 종류에 맞는 팩토리로 Recording 을 만든다 (forScriptStep / forSessionSentence / forSessionFreeForm).
         var entity = repository.save(buildRecording(userId, scriptId, sessionId, stepId, sessionSentenceId, stored.path()));
 
         var analysis = modelClient.analyze(
@@ -95,7 +94,7 @@ class RecordingServiceImpl implements RecordingService {
                 analysis.canonical(),
                 errorList
         );
-        entity.applyAnalysis(
+        entity.applyAnalysis(new Recording.AnalysisOutcome(
                 joinStrings(analysis.perceived()),
                 joinStrings(analysis.canonical()),
                 joinDoubles(analysis.peakSoftmax()),
@@ -103,19 +102,15 @@ class RecordingServiceImpl implements RecordingService {
                 guidanceKr,
                 analysis.durationSec(),
                 score
-        );
+        ));
         return RecordingResponse.from(entity);
     }
 
-    // 모델 호출과 LLM 가이드 생성에 필요한 두 입력값을 한 곳에서 결정한다.
-    //   canonical    : 모델 서버 /analyze 에 보낼 정답 음소 시퀀스 (없으면 PER 미산출)
-    //   targetText   : 한국어 가이드 문장에 넣을 사용자 발음 목표 텍스트
-    //
-    // 분기 규칙
-    //   - scriptId 있음 + stepId 있음  : 추천 학습의 한 step (canonical/targetText 모두 결정됨)
-    //   - scriptId 있음 + stepId 없음  : 추천 학습 자유 녹음 (캐넌 없이 전체 스크립트 평가)
-    //   - sessionSentenceId 있음       : 맞춤 학습 한 문장 단위 (sentence.text 가 targetText)
-    //   - sessionId 만 있음            : 맞춤 학습 통째 녹음 (session.scriptText 가 targetText)
+    // 학습 종류에 따라 정답 음소(canonical) 와 사용자가 발음할 텍스트(targetText) 를 골라낸다.
+    //   - script + step : 추천 학습의 한 step
+    //   - script 만     : 추천 학습 자유 녹음 (canonical 없이)
+    //   - sentenceId    : 맞춤 학습의 한 문장
+    //   - session 만    : 맞춤 학습을 통째로
     private TargetResolution resolveTarget(
             Long userId,
             Long scriptId,
@@ -139,7 +134,6 @@ class RecordingServiceImpl implements RecordingService {
         return new TargetResolution(null, session.getScriptText());
     }
 
-    // 모델 호출용 canonical 과 가이드용 targetText 를 한 묶음으로 들고 다니기 위한 값 객체.
     private record TargetResolution(String canonical, String targetText) {}
 
     private List<PhonemeErrorResponse> toErrorResponses(List<ModelAnalyzeResponse.AlignmentItem> errors) {
@@ -176,7 +170,6 @@ class RecordingServiceImpl implements RecordingService {
         }
     }
 
-    // validateTarget 을 통과한 입력에 한해 학습 종류별 정적 팩토리로 분기한다.
     private static Recording buildRecording(
             Long userId,
             Long scriptId,
