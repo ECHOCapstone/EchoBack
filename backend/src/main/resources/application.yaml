@@ -62,3 +62,8 @@ app:
     step-threshold:
       pass: ${STEP_PASS_THRESHOLD:80}
       ok: ${STEP_OK_THRESHOLD:60}
+    default-practice-word: ${DEFAULT_PRACTICE_WORD:rabbit}
+  session:
+    sentence-min-length: ${SENTENCE_MIN_LENGTH:6}
+  stats:
+    weekly-top-n: ${WEEKLY_TOP_N:5}

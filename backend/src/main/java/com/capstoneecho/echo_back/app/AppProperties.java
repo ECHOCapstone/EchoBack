@@ -17,7 +17,9 @@ public record AppProperties(
         Badge badge,
         Time time,
         Auth auth,
-        Feedback feedback
+        Feedback feedback,
+        Session session,
+        Stats stats
 ) {
 
     public record Jwt(String secret, long expireMs) {}
@@ -31,7 +33,8 @@ public record AppProperties(
 
     public record Storage(String recordingDir) {}
 
-    // provider 가 gemini 일 때만 외부 LLM 클라이언트가 등록되고, 그 외에는 규칙 기반으로 떨어진다.
+    // provider 가 gemini 이고 apiKey 가 채워져 있을 때만 외부 LLM 이 활성화되고, 그 외에는
+    // RuleBasedLlmFeedbackGenerator 가 안전망으로 동작한다.
     public record Llm(String provider, String apiKey, String model) {}
 
     // 한 챕터 학습을 끝냈을 때 사용자에게 지급할 EXP.
@@ -55,9 +58,16 @@ public record AppProperties(
 
     public record DemoGoogle(String username, String email, String nickname, String password) {}
 
-    // 한 step 녹음 직후 한국어 안내 문장의 분기 임계값. step 점수가 pass 이상이면 칭찬,
-    // ok 이상이면 살짝 더 다듬으라는 톤, 그 미만이면 약점 음소를 짚어 다시 시도 권유.
-    public record Feedback(StepThreshold stepThreshold) {}
+    // 발음 코칭 정책.
+    //   stepThreshold        : step 점수 분기 (pass / ok / 그 미만) 임계값
+    //   defaultPracticeWord  : Script.practiceWord 도, 음소 매핑도 결정 못 했을 때의 마지막 기본값
+    public record Feedback(StepThreshold stepThreshold, String defaultPracticeWord) {}
 
     public record StepThreshold(double pass, double ok) {}
+
+    // 사용자 맞춤 학습 세션 정책. sentenceMinLength 미만의 문장 조각은 앞 조각에 흡수된다.
+    public record Session(int sentenceMinLength) {}
+
+    // 통계 화면 표시 정책. 지난 한 주 오류 음소 중 상위 N 개만 노출한다.
+    public record Stats(int weeklyTopN) {}
 }

@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.app.stats;
 
+import com.capstoneecho.echo_back.app.AppProperties;
 import com.capstoneecho.echo_back.app.feedback.FeedbackRepository;
 import com.capstoneecho.echo_back.app.feedback.PronunciationFeedback;
 import com.capstoneecho.echo_back.app.member.MemberService;
@@ -23,26 +24,27 @@ import java.util.TreeMap;
 @Transactional(readOnly = true)
 class StatsServiceImpl implements StatsService {
 
-    private static final int WEEKLY_TOP_N = 5;
-
     private final MemberService memberService;
     private final FeedbackRepository feedbackRepository;
     private final SessionService sessionService;
     private final BadgePolicy badgePolicy;
     private final ZoneId zone;
+    private final int weeklyTopN;
 
     StatsServiceImpl(
             MemberService memberService,
             FeedbackRepository feedbackRepository,
             SessionService sessionService,
             BadgePolicy badgePolicy,
-            ZoneId learningZoneId
+            ZoneId learningZoneId,
+            AppProperties properties
     ) {
         this.memberService = memberService;
         this.feedbackRepository = feedbackRepository;
         this.sessionService = sessionService;
         this.badgePolicy = badgePolicy;
         this.zone = learningZoneId;
+        this.weeklyTopN = properties.stats().weeklyTopN();
     }
 
     @Override
@@ -100,7 +102,7 @@ class StatsServiceImpl implements StatsService {
         }
         return counter.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
-                .limit(WEEKLY_TOP_N)
+                .limit(weeklyTopN)
                 .map(e -> new StatsResponse.PhonemeFrequency(e.getKey(), e.getValue()))
                 .toList();
     }
