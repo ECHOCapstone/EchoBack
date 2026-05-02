@@ -4,9 +4,8 @@ import com.capstoneecho.echo_back.app.common.BusinessException;
 import com.capstoneecho.echo_back.app.common.ErrorCode;
 import com.capstoneecho.echo_back.app.feedback.LlmFeedbackGenerator;
 import com.capstoneecho.echo_back.app.feedback.ModelServerClient;
+import com.capstoneecho.echo_back.app.feedback.PhonemeErrorMapper;
 import com.capstoneecho.echo_back.app.feedback.ScoringPolicy;
-import com.capstoneecho.echo_back.app.feedback.dto.ModelAnalyzeResponse;
-import com.capstoneecho.echo_back.app.feedback.dto.PhonemeErrorResponse;
 import com.capstoneecho.echo_back.app.learning.LearningStep;
 import com.capstoneecho.echo_back.app.recording.dto.RecordingResponse;
 import com.capstoneecho.echo_back.app.script.ScriptService;
@@ -14,7 +13,6 @@ import com.capstoneecho.echo_back.app.session.SessionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,7 +30,7 @@ class RecordingServiceImpl implements RecordingService {
     private final ScriptService scriptService;
     private final SessionService sessionService;
     private final LlmFeedbackGenerator llmGenerator;
-    private final ObjectMapper objectMapper;
+    private final PhonemeErrorMapper errorMapper;
 
     RecordingServiceImpl(
             RecordingRepository repository,
@@ -42,7 +40,7 @@ class RecordingServiceImpl implements RecordingService {
             ScriptService scriptService,
             SessionService sessionService,
             LlmFeedbackGenerator llmGenerator,
-            ObjectMapper objectMapper
+            PhonemeErrorMapper errorMapper
     ) {
         this.repository = repository;
         this.storage = storage;
@@ -51,7 +49,7 @@ class RecordingServiceImpl implements RecordingService {
         this.scriptService = scriptService;
         this.sessionService = sessionService;
         this.llmGenerator = llmGenerator;
-        this.objectMapper = objectMapper;
+        this.errorMapper = errorMapper;
     }
 
     @Override
@@ -86,7 +84,7 @@ class RecordingServiceImpl implements RecordingService {
                 target.canonical()
         );
         var score = scoringPolicy.scoreOf(analysis);
-        var errorList = toErrorResponses(analysis.errors());
+        var errorList = errorMapper.toResponses(analysis.errors());
         var guidanceKr = llmGenerator.stepGuidance(
                 target.targetText(),
                 score,
@@ -98,7 +96,7 @@ class RecordingServiceImpl implements RecordingService {
                 joinStrings(analysis.perceived()),
                 joinStrings(analysis.canonical()),
                 joinDoubles(analysis.peakSoftmax()),
-                serializeErrors(analysis.errors()),
+                errorMapper.serialize(analysis.errors()),
                 guidanceKr,
                 analysis.durationSec(),
                 score
@@ -135,24 +133,6 @@ class RecordingServiceImpl implements RecordingService {
     }
 
     private record TargetResolution(String canonical, String targetText) {}
-
-    private List<PhonemeErrorResponse> toErrorResponses(List<ModelAnalyzeResponse.AlignmentItem> errors) {
-        if (errors == null || errors.isEmpty()) return List.of();
-        return errors.stream()
-                .map(e -> new PhonemeErrorResponse(e.op(), e.canonical(), e.recognized(), e.canonicalIndex()))
-                .toList();
-    }
-
-    private String serializeErrors(List<ModelAnalyzeResponse.AlignmentItem> errors) {
-        if (errors == null || errors.isEmpty()) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(errors);
-        } catch (Exception e) {
-            return null;
-        }
-    }
 
     @Override
     @Transactional(readOnly = true)
