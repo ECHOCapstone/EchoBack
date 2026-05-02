@@ -66,25 +66,7 @@ class RecordingServiceImpl implements RecordingService {
         validateTarget(scriptId, sessionId);
         validateAudio(audio);
 
-        // 추천 학습 흐름이면 step 의 canonical 음소와 targetText 를 사용해 채팅 가이드를 만든다.
-        // 맞춤 학습(session) 은 sessionSentenceId 가 들어온 한 문장 텍스트를 targetText 로 쓰고,
-        // sentenceId 가 없으면 세션 전체 scriptText 를 fallback 으로 사용한다.
-        String canonical = null;
-        String targetText = null;
-        if (scriptId != null) {
-            scriptService.getEntity(scriptId);
-            if (stepId != null) {
-                LearningStep step = scriptService.getStep(scriptId, stepId);
-                canonical = step.getCanonicalPhonemes();
-                targetText = step.getTargetText();
-            }
-        } else if (sessionSentenceId != null) {
-            var sentence = sessionService.getSentence(userId, sessionSentenceId);
-            targetText = sentence.getText();
-        } else {
-            var session = sessionService.getEntity(userId, sessionId);
-            targetText = session.getScriptText();
-        }
+        var target = resolveTarget(userId, scriptId, sessionId, stepId, sessionSentenceId);
 
         byte[] bytes;
         try {
@@ -102,12 +84,12 @@ class RecordingServiceImpl implements RecordingService {
                 bytes,
                 stored.filename() != null ? stored.filename() : "audio.wav",
                 resolveContentType(audio),
-                canonical
+                target.canonical()
         );
         var score = scoringPolicy.scoreOf(analysis);
         var errorList = toErrorResponses(analysis.errors());
         var guidanceKr = llmGenerator.stepGuidance(
-                targetText,
+                target.targetText(),
                 score,
                 analysis.perceived(),
                 analysis.canonical(),
@@ -124,6 +106,41 @@ class RecordingServiceImpl implements RecordingService {
         );
         return RecordingResponse.from(entity);
     }
+
+    // 모델 호출과 LLM 가이드 생성에 필요한 두 입력값을 한 곳에서 결정한다.
+    //   canonical    : 모델 서버 /analyze 에 보낼 정답 음소 시퀀스 (없으면 PER 미산출)
+    //   targetText   : 한국어 가이드 문장에 넣을 사용자 발음 목표 텍스트
+    //
+    // 분기 규칙
+    //   - scriptId 있음 + stepId 있음  : 추천 학습의 한 step (canonical/targetText 모두 결정됨)
+    //   - scriptId 있음 + stepId 없음  : 추천 학습 자유 녹음 (캐넌 없이 전체 스크립트 평가)
+    //   - sessionSentenceId 있음       : 맞춤 학습 한 문장 단위 (sentence.text 가 targetText)
+    //   - sessionId 만 있음            : 맞춤 학습 통째 녹음 (session.scriptText 가 targetText)
+    private TargetResolution resolveTarget(
+            Long userId,
+            Long scriptId,
+            Long sessionId,
+            Long stepId,
+            Long sessionSentenceId
+    ) {
+        if (scriptId != null) {
+            scriptService.getEntity(scriptId);
+            if (stepId != null) {
+                LearningStep step = scriptService.getStep(scriptId, stepId);
+                return new TargetResolution(step.getCanonicalPhonemes(), step.getTargetText());
+            }
+            return new TargetResolution(null, null);
+        }
+        if (sessionSentenceId != null) {
+            var sentence = sessionService.getSentence(userId, sessionSentenceId);
+            return new TargetResolution(null, sentence.getText());
+        }
+        var session = sessionService.getEntity(userId, sessionId);
+        return new TargetResolution(null, session.getScriptText());
+    }
+
+    // 모델 호출용 canonical 과 가이드용 targetText 를 한 묶음으로 들고 다니기 위한 값 객체.
+    private record TargetResolution(String canonical, String targetText) {}
 
     private List<PhonemeErrorResponse> toErrorResponses(List<ModelAnalyzeResponse.AlignmentItem> errors) {
         if (errors == null || errors.isEmpty()) return List.of();
