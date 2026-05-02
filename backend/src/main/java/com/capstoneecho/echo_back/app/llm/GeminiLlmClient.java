@@ -6,17 +6,11 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Gemini REST API 기반 {@link LlmClient} 구현.
- *
- * <p>Gemini `generateContent` 엔드포인트에 프롬프트를 보내고, 첫 번째 candidate의 텍스트를 그대로 반환한다.
- * 도메인 특화 프롬프트 생성 및 응답 파싱은 호출자(도메인 계층)의 책임이다.
- *
- * <p>이 클래스는 Spring 컴포넌트로 자동 등록되지 않는다. {@link LlmClientConfig} 의 {@code @Bean}
- * 메서드에서 어떤 프로바이더와 모델을 쓸지 명시적으로 선택한다.
- *
- * <p>참고: <a href="https://ai.google.dev/api/generate-content">Gemini generateContent API</a>
- */
+// Gemini generateContent 엔드포인트로 프롬프트를 보내고 첫 candidate 의 텍스트를 그대로 돌려준다.
+// 빈으로 자동 등록되지 않고 LlmClientConfig 가 provider=gemini 일 때만 만들어 준다.
+// 응답 후보가 비어 있으면 빈 텍스트로 떨어져 호출자가 fallback 으로 처리한다.
+//
+// docs: https://ai.google.dev/api/generate-content
 public class GeminiLlmClient implements LlmClient {
 
     private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -40,15 +34,27 @@ public class GeminiLlmClient implements LlmClient {
                 )
         );
 
-        GeminiResponse response = restClient.post()
+        var response = restClient.post()
                 .uri("/models/{model}:generateContent", model)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
                 .body(GeminiResponse.class);
 
-        String content = response.candidates().getFirst().content().parts().getFirst().text();
-        return new LlmResponse(content);
+        return new LlmResponse(extractText(response));
+    }
+
+    // 응답 어디든 비어 있을 수 있다. 빈 응답을 하나의 케이스로 묶어 빈 문자열을 돌려준다.
+    private static String extractText(GeminiResponse response) {
+        if (response == null || response.candidates() == null || response.candidates().isEmpty()) {
+            return "";
+        }
+        var content = response.candidates().get(0).content();
+        if (content == null || content.parts() == null || content.parts().isEmpty()) {
+            return "";
+        }
+        var text = content.parts().get(0).text();
+        return text != null ? text : "";
     }
 
     private record GeminiResponse(List<Candidate> candidates) {}
