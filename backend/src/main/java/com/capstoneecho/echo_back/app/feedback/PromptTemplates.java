@@ -28,6 +28,12 @@ class PromptTemplates {
         this.templates = loaded;
     }
 
+    // 모든 호출 앞에 prepend 되는 시스템 프롬프트 / 도메인 지식. 비어 있으면 빈 문자열.
+    public String system() {
+        var raw = templates.get("system");
+        return raw == null ? "" : raw.toString().trim();
+    }
+
     public String prompt(String key) {
         var entry = entry(key);
         var raw = entry.get("prompt");
