@@ -52,8 +52,9 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
         return invoke(prompt, "가장 자주 틀린 음소를 다시 한 번 연습해 보세요.");
     }
 
-    // prompts.yaml 의 retry.schema 가 정의한 {correct, guidance} JSON 으로 응답을 받는다.
-    // 키 이름이 yaml 에서 바뀌면 여기서 꺼내는 path 도 같이 바꿔야 한다.
+    // prompts.yaml 의 retry.schema 가 정의한 {verdict, guidance} JSON 으로 응답을 받는다.
+    // verdict 는 PASS / ALMOST / FAIL 셋 중 하나이며, 도메인의 boolean correct 로는 PASS 만 true 로 본다.
+    // ALMOST 는 "거의 맞음" 이라 다음 단계로 보내지 않고 한 번 더 시도 권유 (= correct=false).
     @Override
     public RetryEvaluation evaluateRetry(
             String practiceWord,
@@ -65,7 +66,8 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
         try {
             var json = llmClient.generateJson(prompt, schema);
             if (json == null) return fallback(practiceWord);
-            boolean correct = json.path("correct").asBoolean(false);
+            var verdict = json.path("verdict").asString("FAIL").trim().toUpperCase(Locale.ROOT);
+            boolean correct = verdict.equals("PASS");
             String guidance = json.path("guidance").asString("");
             if (guidance.isBlank()) guidance = defaultGuidance(correct, practiceWord);
             return new RetryEvaluation(correct, guidance);
@@ -85,8 +87,9 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
                 : practiceWord + " 발음을 한 번 더 또렷하게 굴려 보세요.";
     }
 
-    // prompts.yaml 의 practice-word.schema 가 정의한 {word} JSON 으로 응답을 받는다.
-    // 비어 있거나 실패면 빈 문자열을 돌려 PracticeWordResolver 가 자체 fallback 으로 떨어진다.
+    // prompts.yaml 의 practice-word.schema 가 정의한 {text} JSON 으로 응답을 받는다.
+    // 단어 한 개일 수도, 짧은 구절(예: "thank you") 일 수도 있어 sanitize 는 토큰 1개로 자르지 않고
+    // 영어 소문자 + 공백 + 작은따옴표(don't 같은 축약형) 만 남기는 선에서 멈춘다.
     @Override
     public String recommendPracticeWord(String unitTitle, String weakPhoneme) {
         if (weakPhoneme == null || weakPhoneme.isBlank()) return "";
@@ -95,18 +98,18 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
         try {
             var json = llmClient.generateJson(prompt, schema);
             if (json == null) return "";
-            return sanitizeWord(json.path("word").asString(""));
+            return sanitizeText(json.path("text").asString(""));
         } catch (Exception e) {
             log.warn("LLM 호출 실패, 기본 응답으로 대체합니다: {}", e.getMessage());
             return "";
         }
     }
 
-    // 모델이 따옴표나 공백을 섞어 보낼 가능성에 대비해 a-z 외 문자를 떼고 첫 토큰만 단어로 본다.
-    private static String sanitizeWord(String raw) {
-        var cleaned = raw.toLowerCase(Locale.ROOT).replaceAll("[^a-z]", " ").trim();
-        if (cleaned.isEmpty()) return "";
-        return cleaned.split("\\s+")[0];
+    private static String sanitizeText(String raw) {
+        return raw.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z' ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private String invoke(String prompt, String fallback) {
