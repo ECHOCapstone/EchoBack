@@ -45,8 +45,10 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
             Map.entry("ng", new Hint("NG", "혀 뒷부분을 입천장에 붙이고 코로 소리를 흘려보내세요."))
     );
 
+    // RuleBased 는 단어 단위 정렬 정보를 만들지 않아 wrongWords 는 항상 빈 배열로 둔다.
+    // 단어 색칠은 Gemini 가 활성화됐을 때만 의미 있고, 안전망에서는 음소 색칠로 충분하다.
     @Override
-    public String stepGuidance(
+    public StepGuidance stepGuidance(
             String targetText,
             double stepScore,
             List<String> perceived,
@@ -55,19 +57,19 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
     ) {
         var label = targetText != null && !targetText.isBlank() ? "\"" + targetText + "\"" : "이번";
         if (stepScore >= stepPassThreshold) {
-            return label + " 발음이 정확해요. 다음으로 넘어가 볼까요?";
+            return new StepGuidance(label + " 발음이 정확해요. 다음으로 넘어가 볼까요?", List.of());
         }
         var hint = lookup(pickWeakest(errors));
         if (stepScore >= stepOkThreshold) {
-            if (hint != null) {
-                return label + " 발음 좋아요. " + hint.label() + " 부분만 조금 더 또렷하게 해보세요.";
-            }
-            return label + " 발음 좋아요. 한 번 더 또렷하게 시도해 봐요.";
+            var msg = hint != null
+                    ? label + " 발음 좋아요. " + hint.label() + " 부분만 조금 더 또렷하게 해보세요."
+                    : label + " 발음 좋아요. 한 번 더 또렷하게 시도해 봐요.";
+            return new StepGuidance(msg, List.of());
         }
-        if (hint != null) {
-            return hint.label() + " 발음이 부족해요. " + hint.guidance() + " 다시 한 번 도전해 봐요.";
-        }
-        return label + " 발음을 다시 한 번 또렷하게 시도해 봐요.";
+        var msg = hint != null
+                ? hint.label() + " 발음이 부족해요. " + hint.guidance() + " 다시 한 번 도전해 봐요."
+                : label + " 발음을 다시 한 번 또렷하게 시도해 봐요.";
+        return new StepGuidance(msg, List.of());
     }
 
     @Override

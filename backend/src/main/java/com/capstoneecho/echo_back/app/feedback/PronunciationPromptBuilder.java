@@ -67,6 +67,10 @@ public class PronunciationPromptBuilder {
         return sb.toString();
     }
 
+    public Map<String, Object> stepSchema() {
+        return templates.schema(KEY_STEP);
+    }
+
     public Map<String, Object> retrySchema() {
         return templates.schema(KEY_RETRY);
     }

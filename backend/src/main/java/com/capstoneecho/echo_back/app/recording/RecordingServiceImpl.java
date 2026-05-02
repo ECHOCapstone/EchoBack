@@ -85,7 +85,7 @@ class RecordingServiceImpl implements RecordingService {
         );
         var score = scoringPolicy.scoreOf(analysis);
         var errorList = errorMapper.toResponses(analysis.errors());
-        var guidanceKr = llmGenerator.stepGuidance(
+        var step = llmGenerator.stepGuidance(
                 target.targetText(),
                 score,
                 analysis.perceived(),
@@ -97,11 +97,11 @@ class RecordingServiceImpl implements RecordingService {
                 joinStrings(analysis.canonical()),
                 joinDoubles(analysis.peakSoftmax()),
                 errorMapper.serialize(analysis.errors()),
-                guidanceKr,
+                step.message(),
                 analysis.durationSec(),
                 score
         ));
-        return RecordingResponse.from(entity);
+        return RecordingResponse.from(entity, errorList, step.wrongWords());
     }
 
     // 학습 종류에 따라 정답 음소(canonical) 와 사용자가 발음할 텍스트(targetText) 를 골라낸다.

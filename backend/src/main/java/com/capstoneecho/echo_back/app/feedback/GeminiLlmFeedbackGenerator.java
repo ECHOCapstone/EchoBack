@@ -28,8 +28,10 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
         this.promptBuilder = promptBuilder;
     }
 
+    // step 응답은 prompts.yaml step.schema 가 정의한 {guidance, wrongWords} JSON.
+    // 호출 실패나 형식 깨짐은 정적 안전망 문장 + 빈 wrongWords 로 떨어진다.
     @Override
-    public String stepGuidance(
+    public StepGuidance stepGuidance(
             String targetText,
             double stepScore,
             List<String> perceived,
@@ -37,7 +39,26 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
             List<PhonemeErrorResponse> errors
     ) {
         var prompt = promptBuilder.buildStepPrompt(targetText, stepScore, perceived, canonical, errors);
-        return invoke(prompt, "발음 결과를 확인했어요. 다시 한 번 또렷하게 시도해 봐요.");
+        var schema = promptBuilder.stepSchema();
+        var fallback = "발음 결과를 확인했어요. 다시 한 번 또렷하게 시도해 봐요.";
+        try {
+            var json = llmClient.generateJson(prompt, schema);
+            if (json == null) return new StepGuidance(fallback, List.of());
+            var message = json.path("guidance").asString("").trim();
+            if (message.isEmpty()) message = fallback;
+            var wrongWords = new java.util.ArrayList<String>();
+            var node = json.path("wrongWords");
+            if (node.isArray()) {
+                for (var item : node) {
+                    var token = item.asString("").trim().toLowerCase(Locale.ROOT);
+                    if (!token.isEmpty()) wrongWords.add(token);
+                }
+            }
+            return new StepGuidance(message, List.copyOf(wrongWords));
+        } catch (Exception e) {
+            log.warn("LLM 호출 실패, 기본 응답으로 대체합니다: {}", e.getMessage());
+            return new StepGuidance(fallback, List.of());
+        }
     }
 
     @Override
