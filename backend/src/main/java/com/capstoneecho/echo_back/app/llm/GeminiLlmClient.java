@@ -2,13 +2,18 @@ package com.capstoneecho.echo_back.app.llm;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 // Gemini generateContent 엔드포인트로 프롬프트를 보내고 첫 candidate 의 텍스트를 그대로 돌려준다.
 // 빈으로 자동 등록되지 않고 LlmClientConfig 가 provider=gemini 일 때만 만들어 준다.
-// 응답 후보가 비어 있으면 빈 텍스트로 떨어져 호출자가 fallback 으로 처리한다.
+//
+// generateJson 은 generationConfig.responseMimeType=application/json + responseSchema 를 같이 보내
+// 모델이 JSON 으로만 응답하도록 강제하고, 그 텍스트를 JsonNode 로 파싱한다. 호출자는 키별로 꺼낸다.
 //
 // docs: https://ai.google.dev/api/generate-content
 public class GeminiLlmClient implements LlmClient {
@@ -16,32 +21,45 @@ public class GeminiLlmClient implements LlmClient {
     private static final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
     private final RestClient restClient;
+    private final ObjectMapper objectMapper;
     private final String model;
 
-    public GeminiLlmClient(String apiKey, String model) {
+    public GeminiLlmClient(String apiKey, String model, ObjectMapper objectMapper) {
         this.restClient = RestClient.builder()
                 .baseUrl(BASE_URL)
                 .defaultHeader("x-goog-api-key", apiKey)
                 .build();
+        this.objectMapper = objectMapper;
         this.model = model;
     }
 
     @Override
     public LlmResponse generate(String prompt) {
-        Map<String, Object> request = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(Map.of("text", prompt)))
-                )
-        );
+        var response = call(prompt, null);
+        return new LlmResponse(extractText(response));
+    }
 
-        var response = restClient.post()
+    @Override
+    public JsonNode generateJson(String prompt, Map<String, Object> schema) {
+        var generationConfig = new HashMap<String, Object>();
+        generationConfig.put("responseMimeType", "application/json");
+        if (schema != null) generationConfig.put("responseSchema", schema);
+        var response = call(prompt, generationConfig);
+        var text = extractText(response);
+        if (text.isBlank()) return objectMapper.createObjectNode();
+        return objectMapper.readTree(text);
+    }
+
+    private GeminiResponse call(String prompt, Map<String, Object> generationConfig) {
+        var request = new HashMap<String, Object>();
+        request.put("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
+        if (generationConfig != null) request.put("generationConfig", generationConfig);
+        return restClient.post()
                 .uri("/models/{model}:generateContent", model)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
                 .body(GeminiResponse.class);
-
-        return new LlmResponse(extractText(response));
     }
 
     // 응답 어디든 비어 있을 수 있다. 빈 응답을 하나의 케이스로 묶어 빈 문자열을 돌려준다.

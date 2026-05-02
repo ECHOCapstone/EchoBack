@@ -7,9 +7,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-// LLM 프롬프트 directive 의 단일 보관소.
-// src/main/resources/prompts.yaml 을 한 번 읽어 키별로 꺼내 쓸 수 있게 해 두고, 톤 조정이나
-// 데이터셋 기반 새 프롬프트 실험은 yaml 파일만 손대면 된다.
+// LLM 프롬프트 directive + 응답 스키마의 단일 보관소.
+// src/main/resources/prompts.yaml 을 한 번 읽고 키별 prompt / schema 를 꺼내 쓸 수 있게 한다.
+//
+// 톤이나 데이터셋 기반 새 프롬프트 실험은 yaml 만 손대면 되고, schema 를 가진 키는 Gemini 가
+// JSON 응답을 강제하므로 파싱이 안정적이다.
 @Component
 class PromptTemplates {
 
@@ -26,18 +28,34 @@ class PromptTemplates {
         this.templates = loaded;
     }
 
-    public String step()         { return get("step"); }
-    public String unit()         { return get("unit"); }
-    public String retry()        { return get("retry"); }
-    public String practiceWord() { return get("practice-word"); }
-
-    // 키가 없거나 값이 비면 부팅 자체를 멈추는 게 안전하다 — 빈 directive 로 LLM 을 부르면
-    // 응답 형식이 깨져 흐름이 더 어색해진다.
-    private String get(String key) {
-        var value = templates.get(key);
-        if (value == null || value.toString().isBlank()) {
-            throw new IllegalStateException("prompts.yaml 에 '" + key + "' directive 가 비어 있습니다.");
+    public String prompt(String key) {
+        var entry = entry(key);
+        var raw = entry.get("prompt");
+        if (raw == null || raw.toString().isBlank()) {
+            throw new IllegalStateException("prompts.yaml 의 '" + key + ".prompt' 가 비어 있습니다.");
         }
-        return value.toString().trim();
+        return raw.toString().trim();
+    }
+
+    // schema 가 정의된 키만 JSON 강제 응답을 받는다. 자유 텍스트 키 (step / unit) 는 null.
+    public Map<String, Object> schema(String key) {
+        var entry = entry(key);
+        var raw = entry.get("schema");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> map)) {
+            throw new IllegalStateException("prompts.yaml 의 '" + key + ".schema' 형식이 잘못됐습니다.");
+        }
+        @SuppressWarnings("unchecked")
+        var typed = (Map<String, Object>) map;
+        return typed;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> entry(String key) {
+        var raw = templates.get(key);
+        if (!(raw instanceof Map<?, ?>)) {
+            throw new IllegalStateException("prompts.yaml 에 '" + key + "' 가 없거나 형식이 잘못됐습니다.");
+        }
+        return (Map<String, Object>) raw;
     }
 }

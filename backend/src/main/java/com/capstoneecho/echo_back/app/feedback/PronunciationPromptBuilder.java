@@ -10,6 +10,11 @@ import java.util.List;
 @Component
 public class PronunciationPromptBuilder {
 
+    private static final String KEY_STEP = "step";
+    private static final String KEY_UNIT = "unit";
+    private static final String KEY_RETRY = "retry";
+    private static final String KEY_PRACTICE_WORD = "practice-word";
+
     private final PromptTemplates templates;
 
     public PronunciationPromptBuilder(PromptTemplates templates) {
@@ -23,7 +28,7 @@ public class PronunciationPromptBuilder {
             List<String> canonical,
             List<PhonemeErrorResponse> errors
     ) {
-        var sb = new StringBuilder(templates.step()).append("\n\n[학습 정보]\n");
+        var sb = new StringBuilder(templates.prompt(KEY_STEP)).append("\n\n[학습 정보]\n");
         sb.append("- 목표 발음: ").append(safeText(targetText)).append('\n');
         sb.append("- 점수(0~100): ").append(formatScore(stepScore)).append('\n');
         sb.append("- 정답 음소: ").append(joinPhonemes(canonical)).append('\n');
@@ -38,7 +43,7 @@ public class PronunciationPromptBuilder {
             String weakPhoneme,
             List<PhonemeErrorResponse> errors
     ) {
-        var sb = new StringBuilder(templates.unit()).append("\n\n[누적 결과]\n");
+        var sb = new StringBuilder(templates.prompt(KEY_UNIT)).append("\n\n[누적 결과]\n");
         sb.append("- 학습 단원: ").append(safeText(unitTitle)).append('\n');
         sb.append("- 평균 정확도(0~100): ").append(formatScore(accuracy)).append('\n');
         sb.append("- 가장 자주 틀린 음소: ").append(safeText(weakPhoneme)).append('\n');
@@ -51,18 +56,26 @@ public class PronunciationPromptBuilder {
             List<String> perceived,
             List<String> canonical
     ) {
-        var sb = new StringBuilder(templates.retry()).append("\n\n[재연습 결과]\n");
+        var sb = new StringBuilder(templates.prompt(KEY_RETRY)).append("\n\n[재연습 결과]\n");
         sb.append("- 재연습 단어: ").append(safeText(practiceWord)).append('\n');
         sb.append("- 정답 음소: ").append(joinPhonemes(canonical)).append('\n');
         sb.append("- 인식 음소: ").append(joinPhonemes(perceived));
         return sb.toString();
     }
 
+    public java.util.Map<String, Object> retrySchema() {
+        return templates.schema(KEY_RETRY);
+    }
+
     public String buildPracticeWordPrompt(String unitTitle, String weakPhoneme) {
-        var sb = new StringBuilder(templates.practiceWord()).append("\n\n[입력]\n");
+        var sb = new StringBuilder(templates.prompt(KEY_PRACTICE_WORD)).append("\n\n[입력]\n");
         sb.append("- 학습 단원: ").append(safeText(unitTitle)).append('\n');
         sb.append("- 약점 음소: ").append(safeText(weakPhoneme));
         return sb.toString();
+    }
+
+    public java.util.Map<String, Object> practiceWordSchema() {
+        return templates.schema(KEY_PRACTICE_WORD);
     }
 
     private static String safeText(String value) {
