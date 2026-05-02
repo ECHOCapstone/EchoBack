@@ -2,9 +2,11 @@ package com.capstoneecho.echo_back.app.seed;
 
 import com.capstoneecho.echo_back.app.learning.LearningStep;
 import com.capstoneecho.echo_back.app.learning.LearningStepRepository;
-import com.capstoneecho.echo_back.app.script.ScriptRepository;
 import com.capstoneecho.echo_back.app.script.Difficulty;
 import com.capstoneecho.echo_back.app.script.Script;
+import com.capstoneecho.echo_back.app.script.ScriptRepository;
+import com.capstoneecho.echo_back.app.track.Track;
+import com.capstoneecho.echo_back.app.track.TrackRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -13,16 +15,22 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 
-// 빈 H2 DB 에 시연용 학습 unit 과 단계를 채워 넣는 단발성 초기화기.
-// 추천 학습은 잰말놀이 1개 + R/L · V/B 발음 연습 2개로 구성된다.
-// 동일 시드의 중복 삽입을 막기 위해 Script 가 이미 있으면 건너뛴다.
+// 빈 H2 DB 에 시연용 트랙·챕터·스텝을 채워 넣는 단발성 초기화기.
+// 트랙 1개("기본 발음 트랙") 안에 잰말놀이 + R/L + V/B 세 챕터를 순서대로 배치한다.
+// 동일 시드의 중복 삽입을 막기 위해 트랙이 이미 존재하면 건너뛴다.
 @Component
 class InitialDataLoader implements ApplicationRunner {
 
+    private final TrackRepository trackRepository;
     private final ScriptRepository scriptRepository;
     private final LearningStepRepository stepRepository;
 
-    InitialDataLoader(ScriptRepository scriptRepository, LearningStepRepository stepRepository) {
+    InitialDataLoader(
+            TrackRepository trackRepository,
+            ScriptRepository scriptRepository,
+            LearningStepRepository stepRepository
+    ) {
+        this.trackRepository = trackRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
     }
@@ -30,24 +38,30 @@ class InitialDataLoader implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (!scriptRepository.findByIsPresetTrueOrderByIdAsc().isEmpty()) {
+        if (!trackRepository.findAll().isEmpty()) {
             return;
         }
-        seedTongueTwister();
-        seedPronunciationPairRL();
-        seedPronunciationPairVB();
+        var basicTrack = trackRepository.save(Track.create(
+                "기본 발음 트랙",
+                "잰말놀이부터 R/L · V/B 까지, 영어 발음의 기본기를 빠르게 잡는 입문 트랙.",
+                0
+        ));
+        seedTongueTwisterChapter(basicTrack);
+        seedPronunciationPairRLChapter(basicTrack);
+        seedPronunciationPairVBChapter(basicTrack);
     }
 
-    private void seedTongueTwister() {
-        var script = scriptRepository.save(Script.create(
+    private void seedTongueTwisterChapter(Track track) {
+        var chapter = scriptRepository.save(Script.createChapter(
+                track,
+                0,
                 "영어 잰말놀이",
                 "I slit the sheet, the sheet I slit, and on the slitted sheet I sit.",
-                Difficulty.MEDIUM,
-                true
+                Difficulty.MEDIUM
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.record(
-                script,
+                chapter,
                 0,
                 "오늘의 잰말놀이에요. 아래 문장을 빠르게 따라 읽어보세요.",
                 "I slit the sheet, the sheet I slit, and on the slitted sheet I sit.",
@@ -56,43 +70,45 @@ class InitialDataLoader implements ApplicationRunner {
         stepRepository.saveAll(steps);
     }
 
-    private void seedPronunciationPairRL() {
-        var script = scriptRepository.save(Script.create(
+    private void seedPronunciationPairRLChapter(Track track) {
+        var chapter = scriptRepository.save(Script.createChapter(
+                track,
+                1,
                 "발음 연습: R vs L",
                 "헷갈리는 R 과 L 발음을 단계적으로 구별해 봅니다.",
-                Difficulty.MEDIUM,
-                true
+                Difficulty.MEDIUM
         ));
         var steps = new ArrayList<LearningStep>();
-        steps.add(LearningStep.intro(script, 0, "R과 L을 각각 발음해 볼 겁니다."));
-        steps.add(LearningStep.record(script, 1, "녹음 버튼을 누르고 R을 발음해 보세요.", "R", "r"));
-        steps.add(LearningStep.record(script, 2, "녹음 버튼을 누르고 L을 발음해 보세요.", "L", "l"));
-        steps.add(LearningStep.intro(script, 3, "Right와 Light를 각각 발음해 볼 겁니다."));
-        steps.add(LearningStep.record(script, 4, "녹음 버튼을 누르고 Right를 발음해 보세요.", "Right", "r ay t"));
-        steps.add(LearningStep.record(script, 5, "녹음 버튼을 누르고 Light를 발음해 보세요.", "Light", "l ay t"));
-        steps.add(LearningStep.intro(script, 6, "Store와 Stole을 각각 발음해 볼 겁니다."));
-        steps.add(LearningStep.record(script, 7, "녹음 버튼을 누르고 Store를 발음해 보세요.", "Store", "s t ao r"));
-        steps.add(LearningStep.record(script, 8, "녹음 버튼을 누르고 Stole을 발음해 보세요.", "Stole", "s t ow l"));
+        steps.add(LearningStep.intro(chapter, 0, "R과 L을 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 1, "녹음 버튼을 누르고 R을 발음해 보세요.", "R", "r"));
+        steps.add(LearningStep.record(chapter, 2, "녹음 버튼을 누르고 L을 발음해 보세요.", "L", "l"));
+        steps.add(LearningStep.intro(chapter, 3, "Right와 Light를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 4, "녹음 버튼을 누르고 Right를 발음해 보세요.", "Right", "r ay t"));
+        steps.add(LearningStep.record(chapter, 5, "녹음 버튼을 누르고 Light를 발음해 보세요.", "Light", "l ay t"));
+        steps.add(LearningStep.intro(chapter, 6, "Store와 Stole을 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 7, "녹음 버튼을 누르고 Store를 발음해 보세요.", "Store", "s t ao r"));
+        steps.add(LearningStep.record(chapter, 8, "녹음 버튼을 누르고 Stole을 발음해 보세요.", "Stole", "s t ow l"));
         stepRepository.saveAll(steps);
     }
 
-    private void seedPronunciationPairVB() {
-        var script = scriptRepository.save(Script.create(
+    private void seedPronunciationPairVBChapter(Track track) {
+        var chapter = scriptRepository.save(Script.createChapter(
+                track,
+                2,
                 "발음 연습: V vs B",
                 "헷갈리는 V 와 B 발음을 단계적으로 구별해 봅니다.",
-                Difficulty.MEDIUM,
-                true
+                Difficulty.MEDIUM
         ));
         var steps = new ArrayList<LearningStep>();
-        steps.add(LearningStep.intro(script, 0, "V와 B를 각각 발음해 볼 겁니다."));
-        steps.add(LearningStep.record(script, 1, "녹음 버튼을 누르고 V를 발음해 보세요.", "V", "v"));
-        steps.add(LearningStep.record(script, 2, "녹음 버튼을 누르고 B를 발음해 보세요.", "B", "b"));
-        steps.add(LearningStep.intro(script, 3, "Vest와 Best를 각각 발음해 볼 겁니다."));
-        steps.add(LearningStep.record(script, 4, "녹음 버튼을 누르고 Vest를 발음해 보세요.", "Vest", "v eh s t"));
-        steps.add(LearningStep.record(script, 5, "녹음 버튼을 누르고 Best를 발음해 보세요.", "Best", "b eh s t"));
-        steps.add(LearningStep.intro(script, 6, "Vine와 Bine을 각각 발음해 볼 겁니다."));
-        steps.add(LearningStep.record(script, 7, "녹음 버튼을 누르고 Vine을 발음해 보세요.", "Vine", "v ay n"));
-        steps.add(LearningStep.record(script, 8, "녹음 버튼을 누르고 Bine을 발음해 보세요.", "Bine", "b ay n"));
+        steps.add(LearningStep.intro(chapter, 0, "V와 B를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 1, "녹음 버튼을 누르고 V를 발음해 보세요.", "V", "v"));
+        steps.add(LearningStep.record(chapter, 2, "녹음 버튼을 누르고 B를 발음해 보세요.", "B", "b"));
+        steps.add(LearningStep.intro(chapter, 3, "Vest와 Best를 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 4, "녹음 버튼을 누르고 Vest를 발음해 보세요.", "Vest", "v eh s t"));
+        steps.add(LearningStep.record(chapter, 5, "녹음 버튼을 누르고 Best를 발음해 보세요.", "Best", "b eh s t"));
+        steps.add(LearningStep.intro(chapter, 6, "Vine와 Bine을 각각 발음해 볼 겁니다."));
+        steps.add(LearningStep.record(chapter, 7, "녹음 버튼을 누르고 Vine을 발음해 보세요.", "Vine", "v ay n"));
+        steps.add(LearningStep.record(chapter, 8, "녹음 버튼을 누르고 Bine을 발음해 보세요.", "Bine", "b ay n"));
         stepRepository.saveAll(steps);
     }
 }
