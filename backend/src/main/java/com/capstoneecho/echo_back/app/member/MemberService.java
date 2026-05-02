@@ -8,4 +8,7 @@ public interface MemberService {
     // 한 학습 단위 완료 시 EXP 보상과 streak 갱신을 한 번에 적용하고 갱신된 사용자를 돌려준다.
     // 정책 자체는 User.recordCompletion 안에 캡슐화되어 있다.
     User awardCompletionRewards(Long userId, int expReward);
+
+    // 사용자가 직접 자신의 닉네임을 변경한다. 길이/공백 정규화는 User.changeNickname 가 책임진다.
+    User updateNickname(Long userId, String nickname);
 }

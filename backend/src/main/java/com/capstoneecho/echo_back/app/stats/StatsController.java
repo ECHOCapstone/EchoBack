@@ -6,6 +6,7 @@ import com.capstoneecho.echo_back.app.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.app.stats.dto.StatsResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -19,7 +20,11 @@ public class StatsController {
     }
 
     @GetMapping("/me")
-    public ApiResponse<StatsResponse> me(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.ok(statsService.getMe(principal.userId()));
+    public ApiResponse<StatsResponse> me(
+            @CurrentUser JwtPrincipal principal,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month
+    ) {
+        return ApiResponse.ok(statsService.getMe(principal.userId(), year, month));
     }
 }

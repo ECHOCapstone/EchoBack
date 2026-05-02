@@ -76,6 +76,14 @@ public class User {
         this.updatedAt = Instant.now();
     }
 
+    // 사용자가 직접 닉네임을 바꿀 때의 단일 진입점. 빈 입력은 무시하고 경계 값을 도메인이 책임진다.
+    public void changeNickname(String nickname) {
+        if (nickname == null) return;
+        var trimmed = nickname.trim();
+        if (trimmed.isEmpty()) return;
+        this.nickname = trimmed.length() > 30 ? trimmed.substring(0, 30) : trimmed;
+    }
+
     // 한 학습 단위(=챕터) 를 완료했을 때 호출되는 단일 진입점.
     // streak 은 마지막 학습 일자(lastStudyAt) 와 오늘을 비교해 결정된다.
     //   - 같은 날 다시 완료: streak 그대로 (중복 가산 방지)

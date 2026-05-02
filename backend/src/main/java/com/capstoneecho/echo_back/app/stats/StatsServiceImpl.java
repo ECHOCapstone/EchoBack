@@ -36,23 +36,27 @@ class StatsServiceImpl implements StatsService {
     }
 
     @Override
-    public StatsResponse getMe(Long userId) {
+    public StatsResponse getMe(Long userId, Integer year, Integer month) {
         var user = memberService.getById(userId);
         var feedbacks = feedbackRepository.findByUserIdOrderByCreatedAtDesc(userId);
         var today = LocalDate.now(ZONE);
+        // year/month 가 명시되면 그 월의 출석을, 아니면 오늘이 속한 월의 출석을 집계한다.
+        var calendarTarget = (year != null && month != null)
+                ? LocalDate.of(year, month, 1)
+                : today;
 
         return new StatsResponse(
                 user.getStreak(),
                 user.getExp(),
-                buildAttendance(today, feedbacks),
+                buildAttendance(calendarTarget, feedbacks),
                 buildWeeklyErrors(today, feedbacks),
                 buildBadges(feedbacks)
         );
     }
 
-    private StatsResponse.Attendance buildAttendance(LocalDate today, List<PronunciationFeedback> feedbacks) {
-        var year = today.getYear();
-        var month = today.getMonthValue();
+    private StatsResponse.Attendance buildAttendance(LocalDate target, List<PronunciationFeedback> feedbacks) {
+        var year = target.getYear();
+        var month = target.getMonthValue();
         var days = new TreeMap<Integer, Integer>();
         var prevDay = -1;
         var streak = 0;

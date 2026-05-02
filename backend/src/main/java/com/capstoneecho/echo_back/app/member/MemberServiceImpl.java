@@ -29,4 +29,13 @@ class MemberServiceImpl implements MemberService {
         user.recordCompletion(expReward);
         return user;
     }
+
+    @Override
+    @Transactional
+    public User updateNickname(Long userId, String nickname) {
+        var user = repository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        user.changeNickname(nickname);
+        return user;
+    }
 }

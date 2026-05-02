@@ -3,8 +3,12 @@ package com.capstoneecho.echo_back.app.member;
 import com.capstoneecho.echo_back.app.common.ApiResponse;
 import com.capstoneecho.echo_back.app.jwt.CurrentUser;
 import com.capstoneecho.echo_back.app.jwt.JwtPrincipal;
+import com.capstoneecho.echo_back.app.member.dto.UpdateNicknameRequest;
 import com.capstoneecho.echo_back.app.member.dto.UserResponse;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +25,15 @@ public class MemberController {
     @GetMapping("/me")
     public ApiResponse<UserResponse> me(@CurrentUser JwtPrincipal principal) {
         var user = memberService.getById(principal.userId());
+        return ApiResponse.ok(UserResponse.from(user));
+    }
+
+    @PatchMapping("/me/nickname")
+    public ApiResponse<UserResponse> changeNickname(
+            @CurrentUser JwtPrincipal principal,
+            @Valid @RequestBody UpdateNicknameRequest request
+    ) {
+        var user = memberService.updateNickname(principal.userId(), request.nickname());
         return ApiResponse.ok(UserResponse.from(user));
     }
 }
