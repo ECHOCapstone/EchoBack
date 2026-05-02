@@ -59,13 +59,21 @@ class RankingServiceImpl implements RankingService {
 
     @Override
     public RankingResponse today(Long userId) {
-        var unit = scriptRepository.findByIsPresetTrueOrderByIdAsc().stream()
+        // 사용자가 막 끝낸 챕터의 unitTitle 을 우선 사용한다. 가장 최근 PronunciationFeedback 의
+        // scriptId 로 챕터를 찾고, 학습 이력이 전혀 없을 때만 첫 시드 챕터를 fallback 으로 쓴다.
+        var feedbacksDesc = feedbackRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        var unit = feedbacksDesc.stream()
+                .map(PronunciationFeedback::getScriptId)
+                .filter(scriptId -> scriptId != null)
                 .findFirst()
-                .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
+                .flatMap(scriptRepository::findById)
+                .orElseGet(() -> scriptRepository.findByIsPresetTrueOrderByIdAsc().stream()
+                        .findFirst()
+                        .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND)));
         var unitTitle = unit.getTitle();
         var me = memberService.getById(userId);
 
-        var myAccuracy = feedbackRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+        var myAccuracy = feedbacksDesc.stream()
                 .filter(f -> unit.getId().equals(f.getScriptId()))
                 .mapToDouble(PronunciationFeedback::getAccuracy)
                 .max()

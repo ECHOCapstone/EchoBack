@@ -18,7 +18,6 @@ import java.util.Map;
 )
 class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
 
-    private static final String DEFAULT_PRACTICE_WORD = "rabbit";
     private static final double STEP_PASS_THRESHOLD = 80.0;
     private static final double STEP_OK_THRESHOLD = 60.0;
 
@@ -76,9 +75,10 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
             String weakPhoneme,
             List<PhonemeErrorResponse> errors
     ) {
+        // 정확도 수치는 프론트가 별도 라벨로 표시하므로 이 가이드 문장에는 포함하지 않는다.
+        // 가이드는 "약점 음소 + 한 줄 코칭 + 재연습 안내" 만 담아 정확도 중복 노출을 막는다.
         var hint = lookup(weakPhoneme);
         var sb = new StringBuilder();
-        sb.append("이번 학습 정확도는 ").append(formatAccuracy(accuracy)).append("점이에요. ");
         if (hint != null) {
             sb.append(hint.label()).append(" 발음이 가장 많이 틀렸어요. ");
             sb.append(hint.guidance()).append(" ");
@@ -88,7 +88,9 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
             sb.append("전반적으로 안정적인 발음이지만 더 연습하면 좋아요. ");
         }
         sb.append("아래 단어로 다시 한 번 연습해 보세요.");
-        var practiceWord = hint != null ? hint.practiceWord() : DEFAULT_PRACTICE_WORD;
+        // weakPhoneme 매핑 실패 시 챕터 제목 기반 폴백을 사용해 "잰말놀이/V·B 등 챕터에서도 항상 rabbit"
+        // 으로 떨어지는 문제를 막는다.
+        var practiceWord = hint != null ? hint.practiceWord() : PracticeWordPolicy.byUnitTitle(unitTitle);
         return new Generated(sb.toString(), practiceWord);
     }
 
@@ -113,10 +115,6 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
             return null;
         }
         return HINTS.get(weakPhoneme.toLowerCase());
-    }
-
-    private String formatAccuracy(double accuracy) {
-        return String.format("%.1f", accuracy);
     }
 
     private record Hint(String label, String practiceWord, String guidance) {}

@@ -21,8 +21,7 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiLlmFeedbackGenerator.class);
 
-    private static final String DEFAULT_PRACTICE_WORD = "rabbit";
-    // 음소 → 추천 재연습 단어. 매핑이 없으면 DEFAULT_PRACTICE_WORD 로 폴백.
+    // 음소 → 추천 재연습 단어. 매핑이 없으면 PracticeWordPolicy 가 unitTitle 기반으로 폴백한다.
     private static final Map<String, String> WEAK_TO_PRACTICE_WORD = Map.ofEntries(
             Map.entry("r", "rabbit"),
             Map.entry("l", "light"),
@@ -63,11 +62,14 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
             List<PhonemeErrorResponse> errors
     ) {
         var prompt = promptBuilder.buildUnitPrompt(unitTitle, accuracy, weakPhoneme, errors);
+        // 음소 매핑 실패 시 챕터 제목 기반 폴백 (PracticeWordPolicy) 으로 떨어진다.
+        // 이 폴백은 rule-based 구현과 공유되어 SSOT 가 유지된다.
         var practiceWord = WEAK_TO_PRACTICE_WORD.getOrDefault(
                 weakPhoneme != null ? weakPhoneme.toLowerCase() : "",
-                DEFAULT_PRACTICE_WORD
+                PracticeWordPolicy.byUnitTitle(unitTitle)
         );
-        var fallback = String.format("이번 학습 정확도는 %.1f점이에요. 가장 자주 틀린 음소를 다시 한 번 연습해 보세요.", accuracy);
+        // 정확도 수치는 프론트가 별도 라벨로 노출하므로 fallback 문장에는 포함하지 않는다.
+        var fallback = "가장 자주 틀린 음소를 다시 한 번 연습해 보세요.";
         return new Generated(invoke(prompt, fallback), practiceWord);
     }
 
