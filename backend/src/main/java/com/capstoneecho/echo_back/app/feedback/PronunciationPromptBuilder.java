@@ -5,28 +5,16 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// LLM 에 보낼 발음 코칭 프롬프트를 만든다. 입력에 영문/음소가 섞여 있어도 출력은 한국어
-// 한두 문장이 되도록 directive 로 묶어 둔다.
+// LLM 에 보낼 발음 코칭 프롬프트를 만든다. directive 텍스트는 prompts.yaml 에서 오고,
+// 본 클래스는 directive 뒤에 [학습 정보] / [재연습 결과] 같은 입력 블록을 붙여 완성한다.
 @Component
 public class PronunciationPromptBuilder {
 
-    private static final String STEP_DIRECTIVE =
-            "너는 한국인 영어 학습자를 돕는 발음 코치다. 아래 학습 정보를 보고 한국어로 한 문장만 답해라. " +
-                    "이모지 없이, 친근한 존대 어투로, 60자 이내.";
-    private static final String UNIT_DIRECTIVE =
-            "너는 한국인 영어 학습자를 돕는 발음 코치다. 학습 한 회차의 누적 결과를 받아 한국어로 답한다. " +
-                    "정확도 점수는 화면에 별도로 표시되므로 본문에 다시 언급하지 마라. " +
-                    "가장 자주 틀린 음소 한 가지를 짚고 다음 학습에 도움될 한 줄 코칭을 더해 두 문장 이내로 작성한다. " +
-                    "이모지 없이, 친근한 존대 어투.";
-    private static final String RETRY_DIRECTIVE =
-            "너는 한국인 영어 학습자의 발음 코치다. 사용자가 권장 단어를 다시 발음한 결과를 보고 정/오를 판정하고 짧게 한국어로 안내한다. " +
-                    "출력은 정확히 두 줄. " +
-                    "첫 줄: PASS 또는 FAIL (영어 그대로). " +
-                    "둘째 줄: 한국어 한 문장 (60자 이내, 이모지 없이). 정답이면 칭찬과 다음 단계 안내, 오답이면 발음 교정 힌트.";
-    private static final String PRACTICE_WORD_DIRECTIVE =
-            "너는 한국인 영어 학습자의 발음 코치다. 사용자가 가장 자주 틀린 음소를 받아 그 음소 연습에 어울리는 " +
-                    "짧고 일상적인 영어 단어 한 개를 추천한다. " +
-                    "출력은 정확히 한 줄, 영어 소문자 단어 하나. 따옴표·설명·구두점 없이.";
+    private final PromptTemplates templates;
+
+    public PronunciationPromptBuilder(PromptTemplates templates) {
+        this.templates = templates;
+    }
 
     public String buildStepPrompt(
             String targetText,
@@ -35,7 +23,7 @@ public class PronunciationPromptBuilder {
             List<String> canonical,
             List<PhonemeErrorResponse> errors
     ) {
-        var sb = new StringBuilder(STEP_DIRECTIVE).append("\n\n[학습 정보]\n");
+        var sb = new StringBuilder(templates.step()).append("\n\n[학습 정보]\n");
         sb.append("- 목표 발음: ").append(safeText(targetText)).append('\n');
         sb.append("- 점수(0~100): ").append(formatScore(stepScore)).append('\n');
         sb.append("- 정답 음소: ").append(joinPhonemes(canonical)).append('\n');
@@ -50,7 +38,7 @@ public class PronunciationPromptBuilder {
             String weakPhoneme,
             List<PhonemeErrorResponse> errors
     ) {
-        var sb = new StringBuilder(UNIT_DIRECTIVE).append("\n\n[누적 결과]\n");
+        var sb = new StringBuilder(templates.unit()).append("\n\n[누적 결과]\n");
         sb.append("- 학습 단원: ").append(safeText(unitTitle)).append('\n');
         sb.append("- 평균 정확도(0~100): ").append(formatScore(accuracy)).append('\n');
         sb.append("- 가장 자주 틀린 음소: ").append(safeText(weakPhoneme)).append('\n');
@@ -63,7 +51,7 @@ public class PronunciationPromptBuilder {
             List<String> perceived,
             List<String> canonical
     ) {
-        var sb = new StringBuilder(RETRY_DIRECTIVE).append("\n\n[재연습 결과]\n");
+        var sb = new StringBuilder(templates.retry()).append("\n\n[재연습 결과]\n");
         sb.append("- 재연습 단어: ").append(safeText(practiceWord)).append('\n');
         sb.append("- 정답 음소: ").append(joinPhonemes(canonical)).append('\n');
         sb.append("- 인식 음소: ").append(joinPhonemes(perceived));
@@ -71,7 +59,7 @@ public class PronunciationPromptBuilder {
     }
 
     public String buildPracticeWordPrompt(String unitTitle, String weakPhoneme) {
-        var sb = new StringBuilder(PRACTICE_WORD_DIRECTIVE).append("\n\n[입력]\n");
+        var sb = new StringBuilder(templates.practiceWord()).append("\n\n[입력]\n");
         sb.append("- 학습 단원: ").append(safeText(unitTitle)).append('\n');
         sb.append("- 약점 음소: ").append(safeText(weakPhoneme));
         return sb.toString();
