@@ -93,17 +93,32 @@ class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
         return sb.toString();
     }
 
+    // perceived 음소 중 하나라도 권장 단어의 첫 글자로 시작하면 정답으로 본다.
+    // 안전망에 가까운 휴리스틱이라 LLM 이 활성화되면 사실상 도달하지 않는다.
     @Override
-    public String retryGuidance(
+    public RetryEvaluation evaluateRetry(
             String practiceWord,
-            boolean correct,
             List<String> perceived,
             List<String> canonical
     ) {
-        if (correct) {
-            return practiceWord + " 발음이 정확해졌어요. 다음 단계로 넘어가도 좋아요.";
+        boolean correct = matchesFirstLetter(perceived, practiceWord);
+        String guidance = correct
+                ? practiceWord + " 발음이 정확해졌어요. 다음 단계로 넘어가도 좋아요."
+                : practiceWord + " 의 발음을 한 번 더 또렷하게 굴려 보세요. 입 모양과 혀 위치에 집중해 주세요.";
+        return new RetryEvaluation(correct, guidance);
+    }
+
+    private static boolean matchesFirstLetter(List<String> perceived, String practiceWord) {
+        if (perceived == null || perceived.isEmpty() || practiceWord == null || practiceWord.isBlank()) {
+            return false;
         }
-        return practiceWord + " 의 발음을 한 번 더 또렷하게 굴려 보세요. 입 모양과 혀 위치에 집중해 주세요.";
+        var first = String.valueOf(practiceWord.charAt(0)).toLowerCase();
+        for (var p : perceived) {
+            if (p != null && p.toLowerCase().startsWith(first)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String pickWeakest(List<PhonemeErrorResponse> errors) {

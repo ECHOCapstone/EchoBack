@@ -19,8 +19,10 @@ public class PronunciationPromptBuilder {
                     "가장 자주 틀린 음소 한 가지를 짚고 다음 학습에 도움될 한 줄 코칭을 더해 두 문장 이내로 작성한다. " +
                     "이모지 없이, 친근한 존대 어투.";
     private static final String RETRY_DIRECTIVE =
-            "너는 한국인 영어 학습자의 발음 코치다. 사용자가 권장 단어를 다시 발음했을 때의 결과를 보고 한국어로 답한다. " +
-                    "맞으면 칭찬과 다음 단계 안내, 틀리면 발음 교정 힌트를 한 문장으로 간결히. 60자 이내, 이모지 없이.";
+            "너는 한국인 영어 학습자의 발음 코치다. 사용자가 권장 단어를 다시 발음한 결과를 보고 정/오를 판정하고 짧게 한국어로 안내한다. " +
+                    "출력은 정확히 두 줄. " +
+                    "첫 줄: PASS 또는 FAIL (영어 그대로). " +
+                    "둘째 줄: 한국어 한 문장 (60자 이내, 이모지 없이). 정답이면 칭찬과 다음 단계 안내, 오답이면 발음 교정 힌트.";
 
     public String buildStepPrompt(
             String targetText,
@@ -54,13 +56,11 @@ public class PronunciationPromptBuilder {
 
     public String buildRetryPrompt(
             String practiceWord,
-            boolean correct,
             List<String> perceived,
             List<String> canonical
     ) {
         var sb = new StringBuilder(RETRY_DIRECTIVE).append("\n\n[재연습 결과]\n");
         sb.append("- 재연습 단어: ").append(safeText(practiceWord)).append('\n');
-        sb.append("- 판정: ").append(correct ? "정답" : "오답").append('\n');
         sb.append("- 정답 음소: ").append(joinPhonemes(canonical)).append('\n');
         sb.append("- 인식 음소: ").append(joinPhonemes(perceived));
         return sb.toString();

@@ -121,16 +121,15 @@ class FeedbackServiceImpl implements FeedbackService {
                 null
         );
 
-        var correct = isPracticeWordCorrect(analysis.perceived(), practiceWord);
+        var evaluation = llmGenerator.evaluateRetry(practiceWord, analysis.perceived(), analysis.canonical());
         var score = scoringPolicy.scoreOf(analysis);
-        var guidance = llmGenerator.retryGuidance(practiceWord, correct, analysis.perceived(), analysis.canonical());
 
         return new RetryWordResponse(
-                correct,
+                evaluation.correct(),
                 analysis.perceived(),
                 analysis.canonical(),
                 score,
-                guidance
+                evaluation.guidance()
         );
     }
 
@@ -187,17 +186,4 @@ class FeedbackServiceImpl implements FeedbackService {
         return scores;
     }
 
-    // 권장 단어를 재발음했을 때의 정/오 판정 휴리스틱.
-    // 모델에 단어 1개의 canonical 을 보내지 않으므로 perceived 음소가 단어 첫 글자로 시작하는지로 본다.
-    // 추후 LLM 또는 별도 사전 기반 정밀 판정으로 격상 여지가 있다.
-    private boolean isPracticeWordCorrect(List<String> perceived, String practiceWord) {
-        if (perceived == null || perceived.isEmpty() || practiceWord == null) return false;
-        var first = String.valueOf(practiceWord.charAt(0)).toLowerCase();
-        for (var p : perceived) {
-            if (p != null && p.toLowerCase().startsWith(first)) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
