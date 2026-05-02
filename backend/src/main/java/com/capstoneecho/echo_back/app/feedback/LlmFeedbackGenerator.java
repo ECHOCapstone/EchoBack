@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.app.feedback;
 
 import com.capstoneecho.echo_back.app.feedback.dto.PhonemeErrorResponse;
+import com.capstoneecho.echo_back.app.feedback.dto.WrongWord;
 
 import java.util.List;
 
@@ -35,7 +36,7 @@ public interface LlmFeedbackGenerator {
 
     String recommendPracticeWord(String unitTitle, String weakPhoneme);
 
-    record StepGuidance(String message, List<String> wrongWords) {}
+    record StepGuidance(String message, List<WrongWord> wrongWords) {}
 
     record RetryEvaluation(boolean correct, String guidance) {}
 }

@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.app.feedback;
 
 import com.capstoneecho.echo_back.app.feedback.dto.PhonemeErrorResponse;
+import com.capstoneecho.echo_back.app.feedback.dto.WrongWord;
 import com.capstoneecho.echo_back.app.llm.LlmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -46,12 +48,15 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
             if (json == null) return new StepGuidance(fallback, List.of());
             var message = json.path("guidance").asString("").trim();
             if (message.isEmpty()) message = fallback;
-            var wrongWords = new java.util.ArrayList<String>();
+            var wrongWords = new ArrayList<WrongWord>();
             var node = json.path("wrongWords");
             if (node.isArray()) {
                 for (var item : node) {
-                    var token = item.asString("").trim().toLowerCase(Locale.ROOT);
-                    if (!token.isEmpty()) wrongWords.add(token);
+                    var word = item.path("word").asString("").trim().toLowerCase(Locale.ROOT);
+                    var idx = item.path("index").asInt(-1);
+                    if (!word.isEmpty() && idx >= 0) {
+                        wrongWords.add(new WrongWord(word, idx));
+                    }
                 }
             }
             return new StepGuidance(message, List.copyOf(wrongWords));

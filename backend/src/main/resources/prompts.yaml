@@ -28,8 +28,9 @@ step:
   prompt: |-
     아래 학습 정보를 보고 한국어로 안내한다.
     guidance 는 한 문장(60자 이내, 이모지 없이, 친근한 존대 어투) 으로 채운다.
-    wrongWords 는 목표 발음 안에서 잘못 발음된 영어 단어를 그대로(원문 형태, 소문자) 골라 배열로.
-    잘 발음한 단어는 넣지 말고, 모두 잘했으면 빈 배열.
+    wrongWords 는 잘못 발음된 단어를 word 와 index 로 같이 채워 배열로.
+    index 는 목표 발음(targetText) 을 공백/구두점으로 쪼개 추출한 영어 단어들 중 0-based 위치.
+    같은 단어가 두 번 나오더라도 정확히 잘못 발음된 자리의 index 만 적는다. 잘 했으면 빈 배열.
   schema:
     type: object
     properties:
@@ -38,9 +39,19 @@ step:
         description: "한국인 학습자가 바로 따라할 수 있는 한국어 한 문장. 60자 이내, 이모지 없이. IPA·음소 코드 사용 금지."
       wrongWords:
         type: array
-        description: "목표 발음에서 잘못 발음된 영어 단어 목록. 원문 그대로, 소문자. 잘 했으면 빈 배열."
+        description: "잘못 발음된 단어와 그 위치. 같은 단어가 여러 번 나와도 정확한 자리 하나만 짚는다."
         items:
-          type: string
+          type: object
+          properties:
+            word:
+              type: string
+              description: "원문 영어 단어 (소문자, 따옴표·구두점 제거)"
+            index:
+              type: integer
+              description: "targetText 의 영어 단어들 중 0-based 위치"
+          required:
+            - word
+            - index
     required:
       - guidance
       - wrongWords
