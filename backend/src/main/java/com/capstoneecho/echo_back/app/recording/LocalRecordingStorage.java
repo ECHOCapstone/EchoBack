@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.UUID;
 
-// 로컬 디스크 디스크 저장소. 사용자별 하위 디렉토리에 timestamped 파일명을 부여해 충돌을 피한다.
+// 로컬 디스크 저장소. 사용자별 하위 디렉토리에 timestamped 파일명을 부여해 충돌을 피한다.
 @Component
 class LocalRecordingStorage implements RecordingStorage {
 

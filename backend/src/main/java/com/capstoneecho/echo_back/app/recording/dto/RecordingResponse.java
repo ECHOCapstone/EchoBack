@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.app.recording.dto;
 import com.capstoneecho.echo_back.app.recording.Recording;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 // 한 단계 녹음 업로드의 즉시 응답. perceived/canonical/peakSoftmax 는 모델 분석 결과,
@@ -47,7 +48,7 @@ public record RecordingResponse(
     private static List<Double> splitDoubles(String raw) {
         if (raw == null || raw.isBlank()) return List.of();
         var parts = raw.trim().split("\\s+");
-        var out = new java.util.ArrayList<Double>(parts.length);
+        var out = new ArrayList<Double>(parts.length);
         for (var p : parts) {
             try {
                 out.add(Double.parseDouble(p));
