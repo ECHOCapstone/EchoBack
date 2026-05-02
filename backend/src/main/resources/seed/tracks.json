@@ -99,6 +99,80 @@
           ]
         }
       ]
+    },
+    {
+      "title": "모음 구별 트랙",
+      "description": "한국어에 없는 영어 모음 길이/혀 위치 차이를 짝 단어로 익히는 트랙.",
+      "displayOrder": 1,
+      "chapters": [
+        {
+          "chapterOrder": 0,
+          "title": "발음 연습: A vs E",
+          "content": "혀를 더 낮추는 A (cat) 와 살짝 올리는 E (bed) 의 차이를 익혀요.",
+          "difficulty": "EASY",
+          "practiceWord": "cat",
+          "masteryBadgeName": "A vs E 마스터",
+          "steps": [
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "A 와 E 를 각각 발음해 볼 겁니다.",                       "targetText": null,   "canonicalPhonemes": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Cat 을 발음해 보세요.",              "targetText": "Cat",  "canonicalPhonemes": "k ae t" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bed 를 발음해 보세요.",              "targetText": "Bed",  "canonicalPhonemes": "b eh d" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Bad 와 Bed 를 비교해 볼 겁니다.",                        "targetText": null,   "canonicalPhonemes": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bad 를 발음해 보세요.",              "targetText": "Bad",  "canonicalPhonemes": "b ae d" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bed 를 발음해 보세요.",              "targetText": "Bed",  "canonicalPhonemes": "b eh d" }
+          ]
+        },
+        {
+          "chapterOrder": 1,
+          "title": "발음 연습: I vs EE",
+          "content": "짧은 I (bit) 와 긴 EE (beat) 의 길이/긴장 차이를 짝 단어로 연습해요.",
+          "difficulty": "MEDIUM",
+          "practiceWord": "beat",
+          "masteryBadgeName": "I vs EE 마스터",
+          "steps": [
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "I 와 EE 를 각각 발음해 볼 겁니다.",                      "targetText": null,    "canonicalPhonemes": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Bit 을 발음해 보세요.",              "targetText": "Bit",   "canonicalPhonemes": "b ih t" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Beat 을 발음해 보세요.",             "targetText": "Beat",  "canonicalPhonemes": "b iy t" },
+            { "orderIndex": 3, "kind": "INTRO",  "prompt": "Sit 과 Seat 을 비교해 볼 겁니다.",                       "targetText": null,    "canonicalPhonemes": null },
+            { "orderIndex": 4, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Sit 을 발음해 보세요.",               "targetText": "Sit",   "canonicalPhonemes": "s ih t" },
+            { "orderIndex": 5, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Seat 를 발음해 보세요.",              "targetText": "Seat",  "canonicalPhonemes": "s iy t" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "일상 회화 표현",
+      "description": "처음 만난 사람과 자연스럽게 인사하고 자기소개하는 짧은 표현을 또렷하게 발음해요.",
+      "displayOrder": 2,
+      "chapters": [
+        {
+          "chapterOrder": 0,
+          "title": "인사말 익히기",
+          "content": "Hello, Nice to meet you, How are you 같은 기본 인사말을 또렷이 말해 봅니다.",
+          "difficulty": "EASY",
+          "practiceWord": "hello",
+          "masteryBadgeName": "인사말 마스터",
+          "steps": [
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "기본 인사 표현을 한 문장씩 따라 읽어 봅니다.",          "targetText": null,                "canonicalPhonemes": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Hello 를 발음해 보세요.",            "targetText": "Hello",             "canonicalPhonemes": "hh ah l ow" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 Nice to meet you 를 발음해 보세요.", "targetText": "Nice to meet you",  "canonicalPhonemes": "n ay s t uw m iy t y uw" },
+            { "orderIndex": 3, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 How are you 를 발음해 보세요.",       "targetText": "How are you",       "canonicalPhonemes": "hh aw aa r y uw" }
+          ]
+        },
+        {
+          "chapterOrder": 1,
+          "title": "자기소개 표현",
+          "content": "이름과 출신을 짧게 알리는 표현을 또렷이 말해 봅니다.",
+          "difficulty": "EASY",
+          "practiceWord": "name",
+          "masteryBadgeName": "자기소개 마스터",
+          "steps": [
+            { "orderIndex": 0, "kind": "INTRO",  "prompt": "자기소개 표현을 한 문장씩 따라 읽어 봅니다.",            "targetText": null,                  "canonicalPhonemes": null },
+            { "orderIndex": 1, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 My name is Echo 를 발음해 보세요.",   "targetText": "My name is Echo",     "canonicalPhonemes": "m ay n ey m ih z eh k ow" },
+            { "orderIndex": 2, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 I'm from Seoul 을 발음해 보세요.",     "targetText": "I'm from Seoul",      "canonicalPhonemes": "ay m f r ah m s ow l" },
+            { "orderIndex": 3, "kind": "RECORD", "prompt": "녹음 버튼을 누르고 I'm a student 를 발음해 보세요.",      "targetText": "I'm a student",       "canonicalPhonemes": "ay m ah s t uw d ah n t" }
+          ]
+        }
+      ]
     }
   ]
 }
