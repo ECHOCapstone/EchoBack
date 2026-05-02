@@ -12,7 +12,8 @@ public record AppProperties(
         Cors cors,
         ModelServer modelServer,
         Scoring scoring,
-        Storage storage
+        Storage storage,
+        Llm llm
 ) {
 
     public record Jwt(String secret, long expireMs) {}
@@ -25,4 +26,8 @@ public record AppProperties(
     public record Scoring(double alpha) {}
 
     public record Storage(String recordingDir) {}
+
+    // provider 는 LlmFeedbackGenerator 구현체 선택 키. apiKey 가 비어 있으면
+    // gemini 를 골라도 빈이 등록되지 않아 자동으로 rule-based 로 떨어진다.
+    public record Llm(String provider, String apiKey, String model) {}
 }

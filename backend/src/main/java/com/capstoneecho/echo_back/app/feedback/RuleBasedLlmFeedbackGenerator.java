@@ -1,14 +1,21 @@
 package com.capstoneecho.echo_back.app.feedback;
 
 import com.capstoneecho.echo_back.app.feedback.dto.PhonemeErrorResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
-// LLM 호출 없이 규칙 기반으로 한국어 가이드 문장과 재연습 단어를 생성하는 기본 구현.
-// 실제 환경에서는 동일 인터페이스의 LLM 기반 구현으로 교체된다.
+// 외부 LLM 호출 없이 규칙 기반으로 한국어 가이드 문장과 재연습 단어를 생성하는 폴백 구현.
+// app.llm.provider 가 rule-based(default) 일 때 활성화되며, gemini 일 때는 등록되지 않는다.
 @Component
+@ConditionalOnProperty(
+        prefix = "app.llm",
+        name = "provider",
+        havingValue = "rule-based",
+        matchIfMissing = true
+)
 class RuleBasedLlmFeedbackGenerator implements LlmFeedbackGenerator {
 
     private static final String DEFAULT_PRACTICE_WORD = "rabbit";
