@@ -94,9 +94,9 @@ class RecordingServiceImpl implements RecordingService {
         }
 
         var stored = storage.save(userId, audio.getOriginalFilename(), bytes);
-        var entity = repository.save(Recording.create(
-                userId, scriptId, sessionId, stepId, sessionSentenceId, stored.path()
-        ));
+        // 호출 시점에 결정된 학습 종류에 따라 도메인 의도 그대로 저장한다 (SRP).
+        // forScriptStep 추천 학습 / forSessionSentence 한 문장 단위 / forSessionFreeForm 통째 녹음.
+        var entity = repository.save(buildRecording(userId, scriptId, sessionId, stepId, sessionSentenceId, stored.path()));
 
         var analysis = modelClient.analyze(
                 bytes,
@@ -157,6 +157,24 @@ class RecordingServiceImpl implements RecordingService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,
                     "scriptId 또는 sessionId 중 하나만 지정해야 합니다.");
         }
+    }
+
+    // validateTarget 을 통과한 입력에 한해 학습 종류별 정적 팩토리로 분기한다.
+    private static Recording buildRecording(
+            Long userId,
+            Long scriptId,
+            Long sessionId,
+            Long stepId,
+            Long sessionSentenceId,
+            String audioPath
+    ) {
+        if (scriptId != null) {
+            return Recording.forScriptStep(userId, scriptId, stepId, audioPath);
+        }
+        if (sessionSentenceId != null) {
+            return Recording.forSessionSentence(userId, sessionId, sessionSentenceId, audioPath);
+        }
+        return Recording.forSessionFreeForm(userId, sessionId, audioPath);
     }
 
     private void validateAudio(MultipartFile audio) {

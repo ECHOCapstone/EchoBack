@@ -67,7 +67,7 @@ class RankingServiceImpl implements RankingService {
                 .filter(scriptId -> scriptId != null)
                 .findFirst()
                 .flatMap(scriptRepository::findById)
-                .orElseGet(() -> scriptRepository.findByIsPresetTrueOrderByIdAsc().stream()
+                .orElseGet(() -> scriptRepository.findByPresetTrueOrderByIdAsc().stream()
                         .findFirst()
                         .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND)));
         var unitTitle = unit.getTitle();

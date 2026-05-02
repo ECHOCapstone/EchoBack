@@ -12,6 +12,7 @@ import com.capstoneecho.echo_back.app.member.MemberService;
 import com.capstoneecho.echo_back.app.member.dto.UserResponse;
 import com.capstoneecho.echo_back.app.recording.Recording;
 import com.capstoneecho.echo_back.app.recording.RecordingRepository;
+import com.capstoneecho.echo_back.app.script.Script;
 import com.capstoneecho.echo_back.app.script.ScriptService;
 import com.capstoneecho.echo_back.app.session.SessionService;
 import tools.jackson.core.type.TypeReference;
@@ -32,8 +33,9 @@ import java.util.Map;
 //   1. 요청 검증 (scriptId XOR sessionId, recordingIds 소유 확인)
 //   2. recording 의 stepScore 평균 → unit 정확도
 //   3. 각 recording 의 errorsJson 을 모아 가장 빈번한 canonical 음소 → weakPhoneme
-//   4. LlmFeedbackGenerator 로 한국어 가이드 + 재연습 단어 생성
-//   5. PronunciationFeedback + PhonemeError 영속화
+//   4. LlmFeedbackGenerator 로 한국어 가이드 문장 생성
+//   5. PracticeWordResolver 로 재연습 단어 결정 (Script.practiceWord → 음소매핑 → 제목 → default)
+//   6. PronunciationFeedback + PhonemeError 영속화
 //
 // retryWord 흐름
 //   1. feedbackId 소유 확인 + practiceWord 가져오기
@@ -56,6 +58,7 @@ class FeedbackServiceImpl implements FeedbackService {
     private final SessionService sessionService;
     private final ScoringPolicy scoringPolicy;
     private final LlmFeedbackGenerator llmGenerator;
+    private final PracticeWordResolver practiceWordResolver;
     private final ModelServerClient modelClient;
     private final MemberService memberService;
     private final ObjectMapper objectMapper;
@@ -67,6 +70,7 @@ class FeedbackServiceImpl implements FeedbackService {
             SessionService sessionService,
             ScoringPolicy scoringPolicy,
             LlmFeedbackGenerator llmGenerator,
+            PracticeWordResolver practiceWordResolver,
             ModelServerClient modelClient,
             MemberService memberService,
             ObjectMapper objectMapper
@@ -77,6 +81,7 @@ class FeedbackServiceImpl implements FeedbackService {
         this.sessionService = sessionService;
         this.scoringPolicy = scoringPolicy;
         this.llmGenerator = llmGenerator;
+        this.practiceWordResolver = practiceWordResolver;
         this.modelClient = modelClient;
         this.memberService = memberService;
         this.objectMapper = objectMapper;
@@ -86,7 +91,8 @@ class FeedbackServiceImpl implements FeedbackService {
     public FeedbackResponse generate(Long userId, GenerateFeedbackRequest request) {
         validateTarget(request);
 
-        var title = resolveTitle(userId, request);
+        var script = request.scriptId() != null ? scriptService.getEntity(request.scriptId()) : null;
+        var title = resolveTitle(userId, request, script);
         var recordings = recordingRepository.findByUserIdAndIdIn(userId, request.recordingIds());
         if (recordings.size() != request.recordingIds().size()) {
             throw new BusinessException(ErrorCode.RECORDING_NOT_FOUND);
@@ -95,7 +101,8 @@ class FeedbackServiceImpl implements FeedbackService {
         double accuracy = scoringPolicy.averageScore(stepScoresOf(recordings));
         var aggregatedErrors = aggregateErrors(recordings);
         var weakPhoneme = pickWeakPhoneme(aggregatedErrors);
-        var generated = llmGenerator.generate(title, accuracy, weakPhoneme, aggregatedErrors);
+        var guidance = llmGenerator.unitGuidance(title, accuracy, weakPhoneme, aggregatedErrors);
+        var practiceWord = practiceWordResolver.resolve(script, weakPhoneme, title);
 
         var feedback = PronunciationFeedback.create(
                 userId,
@@ -104,8 +111,8 @@ class FeedbackServiceImpl implements FeedbackService {
                 title,
                 accuracy,
                 weakPhoneme,
-                generated.practiceWord(),
-                generated.guidanceKr()
+                practiceWord,
+                guidance
         );
         for (var err : aggregatedErrors) {
             feedback.addError(PhonemeError.of(err.op(), err.canonical(), err.perceived(), err.canonicalIndex()));
@@ -145,7 +152,7 @@ class FeedbackServiceImpl implements FeedbackService {
                 analysis.perceived(),
                 analysis.canonical(),
                 score,
-                guidance.guidanceKr()
+                guidance
         );
     }
 
@@ -183,9 +190,9 @@ class FeedbackServiceImpl implements FeedbackService {
         }
     }
 
-    private String resolveTitle(Long userId, GenerateFeedbackRequest request) {
-        if (request.scriptId() != null) {
-            return scriptService.getEntity(request.scriptId()).getTitle();
+    private String resolveTitle(Long userId, GenerateFeedbackRequest request, Script script) {
+        if (script != null) {
+            return script.getTitle();
         }
         return sessionService.getEntity(userId, request.sessionId()).getTitle();
     }

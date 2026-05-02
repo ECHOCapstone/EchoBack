@@ -59,7 +59,8 @@ class InitialDataLoader implements ApplicationRunner {
                 0,
                 "영어 잰말놀이",
                 "I slit the sheet, the sheet I slit, and on the slitted sheet I sit.",
-                Difficulty.MEDIUM
+                Difficulty.MEDIUM,
+                "sheet"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.record(
@@ -78,7 +79,8 @@ class InitialDataLoader implements ApplicationRunner {
                 1,
                 "발음 연습: R vs L",
                 "헷갈리는 R 과 L 발음을 단계적으로 구별해 봅니다.",
-                Difficulty.MEDIUM
+                Difficulty.MEDIUM,
+                "light"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "R과 L을 각각 발음해 볼 겁니다."));
@@ -99,7 +101,8 @@ class InitialDataLoader implements ApplicationRunner {
                 2,
                 "발음 연습: V vs B",
                 "헷갈리는 V 와 B 발음을 단계적으로 구별해 봅니다.",
-                Difficulty.MEDIUM
+                Difficulty.MEDIUM,
+                "vest"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "V와 B를 각각 발음해 볼 겁니다."));
@@ -120,7 +123,8 @@ class InitialDataLoader implements ApplicationRunner {
                 3,
                 "발음 연습: F vs P",
                 "헷갈리는 F 와 P 발음을 단계적으로 구별해 봅니다.",
-                Difficulty.MEDIUM
+                Difficulty.MEDIUM,
+                "fine"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "F와 P를 각각 발음해 볼 겁니다."));
@@ -141,7 +145,8 @@ class InitialDataLoader implements ApplicationRunner {
                 4,
                 "발음 연습: TH vs DH",
                 "무성음 TH (think) 와 유성음 DH (this) 의 차이를 단계적으로 익힙니다.",
-                Difficulty.HARD
+                Difficulty.HARD,
+                "think"
         ));
         var steps = new ArrayList<LearningStep>();
         steps.add(LearningStep.intro(chapter, 0, "무성 TH 와 유성 DH 를 각각 발음해 볼 겁니다."));

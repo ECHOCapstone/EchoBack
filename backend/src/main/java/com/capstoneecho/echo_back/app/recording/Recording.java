@@ -71,7 +71,22 @@ public class Recording {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static Recording create(
+    // 추천 학습 트랙의 한 step (LearningStep) 에 대한 녹음.
+    public static Recording forScriptStep(Long userId, Long scriptId, Long stepId, String audioPath) {
+        return build(userId, scriptId, null, stepId, null, audioPath);
+    }
+
+    // 사용자 맞춤 세션의 한 문장 (SessionSentence) 에 대한 녹음.
+    public static Recording forSessionSentence(Long userId, Long sessionId, Long sessionSentenceId, String audioPath) {
+        return build(userId, null, sessionId, null, sessionSentenceId, audioPath);
+    }
+
+    // 사용자 맞춤 세션을 한 호흡으로 통째로 녹음하는 자유 폼 (sentence 분리 없음).
+    public static Recording forSessionFreeForm(Long userId, Long sessionId, String audioPath) {
+        return build(userId, null, sessionId, null, null, audioPath);
+    }
+
+    private static Recording build(
             Long userId,
             Long scriptId,
             Long sessionId,

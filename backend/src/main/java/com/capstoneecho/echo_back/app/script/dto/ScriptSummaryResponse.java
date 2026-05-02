@@ -16,7 +16,7 @@ public record ScriptSummaryResponse(
                 script.getId(),
                 script.getTitle(),
                 script.getDifficulty(),
-                Boolean.TRUE.equals(script.getIsPreset())
+                script.isPreset()
         );
     }
 }

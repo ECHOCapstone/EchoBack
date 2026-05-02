@@ -26,7 +26,7 @@ class ScriptServiceImpl implements ScriptService {
 
     @Override
     public List<ScriptSummaryResponse> getRecommendedToday() {
-        return scriptRepository.findByIsPresetTrueOrderByIdAsc().stream()
+        return scriptRepository.findByPresetTrueOrderByIdAsc().stream()
                 .map(ScriptSummaryResponse::from)
                 .toList();
     }

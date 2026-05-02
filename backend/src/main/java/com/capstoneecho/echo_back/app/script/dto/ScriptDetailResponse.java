@@ -22,7 +22,7 @@ public record ScriptDetailResponse(
                 script.getTitle(),
                 script.getContent(),
                 script.getDifficulty(),
-                Boolean.TRUE.equals(script.getIsPreset()),
+                script.isPreset(),
                 steps.stream().map(StepResponse::from).toList()
         );
     }
