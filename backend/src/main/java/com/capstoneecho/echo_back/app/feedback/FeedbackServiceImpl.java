@@ -109,8 +109,13 @@ class FeedbackServiceImpl implements FeedbackService {
         var bytes = audioReader.read(audio);
 
         var practiceWord = feedback.getPracticeWord();
+        // 재연습 단어가 있으면 G2P 로 정답 음소를 만들어 모델 서버에 같이 보낸다.
+        // 정렬·오류·PER 까지 받아두면 LLM 평가가 빈 입력 같은 케이스에서 환각하는 것을 막을 수 있다.
+        var canonical = (practiceWord != null && !practiceWord.isBlank())
+                ? modelClient.g2p(practiceWord)
+                : null;
         // 파일명/콘텐츠 타입 기본값은 ModelServerClient 가 단독으로 채운다 (SSOT).
-        var analysis = modelClient.analyze(bytes, audio.getOriginalFilename(), audio.getContentType(), null);
+        var analysis = modelClient.analyze(bytes, audio.getOriginalFilename(), audio.getContentType(), canonical);
 
         var evaluation = llmGenerator.evaluateRetry(practiceWord, analysis.perceived(), analysis.canonical());
         var score = scoringPolicy.scoreOf(analysis);

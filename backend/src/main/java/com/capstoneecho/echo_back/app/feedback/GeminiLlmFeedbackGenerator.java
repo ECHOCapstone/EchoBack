@@ -16,11 +16,15 @@ import java.util.Locale;
 // Gemini API 로 한국어 안내 문장을 생성한다. step / unit 은 자유 텍스트, retry / practice-word 는
 // prompts.yaml 의 schema 로 JSON 응답을 강제받아 키별로 꺼낸다. 호출 실패나 응답이 비면 정적
 // 안전망 문장으로 떨어진다. app.llm.provider=gemini 일 때만 빈으로 등록된다.
+//
+// 무음/미발화 처리: perceived 가 비어 있는 입력은 LLM 에 보내도 환각으로 PASS 가 나오기 쉬워
+// 호출 전에 가드한다. 모델 인식 결과가 없는 케이스는 평가가 아니라 재시도 안내가 맞는 응답이다.
 @Component
 @ConditionalOnProperty(prefix = "app.llm", name = "provider", havingValue = "gemini")
 class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiLlmFeedbackGenerator.class);
+    private static final String EMPTY_AUDIO_GUIDANCE = "녹음이 거의 들리지 않았어요. 다시 또렷하게 발음해 주세요.";
 
     private final LlmClient llmClient;
     private final PronunciationPromptBuilder promptBuilder;
@@ -40,6 +44,9 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
             List<String> canonical,
             List<PhonemeErrorResponse> errors
     ) {
+        if (perceived == null || perceived.isEmpty()) {
+            return new StepGuidance(EMPTY_AUDIO_GUIDANCE, List.of());
+        }
         var prompt = promptBuilder.buildStepPrompt(targetText, stepScore, perceived, canonical, errors);
         var schema = promptBuilder.stepSchema();
         var fallback = "발음 결과를 확인했어요. 다시 한 번 또렷하게 시도해 봐요.";
@@ -87,6 +94,9 @@ class GeminiLlmFeedbackGenerator implements LlmFeedbackGenerator {
             List<String> perceived,
             List<String> canonical
     ) {
+        if (perceived == null || perceived.isEmpty()) {
+            return new RetryEvaluation(false, EMPTY_AUDIO_GUIDANCE);
+        }
         var prompt = promptBuilder.buildRetryPrompt(practiceWord, perceived, canonical);
         var schema = promptBuilder.retrySchema();
         try {
