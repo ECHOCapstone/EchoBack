@@ -1,0 +1,99 @@
+name: "✨ 기능 추가 요청"
+description: "새 기능을 제안합니다."
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        기능 요청을 남기기 전에 동일/유사한 이슈가 이미 있는지 확인해 주세요.
+        도메인 구분은 `API_SPEC.md` §3 의 5개 도메인을 따릅니다.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 요약
+      description: 어떤 기능이 필요한지 한두 문장으로 적어주세요.
+      placeholder: "예) 사용자 세션을 즐겨찾기로 묶어 홈 화면에 노출하고 싶다."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 배경 / 문제
+      description: 왜 이 기능이 필요한가요? 현재 어떤 불편 또는 한계가 있나요?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안하는 동작
+      description: 사용자 시나리오와 기대 동작을 적어주세요. 입력/출력, 상태 변화 등.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: 영향 도메인
+      description: 영향 받는 도메인을 모두 선택하세요 (API_SPEC.md §3 기준).
+      multiple: true
+      options:
+        - Member
+        - Learning
+        - Pronunciation Evaluation
+        - Statistics
+        - System
+    validations:
+      required: true
+
+  - type: dropdown
+    id: api_change
+    attributes:
+      label: API 변경
+      description: 이 기능이 외부 API 표면에 미치는 영향.
+      options:
+        - 없음
+        - 신규 엔드포인트 추가
+        - 기존 엔드포인트 수정
+        - 응답 스키마 변경
+        - 기타 (본문에 설명)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 수용 기준
+      description: 이 기능이 "끝났다"고 말할 수 있는 조건을 체크리스트로 적어주세요.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 대안 / 검토했지만 채택하지 않은 방향
+      description: 선택사항. 같은 문제를 푸는 다른 접근이 있다면 적어주세요.
+
+  - type: textarea
+    id: references
+    attributes:
+      label: 참고 자료 / 관련 이슈
+      description: 관련 PR, 외부 문서, 디자인 링크 등.
+
+  - type: checkboxes
+    id: artifacts
+    attributes:
+      label: 함께 갱신할 산출물
+      description: 구현 시 같이 손봐야 할 항목.
+      options:
+        - label: 단위 테스트 (`./gradlew test`)
+        - label: REST Docs 스니펫 (`./gradlew asciidoctor`)
+        - label: API_SPEC.md
+        - label: CLAUDE.md (도메인 정의가 바뀔 때만)

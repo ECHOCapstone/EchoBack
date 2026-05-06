@@ -1,0 +1,118 @@
+name: "🧹 기타 작업"
+description: "문서 작성, 환경 변수/설정 추가, 의존성 업데이트, 리팩터 등 기능 외 작업."
+title: "[Chore] "
+labels: ["chore"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        새 기능 제안은 "✨ 기능 추가 요청" 템플릿을, 버그 신고는 별도 이슈로 작성해 주세요.
+        이 템플릿은 사용자 노출 동작이 거의 바뀌지 않는 작업(문서, 설정, 의존성, 리팩터 등)을 위한 것입니다.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 작업 유형
+      description: 가장 가까운 항목을 골라주세요.
+      options:
+        - 문서 (README / API_SPEC / CLAUDE.md / 가이드)
+        - 환경 변수 / 설정 (application.yaml, .env 등)
+        - 빌드 / CI (Gradle, GitHub Actions, REST Docs)
+        - 의존성 (라이브러리 추가 · 업그레이드 · 제거)
+        - 리팩터 (동작 변화 없음)
+        - 테스트 (테스트 추가 · 보강)
+        - 기타 (본문에 설명)
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 요약
+      description: 어떤 작업인지 한두 문장으로 적어주세요.
+      placeholder: "예) 모델 서버 호출용 API_KEY 환경 변수 추가 및 application.yaml 분리."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 배경 / 이유
+      description: 왜 이 작업이 필요한가요? 어떤 문제·요구·결정에서 비롯됐나요?
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 작업 상세
+      description: 변경 대상 파일/모듈, 추가·삭제할 키, 새 의존성 좌표 등 가능한 한 구체적으로.
+      placeholder: |
+        - 파일:
+        - 추가/변경:
+        - 제거:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 영향 범위
+      description: 이 작업이 어디에 닿는지 (해당 없으면 "범위 없음" 선택).
+      multiple: true
+      options:
+        - 범위 없음 / 전역
+        - Member
+        - Learning
+        - Pronunciation Evaluation
+        - Statistics
+        - System
+        - 빌드/CI 인프라
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime_impact
+    attributes:
+      label: 런타임/배포 영향
+      description: 머지/배포 시 추가 작업이 필요한지.
+      options:
+        - 없음 (코드/문서 변경만)
+        - 환경 변수 추가·변경 필요
+        - DB 마이그레이션 필요
+        - 의존성 재설치 필요
+        - CI/배포 파이프라인 변경 필요
+        - 기타 (본문에 설명)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 수용 기준
+      description: 이 작업이 "끝났다"고 말할 수 있는 조건을 체크리스트로 적어주세요.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: 참고 자료 / 관련 이슈
+      description: 선택사항. 관련 PR·문서·외부 링크.
+
+  - type: checkboxes
+    id: artifacts
+    attributes:
+      label: 함께 갱신할 산출물
+      description: 구현 시 같이 손봐야 할 항목.
+      options:
+        - label: README / 가이드 문서
+        - label: API_SPEC.md
+        - label: CLAUDE.md
+        - label: application.yaml / 환경 변수 문서
+        - label: 단위 테스트 (`./gradlew test`)
+        - label: REST Docs 스니펫 (`./gradlew asciidoctor`)
