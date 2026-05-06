@@ -10,28 +10,31 @@ This application is a backend server for an English pronunciation practice and f
 
 ## Core Domains
 
-- **Member**
-    - Standard sign-up (passwords stored with BCrypt hashing)
-    - OAuth2 integration (Google, Kakao)
-        - If a member with a matching provider-authenticated email already exists, their login method is expanded to support both standard login and OAuth2
+Domains are aligned with the controllers in `API_SPEC.md` §4. The same five-domain split is used in `API_SPEC.md` §3.
 
-- **Feedback**
-    - Converts user-uploaded audio to WAV, calls the model server to compare against the reference, and generates LLM-based feedback
-    - Reference pronunciation playback (via TTS)
+- **Member**
+    - Standard sign-up / login (passwords stored with BCrypt hashing)
+    - Username and email duplicate checks before sign-up
+    - OAuth2 integration (currently a Google demo endpoint; provider expansion planned). When a provider-authenticated email already maps to an existing member, login methods are merged so the same account supports both standard login and OAuth2.
+    - Profile read and nickname update for the authenticated user
 
 - **Learning**
-    - Daily recommended learning with content that refreshes every day
-    - Pronunciation practice and feedback using user-defined custom scripts
+    - Preset learning catalog: tracks (collections of scripts) and scripts with multi-step learning flows (`INTRO` / `RECORD` steps)
+    - Daily recommended scripts that refresh each day
+    - Custom user sessions: user-supplied script text is split into sentences and managed via a CRUD API (favorite toggle, partial update)
+
+- **Pronunciation Evaluation**
+    - Recording upload: converts user audio to WAV, calls the model server, and returns per-step phoneme analysis (perceived vs canonical, peak softmax, error ops, wrong words)
+    - Feedback aggregation: generates a composite feedback for one learning unit from accumulated recordings, supports weak-word retry, and finalizes rewards (exp / streak / badges) on completion
+    - Feedback history: list and detail views of past feedback for the user
+    - TTS: synthesizes English text to MP3 for reference-pronunciation playback
 
 - **Statistics**
-    - Per-phoneme accuracy tracking
-    - Daily completion status (whether at least one learning content was completed that day)
-        - Includes consecutive learning streak info (max value: 7)
-    - Daily goal achievement statistics
-    - Badge (achievement) and experience point system
+    - Per-user stats: cumulative streak (capped at 7), exp, monthly attendance calendar, weekly weak-phoneme top-N, badge inventory
+    - Daily ranking: per-learning-unit leaderboard with the user's own rank and accuracy
 
-- **Notifications**
-    - Learning reminder notifications
+- **System**
+    - Public health check endpoint for boot verification (Spring Boot Actuator endpoints are also on the classpath but secured separately)
 
 ## Build & Test
 
