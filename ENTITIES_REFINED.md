@@ -178,12 +178,12 @@ Ranking       : DemoRankingEntry
 | --- | --- | --- | --- | --- |
 | id | id | Long | 자동 | PK |
 | user | user_id | FK → users.id | NOT NULL | `@ManyToOne(LAZY, optional=false)` |
-| script | script_id | FK → scripts.id | NULL | `@ManyToOne(LAZY)` |
-| session | session_id | FK → sessions.id | NULL | `@ManyToOne(LAZY)` |
-| step | step_id | FK → learning_steps.id | NULL | `@ManyToOne(LAZY)` |
+| script | script_id | FK → scripts.id | NULL | `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)` |
+| session | session_id | FK → sessions.id | NULL | `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)` |
+| step | step_id | FK → learning_steps.id | NULL | `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)` |
 | sessionSentence | session_sentence_id | FK → session_sentences.id | NULL | `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)` |
 | audioPath | audio_path | varchar(500) | NOT NULL | 로컬 디스크 저장 경로 |
-| targetTextSnapshot | target_text_snapshot | TEXT | NULL | 녹음 생성 시점의 학습 대상 문장/단어를 그대로 복사한 immutable 캐시. 사용자가 세션 대본을 편집해 SessionSentence 가 사라지더라도 어떤 문장에 대한 녹음이었는지를 자기완결적으로 보존한다. |
+| targetTextSnapshot | target_text_snapshot | TEXT | NULL | 녹음 생성 시점의 학습 대상 문장/단어를 그대로 복사한 immutable 캐시. 부모 엔티티(SessionSentence/Session/Script/LearningStep)가 삭제되어 컬럼이 NULL 로 끊어져도 어떤 문장/스크립트에 대한 녹음이었는지를 자기완결적으로 보존한다. |
 | durationSec | duration_sec | Double | NULL | |
 | perceived | perceived | TEXT | NULL | 모델 응답 캐시 |
 | canonical | canonical | TEXT | NULL | 모델 응답 캐시 |
@@ -195,15 +195,27 @@ Ranking       : DemoRankingEntry
 
 - **연관관계:**
   - `user : User` — `@ManyToOne(LAZY, optional=false)`, FK `user_id` NOT NULL.
-  - `script : Script` — `@ManyToOne(LAZY)`, nullable.
-  - `session : Session` — `@ManyToOne(LAZY)`, nullable.
-  - `step : LearningStep` — `@ManyToOne(LAZY)`, nullable.
-  - `sessionSentence : SessionSentence` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable. SessionSentence 가 삭제되면 본 컬럼은 NULL 로 끊어지고, `targetTextSnapshot` 으로 의미가 보존된다.
-- **정합성 규칙 (DB CHECK + 도메인 정적 팩토리 동시 강제):**
+  - `script : Script` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
+  - `session : Session` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
+  - `step : LearningStep` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
+  - `sessionSentence : SessionSentence` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
+  - 위 nullable 관계는 모두 부모 엔티티가 삭제되면 컬럼이 NULL 로 끊어지고, `targetTextSnapshot` 으로 의미가 보존된다.
+- **DB 레벨 정합성 (CHECK 제약)** — Hibernate 의 `@org.hibernate.annotations.Check` (또는 `@Checks` 묶음) 로 엔티티 클래스에 선언하여 DDL 레벨 CHECK 제약으로 생성한다:
   - `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 은 정확히 하나만 NOT NULL.
-  - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 그 step 이 속한 script 도 동시에 지정되어야 한다.
-  - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 그 sentence 가 속한 session 도 동시에 지정되어야 한다.
-  - 위 3개 조건은 Hibernate 의 `@org.hibernate.annotations.Check` (또는 `@Checks` 묶음) 로 엔티티 클래스에 선언하여 DDL 레벨 CHECK 제약으로 생성한다.
+  - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 script 도 동반.
+  - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 session 도 동반.
+- **신규 INSERT 시 정적 팩토리가 추가로 강제하는 invariant** (DB CHECK 만으로 표현 불가능한 동일성 규칙). 세 팩토리가 다음 셋 중 하나의 모드를 만들고, 각 모드별 명시 검증을 통과해야만 객체가 생성된다. 위반 시 `IllegalArgumentException`.
+
+  | 팩토리 / 모드 | 시그니처가 강제 (NULL 패턴) | 명시 검증 |
+  | --- | --- | --- |
+  | `forScriptStep(user, script, step, ...)` | script ✓ / step ✓ / session ✗ / sentence ✗ | `step.script == script` |
+  | `forSessionSentence(user, session, sentence, ...)` | script ✗ / step ✗ / session ✓ / sentence ✓ | `sentence.session == session` 그리고 `session.user == user` |
+  | `forSessionFreeForm(user, session, ...)` | script ✗ / step ✗ / session ✓ / sentence ✗ | `session.user == user` |
+
+  - script-flow 에는 user 일관성 검증이 없다 (Script/Track 은 전역 콘텐츠로 user 소유 개념이 없다).
+  - 검증 위치는 서비스가 아닌 **정적 팩토리 본문**. 이유: `@NoArgsConstructor(access = PROTECTED)` 로 외부에서 무인자 생성을 막아두므로 정적 팩토리가 유일한 합법 생성 경로다. 어떤 서비스/테스트/마이그레이션도 invariant 를 우회할 수 없다.
+  - 서비스 레이어는 그 위에서 별도의 책임을 진다 (§5.1 참조): 컨트롤러가 받은 Long ID 들을 user 스코프 리포지토리(`findByIdAndUser_Id` 등) 로 조회해 엔티티 참조를 얻고, 그 엔티티들만 팩토리에 넘긴다. 즉 "팩토리 = 주어진 엔티티들이 서로 일관된가", "서비스 = 이 user 가 그 엔티티들에 접근 가능한가" 의 두 단계 검증.
+- **Invariant 의 시점 한정**: 위 검증은 신규 INSERT 경로에만 적용된다. 이미 저장된 행이 `ON DELETE SET NULL` 등으로 컬럼 일부가 NULL 이 되는 전이는 정상 상태로 받아들이고 다시 검사하지 않는다 (의미 보존은 `targetTextSnapshot` 이 담당).
 - **도메인 메서드:**
   - `static Recording forScriptStep(User user, Script script, LearningStep step, String audioPath, String targetTextSnapshot)` — 추천 학습 트랙의 한 step 에 대한 녹음.
   - `static Recording forSessionSentence(User user, Session session, SessionSentence sentence, String audioPath, String targetTextSnapshot)` — 사용자 맞춤 세션의 한 문장에 대한 녹음.
@@ -221,8 +233,8 @@ Ranking       : DemoRankingEntry
 | --- | --- | --- | --- | --- |
 | id | id | Long | 자동 | PK |
 | user | user_id | FK → users.id | NOT NULL | `@ManyToOne(LAZY, optional=false)` |
-| script | script_id | FK → scripts.id | NULL | `@ManyToOne(LAZY)` |
-| session | session_id | FK → sessions.id | NULL | `@ManyToOne(LAZY)` |
+| script | script_id | FK → scripts.id | NULL | `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)` |
+| session | session_id | FK → sessions.id | NULL | `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)` |
 | title | title | varchar(200) | NOT NULL | |
 | accuracy | accuracy | double | NOT NULL | step 점수 평균 |
 | weakPhoneme | weak_phoneme | varchar(32) | NULL | |
@@ -234,10 +246,15 @@ Ranking       : DemoRankingEntry
 
 - **연관관계:**
   - `user : User` — `@ManyToOne(LAZY, optional=false)`.
-  - `script : Script` — `@ManyToOne(LAZY)`, nullable.
-  - `session : Session` — `@ManyToOne(LAZY)`, nullable.
+  - `script : Script` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
+  - `session : Session` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
   - `errors : List<PhonemeError>` — `@OneToMany`, mappedBy=`feedback`, cascade=ALL, orphanRemoval=true.
-- **정합성 규칙:** `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 정확히 하나만 NOT NULL. Hibernate 의 `@org.hibernate.annotations.Check` 로 엔티티 클래스에 선언, DDL 레벨 CHECK 제약으로 생성한다. 도메인 정적 팩토리도 동일 규칙을 강제한다.
+  - Script/Session 이 삭제되면 해당 FK 는 NULL 로 끊어지지만 `title` / `accuracy` / `weakPhoneme` 등 본문 데이터는 보존된다.
+- **DB 레벨 정합성 (CHECK 제약):** `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 정확히 하나만 NOT NULL. Hibernate 의 `@org.hibernate.annotations.Check` 로 엔티티 클래스에 선언, DDL 레벨 CHECK 제약으로 생성한다.
+- **신규 INSERT 시 정적 팩토리(`create`)가 추가로 강제하는 invariant**:
+  - `(script != null) XOR (session != null)` — 시그니처와 동일성 규칙으로 강제.
+  - session-flow 인 경우 `session.user == user` (script-flow 는 user 일관성 검증 없음 — Script 는 전역 콘텐츠).
+  - 위반 시 `IllegalArgumentException`. 검증 시점은 INSERT 한정 (Recording §2.7 과 동일 원칙).
 - **완료 보상의 idempotency:** `completed` 를 false → true 로 전환하는 경로는 **원자 UPDATE 한 가지뿐**이다. 엔티티에 `markCompleted()` 같은 read-modify-write 도메인 메서드는 두지 않는다 (보조 메서드를 노출하면 직접 호출 경로가 race 를 만든다). 보상 가산은 `FeedbackRepository.markCompletedAtomically(...)` 가 영향 행 1을 반환할 때에만 수행한다 (§5).
 - **도메인 메서드:**
   - `static PronunciationFeedback create(User user, Script script, Session session, String title, double accuracy, String weakPhoneme, String practiceWord, String guidanceKr)` — 정합성 규칙(script XOR session)을 정적 팩토리에서 강제.
@@ -295,14 +312,14 @@ PronunciationFeedback (1) ─── @OneToMany cascade=ALL, orphanRemoval=true �
                                                   │ (역방향 @ManyToOne(optional=false))
 
 Recording ─ @ManyToOne(optional=false)            ─► User
-Recording ─ @ManyToOne                             ─► Script           (nullable)
-Recording ─ @ManyToOne                             ─► Session          (nullable)
-Recording ─ @ManyToOne                             ─► LearningStep     (nullable)
+Recording ─ @ManyToOne + @OnDelete(SET_NULL)       ─► Script           (nullable)
+Recording ─ @ManyToOne + @OnDelete(SET_NULL)       ─► Session          (nullable)
+Recording ─ @ManyToOne + @OnDelete(SET_NULL)       ─► LearningStep     (nullable)
 Recording ─ @ManyToOne + @OnDelete(SET_NULL)       ─► SessionSentence  (nullable)
 
-PronunciationFeedback ─ @ManyToOne(optional=false) ─► User
-PronunciationFeedback ─ @ManyToOne                 ─► Script           (nullable)
-PronunciationFeedback ─ @ManyToOne                 ─► Session          (nullable)
+PronunciationFeedback ─ @ManyToOne(optional=false)       ─► User
+PronunciationFeedback ─ @ManyToOne + @OnDelete(SET_NULL) ─► Script      (nullable)
+PronunciationFeedback ─ @ManyToOne + @OnDelete(SET_NULL) ─► Session     (nullable)
 ```
 
 CHECK 제약으로 강제되는 동시-NOT NULL 규칙은 §2.7 / §2.8 참고.
@@ -336,14 +353,17 @@ CHECK 제약으로 강제되는 동시-NOT NULL 규칙은 §2.7 / §2.8 참고.
 
 ## 5. 리포지토리 / 서비스 사양 (엔티티 일관성 강제)
 
-엔티티 명세를 그대로 구현하기 위해 엔티티 외부에 두어야 하는 규칙을 한 절에 모은다. 이 규칙들은 race / orphan / cross-tenant 가 데이터 레벨에서 막히도록 보장한다.
+엔티티 명세를 그대로 구현하기 위해 엔티티 외부에 두어야 하는 규칙을 한 절에 모은다. 이 규칙들은 race / orphan / cross-tenant / cross-parent 가 데이터 레벨에서 막히도록 보장한다.
 
-### 5.1 사용자 소유 조회 (cross-tenant 방지)
+### 5.1 사용자 소유 조회 + 두 단계 검증
 
 - 사용자 소유 엔티티 (`Session`, `SessionSentence`, `Recording`, `PronunciationFeedback`) 의 리포지토리는 user 스코프가 명시된 메서드만 외부로 노출한다.
   - 예: `findByIdAndUser_Id(Long id, Long userId)`, `findByUser_IdAndIdIn(Long userId, Collection<Long> ids)`, `findByUser_IdOrderByCreatedAtDesc(Long userId)`.
 - 글로벌 `findById` 등 user 스코프가 빠진 메서드는 사용자 소유 엔티티에 대해 외부로 노출하지 않는다 (admin/배치 경로는 별도 리포지토리를 둔다).
-- 컨트롤러는 `@CurrentUser` 로 받은 `userId` 를 그대로 위 메서드에 넘긴다.
+- 컨트롤러가 받은 Long ID 들은 위 user 스코프 메서드로 해석된 엔티티 참조로 변환된 뒤에만 §2.7 / §2.8 의 정적 팩토리에 넘긴다.
+- 결과적으로 두 단계 검증이 작동한다:
+  - **서비스 = "이 user 가 그 엔티티들에 접근 가능한가"** — cross-user ID 는 빈 Optional 로 거절 → 404.
+  - **정적 팩토리 = "주어진 엔티티들이 서로 일관된가"** — `step.script == script`, `sentence.session == session`, `session.user == user`.
 
 ### 5.2 `FeedbackRepository.markCompletedAtomically`
 
@@ -375,9 +395,15 @@ int markCompletedAtomically(@Param("id") Long id, @Param("userId") Long userId);
 엔티티 명세를 그대로 구현했음을 입증하기 위해 다음 테스트를 추가한다.
 
 - **Cross-user 차단**: 사용자 A 의 토큰으로 사용자 B 의 `feedbackId` / `recordingId` / `sessionId` 를 호출하면 404 응답이 나오고, 데이터가 갱신되지 않는다 (Recording, Feedback, Session 각각).
+- **Cross-parent 거절 (Recording 정적 팩토리)**:
+  - `forScriptStep` 에 `step.script != script` 인 조합 → `IllegalArgumentException`.
+  - `forSessionSentence` 에 `sentence.session != session` 또는 `session.user != user` 인 조합 → `IllegalArgumentException`.
+  - `forSessionFreeForm` 에 `session.user != user` → `IllegalArgumentException`.
+- **Cross-parent 거절 (`PronunciationFeedback.create`)**: session-flow 에서 `session.user != user` → `IllegalArgumentException`.
+- **Recording 정합성 CHECK 제약**: 잘못된 조합(예: script 와 session 동시 NOT NULL, step 만 NOT NULL 이고 script 가 NULL) 으로 raw INSERT 시 DB 에서 거절된다.
 - **Session 대본 갱신 후 녹음 보존**: `Session.updateScript` 가 SessionSentence 행을 새로 교체한 직후, 기존 `Recording.session_sentence_id` 는 NULL 로 끊어지지만 `target_text_snapshot` 은 그대로 남아 어떤 문장에 대한 녹음이었는지 추적 가능하다.
+- **Session 하드 삭제 후 history 보존**: 사용자가 `DELETE /api/sessions/{id}` 로 세션을 지운 뒤에도, 해당 세션을 참조하던 `Recording.session_id` / `PronunciationFeedback.session_id` 는 NULL 로 끊어지고 행 자체와 본문 데이터는 살아 있다.
 - **완료 동시성**: 동일한 `feedbackId` 에 대해 `complete` 를 두 스레드가 동시에 호출해도 EXP 가 정확히 한 번만 가산된다 (CountDownLatch 기반 동시성 테스트).
-- **Recording 정합성 CHECK 제약**: 잘못된 조합(예: script 와 session 동시 NOT NULL, step 만 NOT NULL 이고 script 가 NULL) 으로 INSERT 시 DB 에서 거절된다.
 
 ---
 
