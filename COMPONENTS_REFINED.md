@@ -671,7 +671,22 @@ public class RecordingService {
 }
 ```
 
-- 흐름: ① 컨텍스트 mode 분기(API_SPEC_REFINED §4.6 의 `script-flow` / `session-sentence` / `session-free-form`) → ② user-scope 리포지토리로 부모 엔티티 조회 → ③ `MultipartAudioReader` 로 WAV 변환·duration 추출 → ④ `RecordingStorage.save(...)` → ⑤ `targetText` snapshot 결정 → ⑥ `Recording.forScriptStep / forSessionSentence / forSessionFreeForm` 정적 팩토리 호출(ENTITIES_REFINED §2.7 — 두 단계 검증) → ⑦ `ModelServerClient.analyze(audioWav, canonicalPhonemes)` 호출(canonical 은 `ModelServerClient.g2p(targetText)` 또는 빈 문자열) → ⑧ `ScoringPolicy.score(...)`, `WeakPhonemeAnalyzer`, `LlmClient` 로 `AnalysisOutcome` 빌드 → ⑨ `Recording.applyAnalysis(outcome)` → ⑩ `recordingRepository.save` → ⑪ `RecordingResponse.from(Recording)`.
+- 흐름 (storage 잔존 방지 위해 `RecordingStorage.save` 를 마지막 직전으로 이동, ⑪ 의 DB save 실패 시 `RecordingStorage.delete` 보상):
+  1. 컨텍스트 mode 분기 (`script-flow` / `session-sentence` / `session-free-form` — API_SPEC_REFINED §4.6). 위반 시 `INVALID_REQUEST`.
+  2. user-scope 리포지토리로 부모 엔티티 조회 (`SessionRepository.findByIdAndUser_Id`, `SessionSentenceRepository.findByIdAndSession_User_Id`, `ScriptRepository.findById`, `LearningStepRepository.findById`).
+  3. `MultipartAudioReader.read(audio)` — 메모리에서 WAV 변환·duration 추출. 실패 시 `AUDIO_DECODE_FAILED`.
+  4. `targetText` snapshot 결정 (mode 별).
+  5. `Recording.validateForScriptStep / validateForSessionSentence / validateForSessionFreeForm` 호출 — 정적 팩토리 invariant (ENTITIES_REFINED §2.7) 와 동일한 cross-parent 검증을 객체 생성 *전에* 한 번 더 수행. 위반 시 `IllegalArgumentException` (`INTERNAL_ERROR` 로 매핑됨 — 두 단계 검증 1단계가 빠진 프로그래밍 에러).
+  6. `ModelServerClient.g2p(targetText)` — canonical 산출 (해당 mode 만, 빈 입력은 `""` 반환).
+  7. `ModelServerClient.analyze(wavBytes, canonical)` — perceived/peakSoftmax/errors/durationSec.
+  8. `ScoringPolicy`, `WeakPhonemeAnalyzer`, `LlmClient`, `PhonemeErrorMapper` 로 `AnalysisOutcome` 빌드.
+  9. `Recording.forScriptStep / forSessionSentence / forSessionFreeForm` 정적 팩토리 호출 (ENTITIES_REFINED §2.7) — `audioPath` 는 ⑩ 결과를 받아 인자로 전달. 정적 팩토리 본문이 ⑤ 와 동일한 invariant 를 한 번 더 검증 (이중 안전).
+  10. `RecordingStorage.save(userId, wavBytes, originalFilename)` → `audioPath`. 실패 시 그대로 예외 전파 (디스크 잔존 없음 — 아직 파일이 만들어지지 않았거나 storage 가 자체 정리).
+  11. `recording.applyAnalysis(outcome)` 후 `recordingRepository.save(recording)` — try 블록. catch 시 `RecordingStorage.delete(audioPath)` 호출 후 원본 예외 재throw.
+  12. `RecordingResponse.from(recording)`.
+
+  > ① ~ ⑨ 단계는 모두 인-메모리 또는 외부 호출이므로 모델 서버 timeout/에러나 cross-parent 검증 실패가 일어나도 디스크에 orphan WAV 가 남지 않는다. 보상이 필요한 구간은 ⑩ ~ ⑪ 의 windowed write 뿐이고, ⑪ 의 try-catch + `RecordingStorage.delete` 가 그것을 책임진다.
+
 - 의존: `RecordingRepository`, `MultipartAudioReader`, `RecordingStorage`, `ModelServerClient`, `LlmClient`, `ScoringPolicy`, `WeakPhonemeAnalyzer`, `PhonemeErrorMapper`, `MemberService.loadUser`, `ScriptService.loadScript / loadStep`, `SessionService.loadOwnedSession / loadOwnedSentence`.
 - 발생 ErrorCode: `INVALID_REQUEST`(컨텍스트 조합 위반), `AUDIO_DECODE_FAILED`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `STEP_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `MODEL_SERVER_UNAVAILABLE`, `MODEL_SERVER_ERROR`.
 
@@ -683,10 +698,16 @@ public class RecordingService {
 public interface RecordingRepository extends JpaRepository<Recording, Long> {
     Optional<Recording> findByIdAndUser_Id(Long id, Long userId);
     List<Recording> findByUser_IdAndIdIn(Long userId, Collection<Long> ids);
+
+    // FeedbackService.generate 의 컨텍스트 정합 검증 — user-scope + 부모 unit 일치를 SQL 레벨에서 강제.
+    // ON DELETE SET NULL 로 부모가 끊긴 recording (script_id=NULL / session_id=NULL) 은 자동 제외됨.
+    List<Recording> findByUser_IdAndScript_IdAndIdIn(Long userId, Long scriptId, Collection<Long> ids);
+    List<Recording> findByUser_IdAndSession_IdAndIdIn(Long userId, Long sessionId, Collection<Long> ids);
 }
 ```
 
 - user-scope 만 노출. cross-user ID 는 빈 결과 → service 가 `RECORDING_NOT_FOUND` 변환.
+- 마지막 두 메서드는 `FeedbackService.generate` 가 mode 별로 호출. 결과 size 가 입력 ID 수와 다르면 cross-user / cross-context / 부모 끊김 모두 동일하게 `RECORDING_NOT_FOUND` 로 통합 변환 (클라이언트 분기 단순화).
 
 ##### Entities / Support
 
@@ -695,13 +716,26 @@ public interface RecordingRepository extends JpaRepository<Recording, Long> {
 | `Recording` (+ 내부 record `AnalysisOutcome`) | §2.7 (소유) |
 | `User` / `Script` / `LearningStep` / `Session` / `SessionSentence` | 참조만 |
 
+`Recording` 엔티티는 ENTITIES_REFINED §2.7 의 정적 팩토리 3종 (`forScriptStep`, `forSessionSentence`, `forSessionFreeForm`) 외에 본 명세서가 추가로 다음 검증 전용 정적 메서드를 요구한다 — `RecordingService.upload` 의 흐름 ⑤ 에서 `audioPath` 가 아직 결정되지 않은 시점의 cross-parent 검증을 위해 사용한다.
+
+```java
+// 객체를 생성하지 않고 invariant 만 검증. 위반 시 IllegalArgumentException.
+public static void validateForScriptStep(User user, Script script, LearningStep step);
+public static void validateForSessionSentence(User user, Session session, SessionSentence sentence);
+public static void validateForSessionFreeForm(User user, Session session);
+```
+
+정적 팩토리 본문은 변경하지 않는다 (생성 시점에 같은 invariant 를 한 번 더 검증 — 이중 안전). 검증 로직을 위 3개 정적 메서드와 정적 팩토리가 공유하도록 구현한다.
+
 - `pronunciation.recording.support.RecordingStorage` (인터페이스) + `LocalRecordingStorage`.
   ```java
   public interface RecordingStorage {
       String save(Long userId, byte[] wavBytes, String originalFilename);   // returns audioPath
       byte[] load(String audioPath);
+      void   delete(String audioPath);                                       // 보상/관리 경로 — 멱등.
   }
   ```
+  - `delete` 는 멱등 (없는 path 도 silent OK). 실패는 WARN 로그만 기록하고 예외를 throw 하지 않는다 — 보상 경로의 2차 실패가 원본 예외(`RecordingService.upload` 의 DB save 예외 등)를 가리지 않도록.
 - `pronunciation.recording.support.MultipartAudioReader`
   ```java
   public class MultipartAudioReader {
@@ -739,9 +773,26 @@ public class FeedbackService {
 }
 ```
 
-- `generate` 흐름: ① `req.scriptId` XOR `req.sessionId` 검증(아닐 시 `INVALID_REQUEST`) → ② user-scope 로 Script/Session 조회 → ③ `recordingRepository.findByUser_IdAndIdIn(userId, req.recordingIds)` → 결과 size 가 입력 size 와 다르면 `RECORDING_NOT_FOUND` → ④ `ScoringPolicy.aggregate(recordings)` → `WeakPhonemeAnalyzer.topOne(...)` → `PracticeWordResolver.resolve(...)` → `LlmClient.summarizeFeedback(...)` → ⑤ `PronunciationFeedback.create(user, script, session, title, accuracy, weakPhoneme, practiceWord, guidanceKr)` 정적 팩토리(ENTITIES_REFINED §2.8) → ⑥ `PhonemeError` 들 `addError` → ⑦ save → ⑧ `FeedbackResponse.from(feedback)`.
+- `generate` 흐름:
+  1. `req.scriptId` XOR `req.sessionId` 검증 — 위반 시 `INVALID_REQUEST`.
+  2. user-scope 로 Script/Session 조회 (`ScriptRepository.findById` / `SessionRepository.findByIdAndUser_Id`). 빈 결과 → `SCRIPT_NOT_FOUND` / `SESSION_NOT_FOUND`.
+  3. **mode 별 컨텍스트-스코프 조회** (Codex finding F1 반영):
+     - script-flow: `recordingRepository.findByUser_IdAndScript_IdAndIdIn(userId, scriptId, recordingIds)`.
+     - session-flow: `recordingRepository.findByUser_IdAndSession_IdAndIdIn(userId, sessionId, recordingIds)`.
+     - 결과 size 가 입력 ID 수와 다르면 `RECORDING_NOT_FOUND` (cross-user / cross-context / ON DELETE SET NULL 로 부모 끊긴 케이스 모두 동일하게 404 로 통합).
+  4. `ScoringPolicy.aggregate(recordings)` → `WeakPhonemeAnalyzer.topOne(...)` → `PracticeWordResolver.resolve(...)` → `LlmClient.summarizeFeedback(...)`.
+  5. `PronunciationFeedback.create(user, script, session, title, accuracy, weakPhoneme, practiceWord, guidanceKr)` 정적 팩토리 (ENTITIES_REFINED §2.8).
+  6. `PhonemeError` 들 `addError` → save → `FeedbackResponse.from(feedback)`.
 - `retryWord` 흐름: ① user-scope 로 feedback 조회(없으면 `FEEDBACK_NOT_FOUND`) → ② `MultipartAudioReader.read` → ③ `ModelServerClient.g2p(feedback.practiceWord)` → ④ `ModelServerClient.analyze(wav, canonical)` → ⑤ `ScoringPolicy.singleWordScore(...)`, `LlmClient.retryGuidance(...)` → ⑥ `RetryWordResponse` 반환(저장 없음).
-- `complete` 흐름: ① `feedbackRepository.markCompletedAtomically(feedbackId, userId)` → ② 영향 행 1 → `MemberService.awardCompletionRewards(userId, props.feedback().completionExp())` → 갱신된 `UserResponse` ③ 0 → 보상 가산 없이 `MemberService.getMyProfile(userId)` 반환(ENTITIES_REFINED §5.3).
+- `complete` 흐름 (Codex finding F2 반영 — zero-row 를 not-exists 와 already-completed 로 분기):
+  1. `feedbackRepository.markCompletedAtomically(feedbackId, userId)` 호출.
+  2. 영향 행 1 → `MemberService.awardCompletionRewards(userId, props.feedback().completionExp())` → 갱신된 `UserResponse`.
+  3. 영향 행 0 → `feedbackRepository.findByIdAndUser_Id(feedbackId, userId)` 추가 조회로 분기:
+     - present + `completed == true` → 보상 가산 없이 `MemberService.getMyProfile(userId)` 반환 (idempotent — 같은 사용자가 두 번째 호출).
+     - empty → `BusinessException(FEEDBACK_NOT_FOUND)` (cross-user 또는 not-exists. API_SPEC_REFINED §4.4 의 contract 보존).
+     - present + `completed == false` → 이론적으로 도달 불가 (atomic UPDATE 가 1을 반환했어야 함). 방어적으로 `BusinessException(INTERNAL_ERROR)`.
+
+  > 본 분기 명세는 ENTITIES_REFINED §5.3 의 "0 → 가산 없이 현재 사용자 정보만 반환" 조항을 보강한다 — §5.3 자체는 cross-user 측면을 명시적으로 다루지 않으나, API_SPEC_REFINED §4.4 / §7 cross-user 검증 시나리오와의 일관을 위해 본 명세서가 zero-row 분기를 강제한다. 이 추가 조회는 read-only 이므로 atomic UPDATE 의 read-modify-write 금지 원칙에 위배되지 않는다.
 - 의존: `FeedbackRepository`, `PhonemeErrorRepository`, `RecordingRepository`(read), `ScriptService.loadScript`, `SessionService.loadOwnedSession`, `MemberService`, `ModelServerClient`, `LlmClient`, `ScoringPolicy`, `PracticeWordResolver`, `WeakPhonemeAnalyzer`, `PhonemeErrorMapper`, `MultipartAudioReader`.
 - 발생 ErrorCode: `INVALID_REQUEST`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `RECORDING_NOT_FOUND`, `FEEDBACK_NOT_FOUND`, `AUDIO_DECODE_FAILED`, `MODEL_SERVER_UNAVAILABLE`, `MODEL_SERVER_ERROR`, `VALIDATION_FAILED`.
 
@@ -1066,6 +1117,10 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | Session 대본 갱신 후 녹음 보존 (`Recording.session_sentence_id` 는 NULL, `targetTextSnapshot` 보존) | service + DB | `@SpringBootTest` integration, `SessionService.patch` 호출 후 `RecordingRepository` 조회 |
 | Session 하드 삭제 후 history 보존 (Recording / Feedback 의 `session_id` NULL, 본문 보존) | service + DB | 위와 동일 흐름, `delete` 호출 |
 | 완료 동시성 (`complete` 두 스레드 동시 호출 → EXP 정확히 한 번 가산) | service | `CountDownLatch` 기반 동시성 테스트, `FeedbackService.complete` |
+| Cross-context generate 거절 (사용자 자기 소유 recording 이지만 다른 script/session ID 를 섞어 호출 → 404 `RECORDING_NOT_FOUND`. Codex finding F1 회귀 방지) | service (컨텍스트-스코프 repo 메서드의 size 미스매치) | `@SpringBootTest` + MockMvc |
+| ON DELETE SET NULL 로 부모 끊긴 recording 의 generate 거절 (session 삭제 후 그 session 에 속했던 recording 들로 호출 → 동일하게 `RECORDING_NOT_FOUND`) | service | `@SpringBootTest` integration |
+| Cross-user complete 거절 (user A 의 토큰으로 user B 의 feedbackId 호출 → 404 `FEEDBACK_NOT_FOUND`, 보상 가산 없음. Codex finding F2 회귀 방지) | service (atomic UPDATE 0 → existence check empty → 404) | `@SpringBootTest` + MockMvc |
+| Recording upload 부분 실패 시 storage 정리 (model server timeout / 정적 팩토리 검증 실패 / DB save 실패 각각 케이스 → 디스크에 orphan WAV 잔존 0. Codex finding F3 회귀 방지) | service + storage | `@SpringBootTest` + 임시 디렉토리 + 모델 서버 mock |
 
 추가로 controller 별 REST Docs 스니펫 테스트를 작성해 `API_SPEC_REFINED.md` 응답 예시와 일치 여부를 회귀 방지.
 
@@ -1094,9 +1149,9 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | 15 | Learning | PATCH | `/api/sessions/{sessionId}` | `SessionController.patch` | `SessionService.patch` | `SessionRepository.findByIdAndUser_Id` | `Session`, `SessionSentence` |
 | 16 | Learning | DELETE | `/api/sessions/{sessionId}` | `SessionController.delete` | `SessionService.delete` | `SessionRepository.findByIdAndUser_Id`, `delete` | `Session`, `SessionSentence` |
 | 17 | Pronunciation | POST | `/api/recordings` | `RecordingController.upload` | `RecordingService.upload` | `RecordingRepository.save`, `SessionRepository.findByIdAndUser_Id`, `SessionSentenceRepository.findByIdAndSession_User_Id`, `ScriptRepository.findById`, `LearningStepRepository.findById` | `Recording`, `Script`, `LearningStep`, `Session`, `SessionSentence`, `User` |
-| 18 | Pronunciation | POST | `/api/feedback/generate` | `FeedbackController.generate` | `FeedbackService.generate` | `FeedbackRepository.save`, `RecordingRepository.findByUser_IdAndIdIn`, `ScriptRepository.findById`, `SessionRepository.findByIdAndUser_Id` | `PronunciationFeedback`, `PhonemeError`, `Recording`, `Script`/`Session`, `User` |
+| 18 | Pronunciation | POST | `/api/feedback/generate` | `FeedbackController.generate` | `FeedbackService.generate` | `FeedbackRepository.save`, `RecordingRepository.findByUser_IdAndScript_IdAndIdIn` / `findByUser_IdAndSession_IdAndIdIn`, `ScriptRepository.findById`, `SessionRepository.findByIdAndUser_Id` | `PronunciationFeedback`, `PhonemeError`, `Recording`, `Script`/`Session`, `User` |
 | 19 | Pronunciation | POST | `/api/feedback/{feedbackId}/retry-word` | `FeedbackController.retryWord` | `FeedbackService.retryWord` | `FeedbackRepository.findByIdAndUser_Id` | `PronunciationFeedback` |
-| 20 | Pronunciation | POST | `/api/feedback/{feedbackId}/complete` | `FeedbackController.complete` | `FeedbackService.complete` | `FeedbackRepository.markCompletedAtomically`, `UserRepository.findById` | `PronunciationFeedback`, `User` |
+| 20 | Pronunciation | POST | `/api/feedback/{feedbackId}/complete` | `FeedbackController.complete` | `FeedbackService.complete` | `FeedbackRepository.markCompletedAtomically`, `FeedbackRepository.findByIdAndUser_Id` (zero-row 분기), `UserRepository.findById` | `PronunciationFeedback`, `User` |
 | 21 | Pronunciation | GET | `/api/feedbacks` | `FeedbacksReadController.list` | `FeedbackService.listMine` | `FeedbackRepository.findByUser_IdOrderByCreatedAtDesc` | `PronunciationFeedback` |
 | 22 | Pronunciation | GET | `/api/feedbacks/{feedbackId}` | `FeedbacksReadController.detail` | `FeedbackService.getMine` | `FeedbackRepository.findByIdAndUser_Id` | `PronunciationFeedback`, `PhonemeError` |
 | 23 | Pronunciation | POST | `/api/tts` | `TtsController.synthesize` | `TtsService.synthesize` | (없음) | (없음) |
@@ -1125,8 +1180,8 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | `STEP_NOT_FOUND` | `ScriptService.loadStep`, `RecordingService.upload` | `LearningStepRepository.findById` 빈 결과 |
 | `SESSION_NOT_FOUND` | `SessionService.getMine / patch / delete / loadOwnedSession`, `RecordingService.upload`, `FeedbackService.generate` | `SessionRepository.findByIdAndUser_Id` 빈 결과 |
 | `SESSION_SENTENCE_NOT_FOUND` | `SessionService.loadOwnedSentence`, `RecordingService.upload` | `SessionSentenceRepository.findByIdAndSession_User_Id` 빈 결과 |
-| `RECORDING_NOT_FOUND` | `RecordingService.loadOwnedRecording / loadOwnedRecordings`, `FeedbackService.generate` | user-scope 결과가 입력 ID 수와 불일치 |
-| `FEEDBACK_NOT_FOUND` | `FeedbackService.retryWord / complete / getMine` | `FeedbackRepository.findByIdAndUser_Id` 빈 결과 |
+| `RECORDING_NOT_FOUND` | `RecordingService.loadOwnedRecording / loadOwnedRecordings`, `FeedbackService.generate` | user-scope 결과가 입력 ID 수와 불일치. `generate` 의 경우 cross-user / cross-context (다른 script/session 의 recording 혼합) / `ON DELETE SET NULL` 로 부모 끊긴 recording 모두 동일 코드로 통합. |
+| `FEEDBACK_NOT_FOUND` | `FeedbackService.retryWord / complete / getMine` | `FeedbackRepository.findByIdAndUser_Id` 빈 결과. `complete` 는 atomic UPDATE 영향 행 0 후 `findByIdAndUser_Id` 추가 조회로 cross-user/not-exists 케이스를 분기해 본 코드 throw. |
 | `AUDIO_DECODE_FAILED` | `MultipartAudioReader.read` (호출자: `RecordingService`, `FeedbackService.retryWord`) | WAV 변환/duration 추출 실패 |
 | `MODEL_SERVER_UNAVAILABLE` | `ModelServerClient.analyze / g2p` | `ResourceAccessException` (timeout, refused) |
 | `MODEL_SERVER_ERROR` | `ModelServerClient.analyze / g2p` | 비-2xx 응답 |
@@ -1160,6 +1215,8 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 - **`RecommendedScriptSelector.select(today, userId)`** — 시드 (preset=true) 스크립트 풀에서 오늘 날짜 기반 결정적 셔플로 N개 선정. 사용자별 직전 학습 스크립트는 우선순위 하향.
 - **`SentenceSplitter.split(scriptText)`** — 종지부호(`.!?`) 와 줄바꿈을 1차 분할 키로 사용. 약어(예: `Mr.`) 는 휴리스틱으로 보존. 결과는 trim, 빈 문장 제거.
 - **`User.streak` 7 캡** — `User.recordCompletion` 본문에서 7 도달 시 더 이상 증가하지 않음. 어제 학습 → +1, 그 외 → 1 리셋.
+- **`RecordingStorage.delete`** — 멱등. 없는 path 도 silent OK. 실패는 WARN 로그만, 본 예외를 throw 하지 않아 보상 경로의 2차 실패가 원본 예외(`RecordingService.upload` 의 DB save 예외 등)를 가리지 않는다.
+- **`Recording.validateForXxx` 정적 메서드** — `RecordingService.upload` 흐름 ⑤ 단계에서 `audioPath` 가 결정되기 전 cross-parent 검증을 수행. 정적 팩토리(`forXxx`) 자체의 invariant (ENTITIES_REFINED §2.7) 는 변경 없이 유지되며, ⑨ 의 객체 생성 시점에 같은 invariant 가 한 번 더 검증됨 (이중 안전).
 
 ---
 
@@ -1168,3 +1225,4 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | 일자 | 항목 |
 | --- | --- |
 | 2026-05-10 | 초판. 26개 endpoint / 10개 entity / 19개 ErrorCode / 2개 모델 서버 op 전부에 대한 컴포넌트·시그니처 매핑. |
+| 2026-05-10 (rev2) | Codex adversarial review 반영 — (F1) `FeedbackService.generate` 의 컨텍스트 정합 검증을 위해 `RecordingRepository` 에 `findByUser_IdAndScript_IdAndIdIn` / `findByUser_IdAndSession_IdAndIdIn` 신설, (F2) `FeedbackService.complete` 의 atomic UPDATE 영향 행 0 케이스를 not-exists/cross-user(`FEEDBACK_NOT_FOUND`) 와 already-completed(idempotent) 로 분기, (F3) `RecordingService.upload` 흐름 재정렬 (`RecordingStorage.save` 마지막 직전으로 이동) + `RecordingStorage.delete` 보상 메서드 신설 + `Recording.validateForXxx` 검증 전용 정적 메서드 신설. |
