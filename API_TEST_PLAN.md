@@ -2,10 +2,11 @@
 
 ## §0. 메타
 
-- **목적**: `main` 브랜치 (root Gradle 프로젝트) 에 새로 구현될 backend 가 `API_SPEC.md` 의 contract 를 회귀 없이 만족함을 자동 검증한다.
-- **Contract source-of-truth**: `API_SPEC.md` (기존 contract). `API_SPEC_REFINED.md` (새 contract) 와 다른 부분이 있다면 본 plan 은 **`API_SPEC.md` 를 따른다**. 새 SPEC 의 차이를 흡수하는 작업은 별도 라운드.
-- **회귀 방지 정의**: 같은 (HTTP method, path, request body/query/path/headers) 입력에 대해 `API_SPEC.md` 가 명시한 (status, response body schema, ErrorCode, headers) 가 나오면 회귀 없음.
-- **자기완결 약속**: 본 문서 외부 (`*_SPEC_REFINED.md`, 다른 브랜치의 코드, GitHub PR 등) 를 한 번도 참조하지 않고도 모든 테스트 작성이 가능해야 한다. 외부 문서가 변경돼도 본 문서가 source-of-truth.
+- **목적**: `main` 브랜치 (root Gradle 프로젝트) 에 새로 구현될 backend 가 `API_SPEC_REFINED.md` 의 contract 를 회귀 없이 만족함을 자동 검증한다.
+- **Contract source-of-truth**: `API_SPEC_REFINED.md` (새 contract). `API_SPEC.md` (기존) 와 다른 부분이 있다면 본 plan 은 **REFINED 를 따른다**.
+- **회귀 방지 정의**: 같은 (HTTP method, path, request body/query/path/headers) 입력에 대해 `API_SPEC_REFINED.md` 가 명시한 (status, response body schema, ErrorCode, headers) 가 나오면 회귀 없음.
+- **자기완결 약속**: 본 문서 외부 (다른 SPEC 문서, 다른 브랜치의 코드, GitHub PR 등) 를 한 번도 참조하지 않고도 모든 테스트 작성이 가능해야 한다. REFINED 의 차이는 본 문서 본문에 인라인되어 있으며, 본 문서가 source-of-truth.
+- **nullable 표기 정책**: 본 문서의 응답 예시에서 `?` 접미사가 붙은 필드 또는 `@JsonInclude(NON_NULL)` 정책 대상 필드는 null 일 때 응답 JSON 에서 키 자체가 omit 된다 (REFINED §1.3). 골든 assertion 은 키 존재 (`exists()`) / 부재 (`doesNotExist()`) 를 명시적으로 검증한다.
 - **사용 방법**: §3 의 한 endpoint 항목을 한 controller 테스트 클래스로, §4 의 한 invariant 항목을 한 service 테스트 메서드로 그대로 옮긴다.
 - **테스트 스택**: JUnit 5 + Spring Boot Test + MockMvc + Spring REST Docs (MockMvc) + H2 in-memory + Spring Security Test. LLM/모델 서버는 `@MockBean` 으로 격리. 멀티파트는 `MockMultipartFile`.
 - **2-tier 정책**:
@@ -627,15 +628,15 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 { "success": true, "data": {
     "id":21, "title":"Greetings", "content":"Hello! How are you?", "difficulty":"BEGINNER", "isPreset": true,
     "steps": [
-        { "id":201, "orderIndex":0, "kind":"INTRO",  "prompt":"Listen first.", "targetText":null },
+        { "id":201, "orderIndex":0, "kind":"INTRO",  "prompt":"Listen first." },
         { "id":202, "orderIndex":1, "kind":"RECORD", "prompt":"Now record.",   "targetText":"Hello!" }
     ]
 } }
 ```
-- `targetText`: `INTRO` 단계는 `null`. `@JsonInclude(NON_NULL)` 정책일 경우 키 omit. **회귀 기준은 `kind="RECORD"` 단계의 `targetText` 가 비-empty 라는 점**.
+- `targetText`: `INTRO` 단계는 응답에서 키 자체가 **omit** 된다 (`@JsonInclude(NON_NULL)`, `string?`, REFINED §5.9). `RECORD` 단계는 키 존재 + 비-empty. **회귀 기준 = `INTRO` 의 `targetText` `doesNotExist` + `RECORD` 의 `targetText` 비-empty**.
 
 ##### 시나리오
-- **golden** — ScriptFixture.seedScriptWithSteps(intro=1, record=2) → GET → 200 + `data.steps.length=3` + `RECORD` 단계의 `targetText` 비-empty.
+- **golden** — ScriptFixture.seedScriptWithSteps(intro=1, record=2) → GET → 200 + `data.steps.length=3` + `jsonPath('$.data.steps[?(@.kind=="INTRO")].targetText').doesNotExist()` + `jsonPath('$.data.steps[?(@.kind=="RECORD")].targetText')` 비-empty.
 - **unauthorized** — 401.
 - **SCRIPT_NOT_FOUND** — GET `/api/scripts/999999` → 404 + `error.code="SCRIPT_NOT_FOUND"`.
 
@@ -814,11 +815,13 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 | session-sentence | `sessionId` + `sessionSentenceId` |
 | session-free-form | `sessionId` (only) |
 
-- 잘못된 조합 (예: scriptId + sessionId 동시) → `INVALID_REQUEST`.
+- 잘못된 조합 (예: scriptId + sessionId 동시, 4 컨텍스트 모두 누락 등) → `INVALID_REQUEST` (400).
+- **strict 규정 노트**: REFINED §4.6 는 "위 세 조합 외의 케이스는 서버가 정상 응답을 보장하지 않습니다" 로 약화 표현이지만, 본 plan 은 회귀 기준을 명확히 하기 위해 mode 위반 시 **400 INVALID_REQUEST** 를 응답해야 회귀 없음으로 strict 하게 규정한다. 새 backend 구현이 다른 status (예: 500) 또는 다른 ErrorCode 로 응답하면 본 plan 의 회귀 기준 위반.
+- **cross-tenant 정책**: 타 사용자 소유 ID 사용은 user 스코프 조회의 자연 결과로 `*_NOT_FOUND` (404) 가 반환된다 (REFINED §4.6).
 
 ##### Response (golden 201, mode 별)
 
-`ApiResponse<RecordingResponse>`. mode 에 따라 context 키들이 nullable. `@JsonInclude(NON_NULL)` 로 해당 모드에 사용되지 않은 키는 omit.
+`ApiResponse<RecordingResponse>`. mode 에 따라 context 키 (`scriptId` / `sessionId` / `stepId` / `sessionSentenceId`) 가 nullable. `@JsonInclude(NON_NULL)` 정책으로 **해당 모드에 사용되지 않은 컨텍스트 키는 응답에서 omit** (REFINED §4.6 / §5.3). 골든 assertion 은 mode 별로 사용 컨텍스트 키 존재 + 미사용 컨텍스트 키 부재 (`doesNotExist`) 둘 다 검증.
 
 **script-flow** (`scriptId`+`stepId` 만):
 ```json
@@ -865,7 +868,11 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden session-free-form** — `sessionId` 만 → 201 + `data.sessionId` 만 + `data.sessionSentenceId` 키 omit.
 - **golden (perfect, errors empty)** — mock `analyze` returns `WATER_PERFECT` (errors=[]) + mock `llm` returns `GUIDANCE_PERFECT` → 201 + `data.errors=[]` + `data.wrongWords=[]`.
 - **unauthorized** — 401.
-- **INVALID_REQUEST (mode 위반)** — `scriptId` + `sessionId` 동시 → 400 + `INVALID_REQUEST`.
+- **INVALID_REQUEST (mode 위반)** — 다음 케이스 각각 → 400 + `error.code="INVALID_REQUEST"` (본 plan 의 strict 규정):
+  - **두 mode 혼합**: `scriptId` + `sessionId` 동시.
+  - **컨텍스트 모두 누락**: 4 컨텍스트 query 모두 미지정 (mode 결정 불가).
+  - **불완전 script-flow**: `scriptId` 만 (`stepId` 없음) — 3 canonical mode 어디에도 해당 안 됨.
+  - **불완전 session-sentence**: `sessionSentenceId` 만 (`sessionId` 없음).
 - **INVALID_REQUEST (multipart part 누락)** — multipart 보내되 part name 이 `audio` 가 아니라 `file` → 400 + `INVALID_REQUEST`.
 - **AUDIO_DECODE_FAILED** — multipart `audio` 가 빈 byte[] 또는 깨진 헤더 → 400 + `AUDIO_DECODE_FAILED`.
 - **SCRIPT_NOT_FOUND** — `scriptId=999999` + `stepId=...` → 404 + `SCRIPT_NOT_FOUND`.
@@ -920,10 +927,25 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 } }
 ```
 
+**perfect 케이스** (모든 녹음 errors=[], accuracy=100):
+```json
+{ "success": true, "data": {
+    "id": 702, "scriptId": 21,
+    "title": "Greetings",
+    "accuracy": 100.0,
+    "practiceWord": "rabbit",
+    "guidanceKr": "전반적으로 안정적인 발음이지만 더 연습하면 좋아요.",
+    "errors": [],
+    "createdAt": "2026-05-10T12:35:00Z"
+} }
+```
+- `weakPhoneme` 키 **omit** (`@JsonInclude(NON_NULL)` + REFINED §5.4 `string?`).
+- `practiceWord` / `guidanceKr` 는 perfect 케이스에서도 **항상 비-empty** (REFINED §5.4 의 fallback 체인 contract — 시드 챕터 단어 → LLM 추천 → 음소 매핑 → yaml `app.feedback.default-practice-word` 순). fallback 체인이 끊겨 둘 중 하나가 null/empty 면 본 contract 위반.
+
 ##### 시나리오
-- **golden script-flow** — `seedUserA()` + ScriptFixture.seedScriptWithSteps + RecordingFixture.seedScriptFlowRecording ×3 → POST → 200 + `data.scriptId` 반환 + `data.sessionId` 키 omit + `data.weakPhoneme="ɔ"` + `data.practiceWord` non-blank + `data.guidanceKr` non-blank + `data.errors.length>=1`.
+- **golden script-flow** — `seedUserA()` + ScriptFixture.seedScriptWithSteps + RecordingFixture.seedScriptFlowRecording ×3 → POST → 200 + `data.scriptId` 반환 + `jsonPath('$.data.sessionId').doesNotExist()` + `data.weakPhoneme="ɔ"` (키 존재) + `data.practiceWord` 비-empty (REFINED §5.4 non-null contract) + `data.guidanceKr` 비-empty (동일 contract) + `data.errors.length>=1`.
 - **golden session-flow** — sessionFixture + sessionFlowRecording ×3 → POST `{"sessionId":31, "recordingIds":[...]}` → 200 + `data.sessionId` 반환 + `data.scriptId` 키 omit.
-- **golden (perfect, weakPhoneme omit)** — 모든 recording 의 errors=[] → 200 + `data.weakPhoneme` 키 omit (`@JsonInclude(NON_NULL)`).
+- **golden (perfect, weakPhoneme omit)** — 모든 recording 의 errors=[] → 200 + `jsonPath('$.data.weakPhoneme').doesNotExist()` + `jsonPath('$.data.practiceWord')` 비-empty + `jsonPath('$.data.guidanceKr')` 비-empty + `data.accuracy=100.0` (REFINED §5.4 non-null fallback 체인 contract).
 - **unauthorized** — 401.
 - **INVALID_REQUEST (XOR 위반)** — `scriptId` + `sessionId` 둘 다 set 또는 둘 다 null → 400 + `INVALID_REQUEST`.
 - **VALIDATION_FAILED** — `{"recordingIds":[]}` → 400 + `VALIDATION_FAILED`.
@@ -931,11 +953,11 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **SESSION_NOT_FOUND** — `sessionId=999999` 또는 cross-user → 404 + `SESSION_NOT_FOUND`.
 - **RECORDING_NOT_FOUND (cross-user)** — `recordingIds` 에 user B 의 recording ID 포함 → 404 + `RECORDING_NOT_FOUND`.
 - **RECORDING_NOT_FOUND (cross-context)** — `scriptId=21` 인데 `recordingIds` 에 session-flow recording 포함 → 404 + `RECORDING_NOT_FOUND`.
-- **MODEL_SERVER_UNAVAILABLE** — golden 사전 셋업 + 모델 서버 의존 컴포넌트가 `BusinessException(MODEL_SERVER_UNAVAILABLE, ...)` throw → 503 + `error.code="MODEL_SERVER_UNAVAILABLE"` (`API_SPEC §4.4` 의 generate 주요 에러 목록).
+- **MODEL_SERVER_UNAVAILABLE** — golden 사전 셋업 + 모델 서버 의존 컴포넌트가 `BusinessException(MODEL_SERVER_UNAVAILABLE, ...)` throw → 503 + `error.code="MODEL_SERVER_UNAVAILABLE"` (REFINED §4.4 의 generate 주요 에러 목록).
 - **MODEL_SERVER_ERROR** — 모델 서버 의존 컴포넌트가 `BusinessException(MODEL_SERVER_ERROR, ...)` throw → 502 + `error.code="MODEL_SERVER_ERROR"`.
 
 ##### Mock 정책
-- 새 구현이 LLM 또는 모델 서버 의존을 사용한다면, 그 의존을 `@MockBean` 으로 교체하고 정상 stub 또는 `BusinessException` throw 로 케이스 분기. 본 plan 은 구체 클래스 이름을 강제하지 않는다 — `API_SPEC §4.4` 의 ErrorCode 가 응답에 노출되는지가 회귀 기준.
+- 새 구현이 LLM 또는 모델 서버 의존을 사용한다면, 그 의존을 `@MockBean` 으로 교체하고 정상 stub 또는 `BusinessException` throw 로 케이스 분기. 본 plan 은 구체 클래스 이름을 강제하지 않는다 — REFINED §4.4 의 ErrorCode 가 응답에 노출되는지가 회귀 기준.
 - `MODEL_SERVER_UNAVAILABLE` / `MODEL_SERVER_ERROR` 시나리오는 그 의존이 throw 하는 케이스를 mock 으로 강제해 트리거.
 - 정상 (golden) 케이스에서는 LLM 의존이 비-empty `guidanceKr` / `weakPhoneme` 등을 반환하도록 stub.
 
@@ -971,7 +993,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **unauthorized** — 401.
 - **FEEDBACK_NOT_FOUND** — feedbackId=999999 또는 cross-user → 404 + `FEEDBACK_NOT_FOUND`.
 - **AUDIO_DECODE_FAILED** — 깨진 audio (헤더 없는 byte[]) → 400 + `AUDIO_DECODE_FAILED`.
-- **INVALID_REQUEST (multipart 위반)** — bearer + 다음 세 케이스 각각 → 400 + `error.code="INVALID_REQUEST"` (`API_SPEC §4.4` 의 retry-word 주요 에러 목록 — "빈 파트/사이즈 초과"):
+- **INVALID_REQUEST (multipart 위반)** — bearer + 다음 세 케이스 각각 → 400 + `error.code="INVALID_REQUEST"` (REFINED §4.4 의 retry-word 주요 에러 목록 — "빈 파트/사이즈 초과"):
   - **missing part**: multipart 본문에 `audio` part 없음 (다른 part 만 또는 part 0개).
   - **wrong part name**: part name 이 `audio` 가 아닌 `file` / `recording` 등.
   - **size 초과**: `application-test.yaml` 의 `spring.servlet.multipart.max-file-size` (10MB) 초과 byte[]. 큰 파일을 실제 만드는 대신 `MaxUploadSizeExceededException` 강제 mock 으로 시뮬레이션 가능.
@@ -1027,13 +1049,13 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ```json
 { "success": true, "data": [
     { "id":701, "title":"Greetings", "accuracy":86.5, "weakPhoneme":"ɔ", "createdAt":"2026-05-10T12:30:00Z" },
-    { "id":702, "title":"My Cafe",    "accuracy":92.0, "weakPhoneme":null, "createdAt":"2026-05-09T10:00:00Z" }
+    { "id":702, "title":"My Cafe",    "accuracy":92.0, "createdAt":"2026-05-09T10:00:00Z" }
 ] }
 ```
-- 정렬: `createdAt` 내림차순. `weakPhoneme` 가 null 인 경우 `@JsonInclude(NON_NULL)` 로 키 omit 가능.
+- 정렬: `createdAt` 내림차순. `weakPhoneme` 는 `string?` (REFINED §5.6) — perfect 피드백 (errors 없음) 에서는 응답에서 키 자체가 **omit** 된다 (`@JsonInclude(NON_NULL)`).
 
 ##### 시나리오
-- **golden (비-empty)** — 본인 feedback 2건 시드 → 200 + `data.length=2` + `createdAt` 내림차순.
+- **golden (비-empty + perfect omission)** — 본인 feedback 2건 시드 (with-error + perfect 각 1건) → 200 + `data.length=2` + `createdAt` 내림차순 + `data[0].weakPhoneme="ɔ"` (with-error, 키 존재) + `jsonPath('$.data[1].weakPhoneme').doesNotExist()` (perfect, 키 omit, REFINED §5.6 nullable contract).
 - **golden (empty)** — 본인 feedback 0건 → 200 + `data=[]`.
 - **golden (cross-user 격리)** — A 의 feedback 1건 + B 의 feedback 1건 → A 토큰으로 GET → 200 + `data.length=1` + `data[0]` 가 A 것.
 - **unauthorized** — 401.
@@ -1056,7 +1078,8 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 `ApiResponse<FeedbackResponse>` (#19 과 동일 schema).
 
 ##### 시나리오
-- **golden** — 본인 feedback → 200 + 모든 필드 (`title`, `accuracy`, `errors[]`) 존재.
+- **golden (with-error)** — 본인 feedback (errors 있음) → 200 + `data.weakPhoneme="ɔ"` (키 존재) + `data.practiceWord` 비-empty + `data.guidanceKr` 비-empty + `data.errors.length>=1`.
+- **golden (perfect)** — 본인 perfect feedback (errors=[]) → 200 + `jsonPath('$.data.weakPhoneme').doesNotExist()` + `data.practiceWord` 비-empty (REFINED §5.4 non-null contract) + `data.guidanceKr` 비-empty + `data.errors=[]` + `data.accuracy=100.0`.
 - **unauthorized** — 401.
 - **FEEDBACK_NOT_FOUND (cross-user)** — A 토큰 + B 의 feedback ID → 404 + `FEEDBACK_NOT_FOUND`.
 - **FEEDBACK_NOT_FOUND (not-exists)** — 999999 → 404 + `FEEDBACK_NOT_FOUND`.
@@ -1388,7 +1411,7 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 - [ ] §부록 A 매트릭스의 19 ErrorCode 가 최소 1개 endpoint 에 trigger 됨 (`INTERNAL_ERROR` 는 Tier 2 I2 가 trigger).
 - [ ] §4 의 15 invariant 시나리오 모두에 사전 셋업 / 호출 / assertion 본문이 풀로 작성됨 (표만 두지 않음).
 - [ ] §부록 B 의 모든 fixture (SEED_USER_A/B, DEMO_GOOGLE, PRESET_SCRIPT_*, SESSION_*, RECORDING_*, FEEDBACK_*, WAV_*, AnalyzeMockResponses, LlmMockResponses, TtsMockResponses) 가 본문 시나리오 어디선가 1회 이상 사용됨.
-- [ ] 문서 어디에도 "자세한 내용은 *_REFINED.md 참조", "다른 브랜치의 코드 참조" 같은 외부 cross-ref 가 없다 (자기완결).
+- [ ] 본 문서는 `API_SPEC_REFINED.md` 의 contract 차이를 모두 본문에 인라인했다. 외부 cross-ref ("자세한 내용은 SPEC 참조", "다른 브랜치의 코드 참조") 없이 자기완결.
 - [ ] §1.8 snippet 명명 규칙과 §3 본문의 모든 snippet 이름이 일치.
 - [ ] CI 에서 `./gradlew test asciidoctor` 한 번에 통과.
 
@@ -1401,3 +1424,4 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 | 2026-05-10 | 초판. TDD 재구현용 자기완결 회귀 방지 테스트 플랜. 26 endpoint × HTTP contract (Tier 1) + 15 도메인 invariant 시나리오 (Tier 2). REST Docs MockMvc 표준. |
 | 2026-05-10 (rev2) | Codex round 1 4 finding 반영 — (F1) §3.14 POST /api/sessions 의 SessionCreateRequest 에서 scriptText 필드 제거 (develop: title 만), sentence split 시나리오는 PATCH 로만. (F2) §3.26 POST /api/tts 인증을 authenticated 로 정정 (§2.3 SecurityConfig 와 일관), unauthorized 시나리오 신설, golden 에 Bearer 추가. (F3) §3.20 RetryWordResponse 를 {correct, perceived, canonical, score, guidanceKr} 5 필드로 정정 (develop record 와 일치, word/stepScore 제거), correct=true/false 두 golden 분기. (F4) §3.1 GET /api/health 응답을 ApiResponse&lt;Map&lt;String,Object&gt;&gt; envelope 으로 정정, data={status:"UP", service:"echo-app-backend", timestamp:ISO}. §부록 A 매트릭스 #26 TTS 행에 UNAUTHORIZED/INVALID_TOKEN trigger 추가. |
 | 2026-05-10 (rev3) | Codex round 2 3 finding 반영 — (F1) develop 참조 제거 + main 의 root Gradle layout 으로 셋업 경로 정정 (`backend/src/test/...` → `src/test/...`, `backend/build.gradle` → root `build.gradle`). 자기완결 약속의 비교 대상 목록에서 develop 단어 제거. §0 메타에 "API_SPEC.md 가 contract source-of-truth" 명시. (F2) §3.19 POST /api/feedback/generate 에 `MODEL_SERVER_UNAVAILABLE` (503) / `MODEL_SERVER_ERROR` (502) 시나리오 신설 + mock 정책 갱신 (구체 컴포넌트 이름 비강제). §부록 A 매트릭스 #19 의 두 셀을 `mock throws` 로 정정. (F3) §3.20 retry-word 에 `INVALID_REQUEST` (multipart missing part / wrong part name / size 초과) 시나리오 신설. §부록 A 매트릭스 #20 의 INVALID_REQUEST 셀 정정. |
+| 2026-05-10 (rev4) | Contract source-of-truth 를 `API_SPEC.md` → `API_SPEC_REFINED.md` 로 전환. (C1) §0 메타에 nullable `?` + `@JsonInclude(NON_NULL)` 키 omission 정책 명시 (REFINED §1.3). (C2) §3.18 Recording 에 strict 규정 노트 ("mode 위반 = 400 INVALID_REQUEST" 를 본 plan 자체 contract 로 유지) + cross-tenant `*_NOT_FOUND` 정책 한 줄 + INVALID_REQUEST 시나리오에 4 케이스 (두 mode 혼합 / 컨텍스트 모두 누락 / 불완전 script-flow / 불완전 session-sentence) 명시. (C3, C4) §3.19 generate 응답 예시에 perfect 케이스 (`weakPhoneme` omit) 추가, perfect / script-flow 골든에 `practiceWord` / `guidanceKr` 비-empty assertion + REFINED §5.4 non-null fallback 체인 contract 노트. (C5) §3.22 list 응답 예시의 `weakPhoneme: null` → 키 omit 정정, perfect 골든 분기 통합. (C6) §3.12 Script detail 응답 예시의 INTRO `targetText: null` → 키 omit 정정, 골든 assertion 을 INTRO `doesNotExist` + RECORD 비-empty 로 강화. §3.23 detail 에 with-error / perfect 두 골든 분기 분할. §3.19 / §3.20 mock 정책의 `API_SPEC §4.4` 잔재를 REFINED §4.4 로 정정. §부록 A 매트릭스 / §4 Tier 2 invariant / 다른 endpoint 변경 없음. |
