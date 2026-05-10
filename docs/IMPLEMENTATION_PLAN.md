@@ -168,7 +168,7 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 
 | Method | Path | Auth | 요약 |
 |---|---|---|---|
-| GET | `/api/health` | public | `{status:"UP", service:"echo-app-backend", timestamp}` |
+| GET | `/api/health` | public | `ApiResponse<Map<String,Object>>` 봉투 — `{success:true, data:{status:"UP", service:"echo-app-backend", timestamp}}` |
 
 - Actuator(`/actuator/**`) 는 별도 포트/시큐리티로 분리 (운영 단계 결정)
 
@@ -552,7 +552,7 @@ Phase 별 PR 머지 전에 게이트 통과를 강제한다.
   - 26개 엔드포인트 path (예: `/api/auth/signup`, `/api/recordings`, ...)
   - 19개 ErrorCode
   - 10개 엔티티 이름
-- `legacy` 단어가 본 문서 본문에 사용되지 않았는지 확인 (`docs/legacy/` 경로 언급은 §1.3 의 1곳만 허용)
+- `docs/legacy/` 의 구 문서가 **권위 인용 표(§1.2 / §3 / §4 / §5 / §8) 어디에도 등장하지 않음** 을 확인. 정책 선언/명시적 배제 (예: 인트로 작성 원칙·§1.3·본 §12.1 룰) 는 허용.
 
 ### 12.2 Phase 진입 시 검증
 
