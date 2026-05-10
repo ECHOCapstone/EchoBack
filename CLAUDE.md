@@ -10,7 +10,7 @@ This application is a backend server for an English pronunciation practice and f
 
 ## Core Domains
 
-Domains are aligned with the controllers in `API_SPEC.md` §4. The same five-domain split is used in `API_SPEC.md` §3.
+Domains are aligned with the controllers in `docs/API_SPEC_REFINED.md` §4. The same five-domain split is used in `docs/API_SPEC_REFINED.md` §3.
 
 - **Member**
     - Standard sign-up / login (passwords stored with BCrypt hashing)
