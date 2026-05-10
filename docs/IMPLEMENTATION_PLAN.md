@@ -228,39 +228,40 @@ erDiagram
 com.capstoneecho.echo_back
 ├── EchoBackApplication.java                 // 기존
 ├── global
-│   ├── common                              // ApiResponse, ErrorCode, BusinessException, GlobalExceptionHandler
-│   ├── security                            // SecurityConfig, JwtAuthFilter, JwtAuthEntryPoint, CurrentUserArgumentResolver
-│   ├── jwt                                 // JwtProvider, JwtPrincipal, @CurrentUser
-│   └── config                              // AppProperties, HttpClientConfig, WebMvcConfig
+│   ├── common                               // ApiResponse, ErrorCode, BusinessException, GlobalExceptionHandler
+│   ├── security                             // SecurityConfig, JwtAuthFilter, JwtAuthEntryPoint, CurrentUserArgumentResolver
+│   ├── jwt                                  // JwtProvider, JwtPrincipal, @CurrentUser
+│   └── config                               // AppProperties, HttpClientConfig, WebMvcConfig
 ├── member
-│   ├── domain (User)
-│   ├── repository (UserRepository)
-│   ├── service (MemberService, AuthService)
-│   ├── controller (AuthController, MemberController)
+│   ├── controller                           // AuthController, MemberController
+│   ├── service                              // AuthService, MemberService
+│   ├── repository                           // UserRepository
+│   ├── entity                               // User
 │   └── dto
 ├── learning
-│   ├── track    (Track + repository/service/controller/dto)
-│   ├── script   (Script, LearningStep + RecommendedScriptSelector)
-│   └── session  (Session, SessionSentence + CRUD)
+│   ├── track       { controller, service, repository, entity, dto }
+│   ├── script      { controller, service, repository, entity, dto, support (RecommendedScriptSelector) }
+│   └── session     { controller, service, repository, entity, dto, support }
 ├── pronunciation
-│   ├── recording (Recording + RecordingService 8단계 + RecordingStorage interface + LocalRecordingStorage)
-│   ├── feedback  (PronunciationFeedback, PhonemeError + ScoringPolicy, WeakPhonemeAnalyzer, PracticeWordResolver, PronunciationPromptBuilder)
-│   └── tts       (TtsController, TtsService, TtsClient interface + DefaultTtsClient)
-├── stats
-│   ├── stat    (StatsController, StatsService)
-│   └── ranking (RankingController, RankingService, DemoRankingEntry)
-├── system      (HealthController)
+│   ├── recording   { controller, service, repository, entity, dto, support (RecordingStorage interface, LocalRecordingStorage) }
+│   ├── feedback    { controller, service, repository, entity, dto, support (ScoringPolicy, WeakPhonemeAnalyzer, PracticeWordResolver, PronunciationPromptBuilder) }
+│   └── tts         { controller, service, dto, support (TtsClient interface, DefaultTtsClient) }
+├── statistics
+│   ├── stats       { controller, service, dto, support (BadgePolicy) }
+│   └── ranking     { controller, service, repository, entity, dto }
+├── system                                   // HealthController
 └── external
-    ├── modelserver (ModelServerClient — single @Component, RestClient)
-    └── llm         (LlmClient interface, RuleBasedLlmFeedbackGenerator [default], GeminiLlmFeedbackGenerator [optional])
+    ├── modelserver                          // ModelServerClient (concrete @Component, RestClient — §1.2 정책)
+    └── llm                                  // LlmClient interface, RuleBasedLlmFeedbackGenerator [default], GeminiLlmFeedbackGenerator [optional]
 ```
 
 ### 5.1 어댑터 인터페이스
 
+> `ModelServerClient` 는 `COMPONENTS_REFINED.md §1.2` 정책에 따라 인터페이스 없이 concrete `@Component` (RestClient) 로 둔다. 아래 표는 인터페이스가 분리된 어댑터만 다룬다.
+
 | 인터페이스 | 책임 |
 |---|---|
-| `ModelServerClient` | `/analyze`, `/g2p` 호출. HTTP/1.1 강제, 타임아웃 30s, 무재시도. |
-| `LlmClient` | `summarizeRecording(...)` → `RecordingGuidance(guidanceKr, wrongWords[])`. 항상 non-empty 폴백 보장. |
+| `LlmClient` | `summarizeRecording(...)` → `RecordingGuidance(guidanceKr, wrongWords[])`. `guidanceKr` 폴백 non-empty, `wrongWords` 는 빈 배열 허용. |
 | `RecordingStorage` | 오디오 파일 저장/삭제. `userId/yyyyMM/uuid.wav` 패턴. delete 는 idempotent. |
 | `TtsClient` | 영문 → 오디오 바이트(MP3). 1차는 로컬 스텁. |
 
@@ -465,7 +466,7 @@ Phase 별 PR 머지 전에 게이트 통과를 강제한다.
 | `RuleBasedLlmFeedbackGenerator` | `app.llm.provider=rule-based` (기본) | `errors.canonicalIndex` + targetText 단어 경계로 wrongWords 산출, LLM 호출 없음 |
 | `GeminiLlmFeedbackGenerator` | `app.llm.provider=gemini` | Gemini API 호출 + 파싱; 실패 시 룰 기반 폴백(추후) |
 
-- `summarizeRecording(...)` 은 항상 `RecordingGuidance(guidanceKr, wrongWords[])` 를 non-empty 로 반환.
+- `summarizeRecording(...)` 은 항상 `RecordingGuidance(guidanceKr, wrongWords[])` 를 반환. `guidanceKr` 는 폴백으로 항상 non-empty 보장, `wrongWords` 는 약점 단어가 없으면 빈 배열 `[]` (API_SPEC_REFINED §5.3 정합).
 
 ### 8.3 파일 저장
 
