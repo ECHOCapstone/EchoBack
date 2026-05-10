@@ -291,14 +291,19 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - 없음.
 
 ##### Response (golden 200)
+`ApiResponse<Map<String, Object>>`:
 ```json
-{ "status": "UP", "timestamp": "2026-05-10T12:34:56Z" }
+{ "success": true, "data": {
+    "status": "UP",
+    "service": "echo-app-backend",
+    "timestamp": "2026-05-10T12:34:56Z"
+} }
 ```
-- Content-Type `application/json; charset=UTF-8`. **주의**: 본 endpoint 는 `ApiResponse` envelope 을 사용하지 않는 raw map (편의용 health probe).
-- `status`: 항상 `"UP"`. `timestamp`: ISO 8601 UTC.
+- Content-Type `application/json; charset=UTF-8`. envelope 사용 (data 는 임의의 Map).
+- `data.status`: 항상 `"UP"`. `data.service`: 항상 `"echo-app-backend"`. `data.timestamp`: ISO 8601 UTC (`Instant.now().toString()`).
 
 ##### 시나리오
-- **golden** — 요청 → 200 + body 의 `status="UP"` + `timestamp` 가 ISO 8601 형식.
+- **golden** — 요청 → 200 + `apiSuccess()` + `data.status="UP"` + `data.service="echo-app-backend"` + `data.timestamp` 가 ISO 8601 형식.
 
 ##### Mock 정책
 - 없음.
@@ -678,20 +683,27 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 | 필드 | 타입 | 제약 |
 | --- | --- | --- |
 | `title` | String | `@NotBlank`, `@Size(max=100)` |
-| `scriptText` | String | `@Size(max=5000)` (nullable 허용) |
 
 ```json
-{ "title": "My Coffee Order", "scriptText": "I want a latte. Make it iced." }
+{ "title": "My Coffee Order" }
 ```
 
+> `scriptText` 갱신과 sentence split 은 `PATCH /api/sessions/{sessionId}` (#16, `SessionUpdateRequest.scriptText`) 에서만 가능. POST 는 `title` 만 받고 빈 세션을 생성한다.
+
 ##### Response (golden 201)
-`ApiResponse<SessionResponse>` (#13 항목과 동일 schema). `sentences` 는 `scriptText` 를 종지부호 기준으로 split 한 결과.
+`ApiResponse<SessionResponse>` — 빈 세션 (sentences=[], scriptText="" 또는 null, favorite=false):
+```json
+{ "success": true, "data": {
+    "id": 31, "title": "My Coffee Order",
+    "scriptText": "", "favorite": false, "sentences": [],
+    "createdAt": "2026-05-10T10:00:00Z", "updatedAt": "2026-05-10T10:00:00Z"
+} }
+```
 
 ##### 시나리오
-- **golden** — `seedUserA()` + bearer → POST → 201 + `data.title="My Coffee Order"` + `data.sentences.length=2` (`"I want a latte."`, `"Make it iced."`) + `data.favorite=false`.
-- **golden (no scriptText)** — `{"title":"Empty"}` → 201 + `data.sentences=[]` + `data.scriptText=""` 또는 null.
+- **golden** — `seedUserA()` + bearer + POST `{"title":"My Coffee Order"}` → 201 + `data.title="My Coffee Order"` + `data.sentences=[]` + `data.scriptText=""` (또는 null) + `data.favorite=false`. (scriptText 와 sentences 갱신은 PATCH 시나리오 #16 참조.)
 - **unauthorized** — 401.
-- **VALIDATION_FAILED** — `{"title":""}` → 400 + `VALIDATION_FAILED`.
+- **VALIDATION_FAILED** — `{"title":""}` 또는 100자 초과 → 400 + `VALIDATION_FAILED`.
 
 ##### Mock 정책
 - 없음.
@@ -935,17 +947,19 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 `ApiResponse<RetryWordResponse>`:
 ```json
 { "success": true, "data": {
-    "word": "water",
-    "stepScore": 88.0,
-    "guidanceKr": "이번엔 더 가까워졌어요.",
+    "correct": true,
     "perceived": ["w","ɔ","t","ɚ"],
-    "canonical":  ["w","ɔ","t","ɚ"]
+    "canonical": ["w","ɔ","t","ɚ"],
+    "score": 88.0,
+    "guidanceKr": "이번엔 더 가까워졌어요."
 } }
 ```
-- 저장 없음 (read-only retry).
+- `record RetryWordResponse(boolean correct, List<String> perceived, List<String> canonical, double score, String guidanceKr)` — 정확히 5 필드. `word` / `stepScore` 키 없음 (저장 없음, read-only retry).
+- `correct`: `perceived == canonical` 일 때 true. `score`: 0~100. `guidanceKr`: 한 줄 한국어 가이드.
 
 ##### 시나리오
-- **golden** — 본인 feedback (practiceWord=water) + `WATER_1S` WAV + mock `g2p` + mock `analyze` (perfect) + mock `llmClient.retryGuidance(...)` returns `"이번엔 더 가까워졌어요."` → 200 + `data.word="water"` + `data.stepScore` 가 number + `data.guidanceKr` 비-empty.
+- **golden (correct=true)** — 본인 feedback (practiceWord=water) + `WATER_1S` WAV + mock `g2p` returns `["w","ɔ","t","ɚ"]` + mock `analyze` returns `AnalyzeMockResponses.WATER_PERFECT` + mock `llmClient.retryGuidance(...)` returns `"이번엔 더 가까워졌어요."` → 200 + `data.correct=true` + `data.perceived == data.canonical` + `data.score >= 80.0` + `data.guidanceKr` 비-empty + `data` 키에 `word`/`stepScore` 부재.
+- **golden (correct=false)** — 같은 사전 셋업 + mock `analyze` returns `AnalyzeMockResponses.WATER_WITH_ERROR` (perceived 의 ɔ → ʌ) → 200 + `data.correct=false` + `data.perceived[1]="ʌ"` + `data.canonical[1]="ɔ"` + `data.score < 80.0`.
 - **unauthorized** — 401.
 - **FEEDBACK_NOT_FOUND** — feedbackId=999999 또는 cross-user → 404 + `FEEDBACK_NOT_FOUND`.
 - **AUDIO_DECODE_FAILED** — 깨진 audio → 400 + `AUDIO_DECODE_FAILED`.
@@ -1127,7 +1141,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 
 #### 26. `POST /api/tts` → TtsController.synthesize
 
-- **인증**: `permitAll` (단 yaml 정책 변경 시 authenticated 가 될 수 있음 — 본 plan 은 §2.3 SecurityConfig 매핑 기준 permitAll 로 명시).
+- **인증**: `authenticated`. (§2.3 SecurityConfig 매핑: `/api/auth/**`, `/api/health`, `/error`, `/actuator/health` 만 `permitAll`, 나머지 `/api/**` 는 모두 `authenticated`. `/api/tts` 는 후자에 속한다.)
 - **Test class**: `tts.TtsControllerTest#synthesize`.
 - **Snippet base**: `tts/synthesize`.
 
@@ -1148,10 +1162,11 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - HTTP status 200, Content-Type `audio/mpeg`, body 가 비-empty `byte[]`.
 
 ##### 시나리오
-- **golden** — mock `ttsClient.synthesize(text, lang)` returns `byte[] {0x49,0x44,0x33,...}` (MP3 magic) → POST → 200 + `Content-Type: audio/mpeg` + body length > 0.
-- **VALIDATION_FAILED** — `{"text":""}` → 400 + JSON `ApiResponse.fail(VALIDATION_FAILED)` (에러는 envelope, content-type negotiation 우선이 아닌 한).
-- **MODEL_SERVER_UNAVAILABLE** — mock 이 throws `BusinessException(MODEL_SERVER_UNAVAILABLE, ...)` → 503 + JSON envelope (audio 가 아니라).
-- **MODEL_SERVER_ERROR** — mock 이 throws → 502 + JSON envelope.
+- **golden** — `seedUserA()` + `bearer(userA)` + mock `ttsClient.synthesize(text, lang)` returns `byte[] {0x49,0x44,0x33,...}` (MP3 magic) → POST `{"text":"Welcome to the coffee shop."}` (Authorization 헤더 포함) → 200 + `Content-Type: audio/mpeg` + body length > 0.
+- **unauthorized** — Authorization 헤더 미포함 + `{"text":"..."}` → 401 + `apiError("UNAUTHORIZED")`. Content-Type `application/json` (audio 가 아니라 envelope JSON).
+- **VALIDATION_FAILED** — bearer + `{"text":""}` → 400 + `apiError("VALIDATION_FAILED")` JSON envelope.
+- **MODEL_SERVER_UNAVAILABLE** — bearer + mock 이 throws `BusinessException(MODEL_SERVER_UNAVAILABLE, ...)` → 503 + `apiError("MODEL_SERVER_UNAVAILABLE")` JSON envelope.
+- **MODEL_SERVER_ERROR** — bearer + mock 이 throws → 502 + `apiError("MODEL_SERVER_ERROR")` JSON envelope.
 
 ##### Mock 정책
 - `ttsClient.synthesize(String text, String lang)`: mock 으로 stub 처리. 정상은 MP3 magic 바이트 배열, 에러는 `BusinessException` throw.
@@ -1292,8 +1307,8 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | INVALID_REQUEST           | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mode 위반/multipart 누락 | XOR 위반 | — | — | — | — | year/month 범위 위반 | — | — |
 | VALIDATION_FAILED         | — | NotBlank/Pattern/AssertTrue | NotBlank | NotBlank | NotBlank | — | — | NotBlank/Size | — | — | — | — | — | NotBlank/Size | — | (옵션) | — | — | recordingIds NotEmpty | — | — | — | — | — | — | NotBlank/Size |
-| UNAUTHORIZED              | — | — | — | — | — | — | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | — |
-| INVALID_TOKEN             | — | — | — | — | — | — | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | — |
+| UNAUTHORIZED              | — | — | — | — | — | — | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 |
+| INVALID_TOKEN             | — | — | — | — | — | — | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 |
 | LOGIN_FAILED              | — | — | bad creds | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 | USERNAME_DUPLICATED       | — | dup user | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 | EMAIL_DUPLICATED          | — | dup email | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
@@ -1372,3 +1387,4 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 | 일자 | 항목 |
 | --- | --- |
 | 2026-05-10 | 초판. TDD 재구현용 자기완결 회귀 방지 테스트 플랜. 26 endpoint × HTTP contract (Tier 1) + 15 도메인 invariant 시나리오 (Tier 2). REST Docs MockMvc 표준. |
+| 2026-05-10 (rev2) | Codex round 1 4 finding 반영 — (F1) §3.14 POST /api/sessions 의 SessionCreateRequest 에서 scriptText 필드 제거 (develop: title 만), sentence split 시나리오는 PATCH 로만. (F2) §3.26 POST /api/tts 인증을 authenticated 로 정정 (§2.3 SecurityConfig 와 일관), unauthorized 시나리오 신설, golden 에 Bearer 추가. (F3) §3.20 RetryWordResponse 를 {correct, perceived, canonical, score, guidanceKr} 5 필드로 정정 (develop record 와 일치, word/stepScore 제거), correct=true/false 두 golden 분기. (F4) §3.1 GET /api/health 응답을 ApiResponse&lt;Map&lt;String,Object&gt;&gt; envelope 으로 정정, data={status:"UP", service:"echo-app-backend", timestamp:ISO}. §부록 A 매트릭스 #26 TTS 행에 UNAUTHORIZED/INVALID_TOKEN trigger 추가. |
