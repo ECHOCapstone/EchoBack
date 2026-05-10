@@ -97,7 +97,7 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 | POST | `/api/auth/login` | public | `LOGIN_FAILED` | 자격 증명 검증 후 JWT(200) |
 | POST | `/api/auth/check-username` | public | — | 중복 체크 |
 | POST | `/api/auth/check-email` | public | — | 중복 체크 |
-| GET | `/api/auth/oauth2/google/demo` | public | `USER_NOT_FOUND` | Google OAuth2 데모(이메일 lookup → 자동 생성) |
+| GET | `/api/auth/oauth2/google/demo` | public | — | Google OAuth2 데모 — 데모 사용자 자동 upsert(멱등 200) |
 | GET | `/api/members/me` | JWT | `USER_NOT_FOUND` | 현재 사용자 프로필 |
 | PATCH | `/api/members/me/nickname` | JWT | `VALIDATION_FAILED` | 닉네임 변경 |
 
@@ -186,7 +186,7 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 | 4 | `LearningStep` / `learning_steps` | kind(INTRO/RECORD), prompt, targetText(null when INTRO) | — | — | `LearningStep.intro(...)`, `LearningStep.record(...)` |
 | 5 | `Session` / `sessions` | title, scriptText(nullable), favorite | — | — | `Session.create(user, title)` + `updateScript(...)` |
 | 6 | `SessionSentence` / `session_sentences` | sentenceIndex, text | `ix_session_sentences_session(session_id, sentence_index)` | — | (Session 내부에서만 생성) |
-| 7 | `Recording` / `recordings` | audioPath, targetTextSnapshot, durationSec, perceived, canonical, peakSoftmax, errorsJson, stepScore, guidanceKr, wrongWordsJson, createdAt | (FK auto) | `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` | `forScriptStep(...)`, `forSessionSentence(...)`, `forSessionFreeForm(...)` |
+| 7 | `Recording` / `recordings` | audioPath, targetTextSnapshot, durationSec, perceived, canonical, peakSoftmax, errorsJson, stepScore, guidanceKr, wrongWordsJson, createdAt | (FK auto) | `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))`<br>`step_id IS NULL OR script_id IS NOT NULL`<br>`session_sentence_id IS NULL OR session_id IS NOT NULL` | `forScriptStep(...)`, `forSessionSentence(...)`, `forSessionFreeForm(...)` |
 | 8 | `PronunciationFeedback` / `pronunciation_feedbacks` | title, accuracy(0..100), weakPhoneme, practiceWord, guidanceKr, completed, completedAt | `idx_feedback_user_completed_at(user_id, completed_at)` | 동일 XOR 패턴 (script XOR session) | `forScript(...)`, `forSession(...)` |
 | 9 | `PhonemeError` / `phoneme_errors` | op(enum), canonical, perceived, canonicalIndex | — | — | (Feedback 내부 attach) |
 | 10 | `DemoRankingEntry` / `demo_ranking_entries` | nickname, accuracy | — | — | — |
@@ -574,7 +574,7 @@ Phase 별 PR 머지 전에 게이트 통과를 강제한다.
 
 - `docs/IMPLEMENTATION_PLAN.md` 가 위 12개 섹션을 모두 포함
 - 12.1 self-grep 통과
-- `gh pr create --base develop` 로 PR 생성 (head: `docs/implementation-plan`)
+- `gh pr create --base main` 로 PR 생성 (head: `docs/implementation-plan`). 최근 머지 PR(#2~#10) 모두 `main` 기준이며 `develop` 은 정체 브랜치.
 - `chore/docs` 또는 `docs/*` 계열 기존 PR 패턴과 정합한 커밋 메시지
 
 ---
