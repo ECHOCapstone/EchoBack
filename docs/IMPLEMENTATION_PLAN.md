@@ -427,7 +427,7 @@ com.capstoneecho.echo_back
 | `AnalyzeMockResponses` | `/analyze` 모킹 응답 (성공/PER null/에러) |
 | `LlmMockResponses` | LLM 결과 모킹 (wrongWords 비/유) |
 
-- `@MockBean ModelServerClient`, `@MockBean LlmClient` 로 외부 의존 격리.
+- `@MockitoBean ModelServerClient`, `@MockitoBean LlmClient` 로 외부 의존 격리. Spring Boot 4 에서 `org.springframework.boot.test.mock.mockito.MockBean` 이 제거되었으므로 Spring Framework 6.2 의 `org.springframework.test.context.bean.override.mockito.MockitoBean` 을 사용한다.
 - 테스트 DB: H2 in-memory `MODE=MySQL`, `ddl=create-drop`, JaCoCo 80%+ 게이트.
 
 ### 7.4 REST Docs 흐름
