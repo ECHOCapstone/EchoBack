@@ -191,6 +191,7 @@ Ranking       : DemoRankingEntry
 | stepScore | step_score | Double | NULL | `ScoringPolicy` 결과 (0~100) |
 | guidanceKr | guidance_kr | TEXT | NULL | 녹음 직후 채팅 흐름에 노출되는 한국어 한 줄 가이드 |
 | errorsJson | errors_json | TEXT | NULL | `ModelAnalyzeResponse.errors` JSON 직렬화. `FeedbackService` 가 unit 종합 시 음소 빈도 집계에 사용. |
+| wrongWordsJson | wrong_words_json | TEXT | NULL | `LlmClient.summarizeRecording` 이 산출한 `WrongWord[]` 의 JSON 직렬화. `RecordingResponse.wrongWords` 매핑 소스. NULL 도 빈 배열(`[]`)로 응답. |
 | createdAt | created_at | Instant | NOT NULL, updatable=false | `@PrePersist` |
 
 - **연관관계:**
@@ -201,9 +202,9 @@ Ranking       : DemoRankingEntry
   - `sessionSentence : SessionSentence` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
   - 위 nullable 관계는 모두 부모 엔티티가 삭제되면 컬럼이 NULL 로 끊어지고, `targetTextSnapshot` 으로 의미가 보존된다.
 - **DB 레벨 정합성 (CHECK 제약)** — Hibernate 의 `@org.hibernate.annotations.Check` (또는 `@Checks` 묶음) 로 엔티티 클래스에 선언하여 DDL 레벨 CHECK 제약으로 생성한다:
-  - `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 은 정확히 하나만 NOT NULL.
-  - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 script 도 동반.
-  - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 session 도 동반.
+  - `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` — INSERT 시점에는 정적 팩토리 3종 (`forScriptStep` / `forSessionSentence` / `forSessionFreeForm`) 이 strict XOR (script 와 session 은 정확히 하나만 NOT NULL) 을 application-level 로 보장. 양쪽 NULL 상태는 Session/Script 가 hard-delete 되어 ON DELETE SET NULL 로 부모가 끊긴 history 행에서만 발생하며 정상으로 받아들인다 (`targetTextSnapshot` 으로 의미 보존). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절.
+  - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 script 도 동반. (Script hard-delete 시 step_id 도 함께 NULL 로 끊겨 본 식이 유지된다.)
+  - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 session 도 동반. (Session hard-delete 시 session_sentence_id 도 함께 NULL 로 끊겨 본 식이 유지된다.)
 - **신규 INSERT 시 정적 팩토리가 추가로 강제하는 invariant** (DB CHECK 만으로 표현 불가능한 동일성 규칙). 세 팩토리가 다음 셋 중 하나의 모드를 만들고, 각 모드별 명시 검증을 통과해야만 객체가 생성된다. 위반 시 `IllegalArgumentException`.
 
   | 팩토리 / 모드 | 시그니처가 강제 (NULL 패턴) | 명시 검증 |
@@ -220,13 +221,13 @@ Ranking       : DemoRankingEntry
   - `static Recording forScriptStep(User user, Script script, LearningStep step, String audioPath, String targetTextSnapshot)` — 추천 학습 트랙의 한 step 에 대한 녹음.
   - `static Recording forSessionSentence(User user, Session session, SessionSentence sentence, String audioPath, String targetTextSnapshot)` — 사용자 맞춤 세션의 한 문장에 대한 녹음.
   - `static Recording forSessionFreeForm(User user, Session session, String audioPath, String targetTextSnapshot)` — 사용자 맞춤 세션을 한 호흡으로 통째 녹음(sentence 분리 없음).
-  - `void applyAnalysis(AnalysisOutcome outcome)` — perceived/canonical/peakSoftmax/errorsJson/guidanceKr/durationSec/stepScore 한 번에 반영.
-- **값 객체:** 본 클래스 안의 `record AnalysisOutcome(perceivedJoined, canonicalJoined, peakSoftmaxJoined, errorsJson, guidanceKr, durationSec, stepScore)` 은 분석 결과를 한 번에 들고 다니는 묶음 값이며 JPA 매핑 대상 아님.
+  - `void applyAnalysis(AnalysisOutcome outcome)` — perceived/canonical/peakSoftmax/errorsJson/guidanceKr/durationSec/stepScore/wrongWordsJson 한 번에 반영.
+- **값 객체:** 본 클래스 안의 `record AnalysisOutcome(perceivedJoined, canonicalJoined, peakSoftmaxJoined, errorsJson, guidanceKr, durationSec, stepScore, wrongWordsJson)` 은 분석 결과를 한 번에 들고 다니는 묶음 값이며 JPA 매핑 대상 아님. `wrongWordsJson` 은 `LlmClient.summarizeRecording` 의 `RecordingGuidance.wrongWords` 를 JSON 직렬화한 문자열 (NULL 가능 — 응답 매핑이 빈 배열로 변환).
 
 ### 2.8 `PronunciationFeedback` — 종합 피드백 한 건
 
 - **테이블:** `pronunciation_feedbacks`
-- **인덱스:** `user_id` / `script_id` / `session_id` 인덱스는 MySQL FK 보조 인덱스로 자동 생성되므로 엔티티 코드에 `@Index` 로 직접 선언하지 않는다.
+- **인덱스:** `user_id` / `script_id` / `session_id` 인덱스는 MySQL FK 보조 인덱스로 자동 생성되므로 엔티티 코드에 `@Index` 로 직접 선언하지 않는다. **추가 인덱스: `(user_id, completed_at)`** — `StatsService.getMyStats` 의 월간 attendance group-by 와 미래의 ranking/주간 통계용. FK 자동 인덱스로는 못 만들어지므로 엔티티 코드에 `@Index(name="idx_feedback_user_completed_at", columnList="user_id,completed_at")` 로 명시 선언.
 - **요약:** 한 챕터 또는 한 세션을 끝냈을 때 만들어지는 종합 피드백 한 건. `accuracy` 는 step 점수 평균(0~100), `weakPhoneme` 는 가장 자주 틀린 음소.
 
 | 필드 | DB 컬럼 | 타입 | nullable | 비고 |
@@ -241,6 +242,7 @@ Ranking       : DemoRankingEntry
 | practiceWord | practice_word | varchar(100) | NULL | |
 | guidanceKr | guidance_kr | TEXT | NULL | |
 | completed | completed | boolean | NOT NULL | 보상이 한 번 적용되었는지. 원자 UPDATE 로만 true 로 전환된다. |
+| completedAt | completed_at | Instant | NULL | 보상이 적용된 시각. `markCompletedAtomically` 의 같은 SQL 안에서 `completed=true` 와 동시에 set. attendance/통계 일자 group-by 의 권한 키. |
 | errors | (역방향) | List\<PhonemeError\> | — | `@OneToMany(mappedBy="feedback", cascade=ALL, orphanRemoval=true)` |
 | createdAt | created_at | Instant | NOT NULL, updatable=false | `@PrePersist` |
 
@@ -250,12 +252,12 @@ Ranking       : DemoRankingEntry
   - `session : Session` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
   - `errors : List<PhonemeError>` — `@OneToMany`, mappedBy=`feedback`, cascade=ALL, orphanRemoval=true.
   - Script/Session 이 삭제되면 해당 FK 는 NULL 로 끊어지지만 `title` / `accuracy` / `weakPhoneme` 등 본문 데이터는 보존된다.
-- **DB 레벨 정합성 (CHECK 제약):** `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 정확히 하나만 NOT NULL. Hibernate 의 `@org.hibernate.annotations.Check` 로 엔티티 클래스에 선언, DDL 레벨 CHECK 제약으로 생성한다.
+- **DB 레벨 정합성 (CHECK 제약):** `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` — INSERT 시점에는 정적 팩토리 (`create`) 가 strict XOR (script 와 session 은 정확히 하나만 NOT NULL) 을 application-level 로 보장. 양쪽 NULL 상태는 Script/Session 이 hard-delete 되어 ON DELETE SET NULL 로 부모가 끊긴 history 행에서만 발생하며 정상으로 받아들인다 (`title` / `accuracy` / `weakPhoneme` 등 본문 데이터로 의미 보존). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절. Hibernate 의 `@org.hibernate.annotations.Check` 로 엔티티 클래스에 선언, DDL 레벨 CHECK 제약으로 생성한다.
 - **신규 INSERT 시 정적 팩토리(`create`)가 추가로 강제하는 invariant**:
   - `(script != null) XOR (session != null)` — 시그니처와 동일성 규칙으로 강제.
   - session-flow 인 경우 `session.user == user` (script-flow 는 user 일관성 검증 없음 — Script 는 전역 콘텐츠).
   - 위반 시 `IllegalArgumentException`. 검증 시점은 INSERT 한정 (Recording §2.7 과 동일 원칙).
-- **완료 보상의 idempotency:** `completed` 를 false → true 로 전환하는 경로는 **원자 UPDATE 한 가지뿐**이다. 엔티티에 `markCompleted()` 같은 read-modify-write 도메인 메서드는 두지 않는다 (보조 메서드를 노출하면 직접 호출 경로가 race 를 만든다). 보상 가산은 `FeedbackRepository.markCompletedAtomically(...)` 가 영향 행 1을 반환할 때에만 수행한다 (§5).
+- **완료 보상의 idempotency:** `completed` 를 false → true 로 전환하는 경로는 **원자 UPDATE 한 가지뿐**이다. 엔티티에 `markCompleted()` 같은 read-modify-write 도메인 메서드는 두지 않는다 (보조 메서드를 노출하면 직접 호출 경로가 race 를 만든다). 보상 가산은 `FeedbackRepository.markCompletedAtomically(...)` 가 영향 행 1을 반환할 때에만 수행한다 (§5). 동일 atomic UPDATE 가 `completed_at` 도 같은 SQL 안에서 set 하므로 (`completed=true` ↔ `completed_at!=NULL` 이 항상 동시에 보장), 보상 시점과 attendance 캘린더 일자가 정확히 일치한다.
 - **도메인 메서드:**
   - `static PronunciationFeedback create(User user, Script script, Session session, String title, double accuracy, String weakPhoneme, String practiceWord, String guidanceKr)` — 정합성 규칙(script XOR session)을 정적 팩토리에서 강제.
   - `void addError(PhonemeError)` — 역방향 attach 후 컬렉션 추가.
@@ -371,24 +373,28 @@ CHECK 제약으로 강제되는 동시-NOT NULL 규칙은 §2.7 / §2.8 참고.
 @Modifying
 @Query("""
     UPDATE PronunciationFeedback f
-       SET f.completed = true
+       SET f.completed   = true,
+           f.completedAt = :now
      WHERE f.id = :id
        AND f.user.id = :userId
        AND f.completed = false
 """)
-int markCompletedAtomically(@Param("id") Long id, @Param("userId") Long userId);
+int markCompletedAtomically(@Param("id") Long id,
+                            @Param("userId") Long userId,
+                            @Param("now") Instant now);
 ```
 
 - 반환은 영향을 받은 행의 수.
-- 보상 가산은 반환값이 1 일 때에만 수행한다. 0 이면 이미 완료 처리된 피드백이거나 cross-user 호출이므로 보상 가산을 건너뛴다.
+- `completedAt` 은 같은 UPDATE SQL 안에서 set 되므로 `completed=true` 와 `completedAt!=NULL` 이 항상 동시에 보장된다 (read-modify-write 가 아닌 단일 UPDATE).
+- 보상 가산은 반환값이 1 일 때에만 수행한다. 0 이면 이미 완료 처리된 피드백이거나 cross-user 호출이므로 보상 가산을 건너뛴다 (cross-user / not-exists / already-completed 의 분기는 호출부 — `FeedbackService.complete` — 가 추가 read-only 조회로 책임. COMPONENTS_REFINED §3.3.2 / §5 참조).
 
 ### 5.3 트랜잭션 경계
 
 - 모든 쓰기 서비스 메서드는 `@Transactional`. 읽기 서비스 메서드는 `@Transactional(readOnly = true)` 를 권장한다.
 - `FeedbackService.complete(Long userId, Long feedbackId)` 의 흐름:
-  1. `feedbackRepository.markCompletedAtomically(feedbackId, userId)` 호출.
+  1. `feedbackRepository.markCompletedAtomically(feedbackId, userId, Instant.now())` 호출 — `now` 는 service 가 주입.
   2. 반환값이 1 → `MemberService.awardCompletionRewards(userId, completionExp)` 로 EXP/streak 가산.
-  3. 반환값이 0 → 가산 없이 현재 사용자 정보만 반환.
+  3. 반환값이 0 → 추가 read-only 조회로 분기 (cross-user/not-exists 는 `FEEDBACK_NOT_FOUND`, already-completed 는 가산 없이 현재 프로필 반환). 자세한 분기 정책은 COMPONENTS_REFINED §3.3.2 / §5 참조.
 
 ### 5.4 검증 테스트
 
@@ -400,10 +406,11 @@ int markCompletedAtomically(@Param("id") Long id, @Param("userId") Long userId);
   - `forSessionSentence` 에 `sentence.session != session` 또는 `session.user != user` 인 조합 → `IllegalArgumentException`.
   - `forSessionFreeForm` 에 `session.user != user` → `IllegalArgumentException`.
 - **Cross-parent 거절 (`PronunciationFeedback.create`)**: session-flow 에서 `session.user != user` → `IllegalArgumentException`.
-- **Recording 정합성 CHECK 제약**: 잘못된 조합(예: script 와 session 동시 NOT NULL, step 만 NOT NULL 이고 script 가 NULL) 으로 raw INSERT 시 DB 에서 거절된다.
+- **Recording 정합성 CHECK 제약**: 양쪽 NOT NULL, step 만 NOT NULL 이고 script 가 NULL 같은 명백한 misuse 는 raw INSERT 시 DB 에서 거절된다. 단 ON DELETE SET NULL 로 양쪽 NULL 이 되는 history 전이는 허용한다 (CHECK 식이 `양쪽 NULL OR XOR` 형태로 완화되어 있음 — §2.7 참조). INSERT 시점의 strict XOR 은 정적 팩토리 3종이 application-level 로 보장.
 - **Session 대본 갱신 후 녹음 보존**: `Session.updateScript` 가 SessionSentence 행을 새로 교체한 직후, 기존 `Recording.session_sentence_id` 는 NULL 로 끊어지지만 `target_text_snapshot` 은 그대로 남아 어떤 문장에 대한 녹음이었는지 추적 가능하다.
 - **Session 하드 삭제 후 history 보존**: 사용자가 `DELETE /api/sessions/{id}` 로 세션을 지운 뒤에도, 해당 세션을 참조하던 `Recording.session_id` / `PronunciationFeedback.session_id` 는 NULL 로 끊어지고 행 자체와 본문 데이터는 살아 있다.
 - **완료 동시성**: 동일한 `feedbackId` 에 대해 `complete` 를 두 스레드가 동시에 호출해도 EXP 가 정확히 한 번만 가산된다 (CountDownLatch 기반 동시성 테스트).
+- **Attendance 일자 정확도**: 같은 사용자가 day=N 에 generate 한 feedback 을 day=N+2 에 complete 했을 때, `/api/stats/me?year=Y&month=M` 의 `attendance.days` 가 N+2 위치에서 누적 streak 가 1 증가하고 N 위치는 영향 없다. `completed_at` 컬럼 기반 group-by 가 일자 정확도를 책임진다 (COMPONENTS_REFINED §3.4.1).
 
 ---
 
