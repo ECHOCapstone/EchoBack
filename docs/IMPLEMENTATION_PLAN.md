@@ -70,7 +70,7 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 | 시간 직렬화 | ISO-8601 UTC `Instant` |
 | KST 변환 | Statistics 도메인에서만 (출석 일자 버킷팅) |
 | 인증 | Stateless JWT, `Authorization: Bearer <token>`, HS256 |
-| CORS | `AppProperties.cors.allowedOrigins`, GET/POST/PUT/PATCH/DELETE, `expose: Authorization, Content-Disposition`, `allowCredentials=true`, `maxAge=1h` |
+| CORS | `AppProperties.cors.allowedOrigins`, GET/POST/PUT/PATCH/DELETE/OPTIONS, `expose: Authorization, Content-Disposition`, `allowCredentials=true`, `maxAge=1h` |
 | 멀티파트 한도 | 25 MB (max-file/max-request) |
 | 통합 테스트 DB | H2 in-memory (`jdbc:h2:mem:testdb;MODE=MySQL`, `ddl=create-drop`) |
 | 로그 시간대 | UTC |
@@ -132,13 +132,13 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 
 | Method | Path | Auth | 주요 ErrorCode | 요약 |
 |---|---|---|---|---|
-| POST | `/api/recordings` | JWT | `INVALID_REQUEST`, `STEP_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `MODEL_SERVER_ERROR`, `MODEL_SERVER_UNAVAILABLE`, `AUDIO_DECODE_FAILED` | 3-mode 업로드 (script-flow / session-sentence / session-free-form) |
-| POST | `/api/feedback/generate` | JWT | `INVALID_REQUEST`, `RECORDING_NOT_FOUND` | 누적 녹음에서 통합 피드백 생성 |
-| POST | `/api/feedback/{feedbackId}/retry-word` | JWT | `FEEDBACK_NOT_FOUND` | 약점 단어 재시도 |
+| POST | `/api/recordings` | JWT | `INVALID_REQUEST`, `AUDIO_DECODE_FAILED`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `STEP_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `MODEL_SERVER_ERROR`, `MODEL_SERVER_UNAVAILABLE` | 3-mode 업로드 (script-flow / session-sentence / session-free-form) |
+| POST | `/api/feedback/generate` | JWT | `INVALID_REQUEST`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `RECORDING_NOT_FOUND`, `MODEL_SERVER_ERROR`, `MODEL_SERVER_UNAVAILABLE` | 누적 녹음에서 통합 피드백 생성 |
+| POST | `/api/feedback/{feedbackId}/retry-word` | JWT | `INVALID_REQUEST`, `AUDIO_DECODE_FAILED`, `FEEDBACK_NOT_FOUND`, `MODEL_SERVER_ERROR`, `MODEL_SERVER_UNAVAILABLE` | 약점 단어 재시도 (multipart) |
 | POST | `/api/feedback/{feedbackId}/complete` | JWT | `FEEDBACK_NOT_FOUND` | 학습 완료 + 보상 확정 |
 | GET | `/api/feedbacks` | JWT | — | 피드백 목록 |
 | GET | `/api/feedbacks/{feedbackId}` | JWT | `FEEDBACK_NOT_FOUND` | 피드백 상세 |
-| POST | `/api/tts` | JWT | `INVALID_REQUEST` | 영문 → MP3 raw bytes |
+| POST | `/api/tts` | JWT | `INVALID_REQUEST`, `MODEL_SERVER_ERROR`, `MODEL_SERVER_UNAVAILABLE` | 영문 → MP3 raw bytes |
 
 - **엔티티**: `Recording`, `PronunciationFeedback`, `PhonemeError` (+ Script/Session 참조)
 - **리포지터리**: `RecordingRepository`, `FeedbackRepository` (사용자 스코프 + atomic UPDATE)
@@ -184,7 +184,7 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 | 2 | `Track` / `tracks` | title, description, displayOrder | — | — | — |
 | 3 | `Script` / `scripts` | title, content, difficulty(enum STRING), preset(boolean), practiceWord, masteryBadgeName, chapterOrder(nullable) | `ix_scripts_track(track_id, chapter_order)` | — | — |
 | 4 | `LearningStep` / `learning_steps` | kind(INTRO/RECORD), prompt, targetText(null when INTRO) | — | — | `LearningStep.intro(...)`, `LearningStep.record(...)` |
-| 5 | `Session` / `sessions` | title, scriptText(nullable), favorite | — | — | `Session.create(user, title)` + `updateScript(...)` |
+| 5 | `Session` / `sessions` | title, scriptText(NOT NULL, 초기값 빈 문자열), favorite | — | — | `Session.create(user, title)` (scriptText="", favorite=false) + `updateScript(...)` |
 | 6 | `SessionSentence` / `session_sentences` | sentenceIndex, text | `ix_session_sentences_session(session_id, sentence_index)` | — | (Session 내부에서만 생성) |
 | 7 | `Recording` / `recordings` | audioPath, targetTextSnapshot, durationSec, perceived, canonical, peakSoftmax, errorsJson, stepScore, guidanceKr, wrongWordsJson, createdAt | (FK auto) | `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))`<br>`step_id IS NULL OR script_id IS NOT NULL`<br>`session_sentence_id IS NULL OR session_id IS NOT NULL` | `forScriptStep(...)`, `forSessionSentence(...)`, `forSessionFreeForm(...)` |
 | 8 | `PronunciationFeedback` / `pronunciation_feedbacks` | title, accuracy(0..100), weakPhoneme, practiceWord, guidanceKr, completed, completedAt | `idx_feedback_user_completed_at(user_id, completed_at)` | 동일 XOR 패턴 (script XOR session) | `forScript(...)`, `forSession(...)` |
