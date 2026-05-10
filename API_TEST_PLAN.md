@@ -173,11 +173,97 @@ public abstract class AbstractServiceIntegrationTest {
 
 - **헤더 형식**: `Authorization: Bearer <jwt>`. JWT 알고리즘 HS256, secret 은 `app.jwt.secret`.
 - **JWT claims**: `sub`=username, `uid`=userId(Long), `iat`, `exp`. 검증 측은 secret 으로 서명 검증 후 `JwtPrincipal(userId, username)` 반환.
-- **401 응답** (인증 필요 endpoint, 토큰 누락 / 만료 / 변조 모두):
-  ```json
-  { "success": false, "error": { "code": "UNAUTHORIZED", "message": "..." } }
-  ```
-  Content-Type `application/json; charset=UTF-8`. `data` 키는 `@JsonInclude(NON_NULL)` 로 omit.
+- **401 응답 분리** (REFINED §2.2):
+  - **missing token** (Authorization 헤더 부재) → 401 + `{ "success": false, "error": { "code": "UNAUTHORIZED", ... } }`. JwtAuthFilter 가 SecurityContext 를 비우면 Spring `AuthenticationException` → GlobalExceptionHandler → UNAUTHORIZED.
+  - **malformed token** (서명 깨짐 / 구조 깨짐 / 알고리즘 불일치) → 401 + `error.code="INVALID_TOKEN"`. JwtAuthFilter 가 파싱 실패를 INVALID_TOKEN BusinessException 으로 throw.
+  - **expired token** (`exp` 가 현재 시각 이전) → 401 + `error.code="INVALID_TOKEN"`.
+  - 모든 401 응답: Content-Type `application/json; charset=UTF-8`, `data` 키 omit (`@JsonInclude(NON_NULL)`).
+- **회귀 기준**: missing 과 malformed/expired 가 서로 다른 ErrorCode 로 응답되어야 한다. 둘을 구분하지 않고 하나의 코드로만 응답하는 구현은 회귀 위반.
+
+#### §1.5.1 보호 endpoint 일괄 401 검증 (parametrized)
+
+본 plan 은 20개 보호 endpoint (auth/health 제외) 모두에 대해 missing-token / malformed-token / expired-token 3 시나리오를 일괄 검증하는 단일 parametrized 테스트를 명세한다. per-endpoint §3 시나리오는 기존 `unauthorized` 한 줄 + `INVALID_TOKEN — see §1.5.1` 한 줄로 본 테스트를 참조.
+
+**테스트 클래스**: `auth.ProtectedEndpointAuthContractTest` (Tier 1).
+
+**대상 dispatch 표 (20개, minimal request)**:
+
+| HTTP method + path | minimal request body / params |
+| --- | --- |
+| `GET /api/members/me` | (없음) |
+| `PATCH /api/members/me/nickname` | `{"nickname":"x"}` |
+| `GET /api/tracks` | (없음) |
+| `GET /api/tracks/1` | (없음) |
+| `GET /api/scripts/recommended/today` | (없음) |
+| `GET /api/scripts/1` | (없음) |
+| `GET /api/sessions` | (없음) |
+| `POST /api/sessions` | `{"title":"x"}` |
+| `GET /api/sessions/1` | (없음) |
+| `PATCH /api/sessions/1` | `{"favorite":true}` |
+| `DELETE /api/sessions/1` | (없음) |
+| `POST /api/recordings` | multipart `audio` part + `?scriptId=1&stepId=1` |
+| `POST /api/feedback/generate` | `{"scriptId":1,"recordingIds":[1]}` |
+| `POST /api/feedback/1/retry-word` | multipart `audio` part |
+| `POST /api/feedback/1/complete` | (없음) |
+| `GET /api/feedbacks` | (없음) |
+| `GET /api/feedbacks/1` | (없음) |
+| `GET /api/stats/me` | (없음) |
+| `GET /api/ranking/today` | (없음) |
+| `POST /api/tts` | `{"text":"hi"}` |
+
+> **중요**: 401 검증은 도메인 자원 존재 여부와 무관하다 — 인증 단계가 더 앞이므로 path 의 ID 가 999999 든 1 이든 401 이 먼저 나와야 한다. 따라서 dispatch 표는 fixture 시드 없이 그대로 호출하면 된다.
+
+**JUnit5 명세 (의사 코드)**:
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class ProtectedEndpointAuthContractTest {
+    @Autowired MockMvc mockMvc;
+    @Autowired JwtFixture jwtFixture;
+
+    record EndpointSpec(HttpMethod method, String path, String body, MediaType ct) {
+        MockHttpServletRequestBuilder toRequestBuilder() { /* request 빌드 */ }
+    }
+
+    @ParameterizedTest
+    @MethodSource("protectedEndpoints")
+    void missingToken_returnsUnauthorized(EndpointSpec spec) throws Exception {
+        mockMvc.perform(spec.toRequestBuilder())   // no Authorization
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("protectedEndpoints")
+    void malformedToken_returnsInvalidToken(EndpointSpec spec) throws Exception {
+        mockMvc.perform(spec.toRequestBuilder().header("Authorization", "Bearer not.a.jwt"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("protectedEndpoints")
+    void expiredToken_returnsInvalidToken(EndpointSpec spec) throws Exception {
+        String jwt = jwtFixture.expired(seedUserA.id(), seedUserA.username());
+        mockMvc.perform(spec.toRequestBuilder().header("Authorization", "Bearer " + jwt))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+    }
+
+    static Stream<EndpointSpec> protectedEndpoints() {
+        // 위 dispatch 표 그대로 20행
+    }
+}
+```
+
+**fixture 추가**:
+- `JwtFixture.expired(Long uid, String username)` — secret 으로 서명 + `exp = Instant.now().minusSeconds(3600)` 인 JWT 생성.
+- malformed 케이스는 fixture 없이 `"Bearer not.a.jwt"` 문자열 그대로 사용.
+
+**REST Docs snippet**: `auth/protected-endpoint-missing-token`, `auth/protected-endpoint-malformed-token`, `auth/protected-endpoint-expired-token` (대표 1 endpoint 만 snippet 생성, 나머지 19 는 assertion 만).
 
 ### §1.6 검증 (`@Valid`) 응답 contract
 
@@ -483,6 +569,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — `seedUserA()` → `bearer(userA)` → GET → 200 + `data.username="alice"` + 모든 필드 존재.
 - **unauthorized** — header 미포함 → 401 + `error.code="UNAUTHORIZED"`.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **USER_NOT_FOUND** — `bearer(userId=999999)` (존재하지 않는 ID 의 토큰 직접 발급) → 404 + `error.code="USER_NOT_FOUND"`. (실 운영에서 거의 없는 케이스지만 contract 로 노출.)
 
 ##### Mock 정책
@@ -516,6 +603,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — `seedUserA()` → `bearer(userA)` → PATCH `{"nickname":"Newbie"}` → 200 + `data.nickname="Newbie"` + DB 의 user.nickname 도 변경.
 - **unauthorized** — header 미포함 → 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **VALIDATION_FAILED** — `{"nickname":""}` 또는 31자 이상 → 400 + `VALIDATION_FAILED`.
 - **USER_NOT_FOUND** — `bearer(999999)` → 404 + `USER_NOT_FOUND`.
 
@@ -548,6 +636,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (비-empty)** — TrackFixture.seedTracks(2) → 200 + `data.length=2` + 각 항목의 모든 필드 존재 + `displayOrder` 오름차순.
 - **golden (empty)** — 빈 DB → 200 + `data=[]`.
 - **unauthorized** — header 미포함 → 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 
 ##### Mock 정책
 - 없음.
@@ -578,6 +667,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — TrackFixture.seedTrackWithChapters(2) → GET `/api/tracks/{id}` → 200 + `data.chapters.length=2` + `chapterOrder` 오름차순.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **TRACK_NOT_FOUND** — GET `/api/tracks/999999` → 404 + `error.code="TRACK_NOT_FOUND"`.
 
 ##### Mock 정책
@@ -607,6 +697,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (비-empty)** — ScriptFixture.seedPresetScripts(N=2) → 200 + `data.length>=1` + 모두 `isPreset=true`.
 - **golden (empty)** — preset 스크립트 0건 → 200 + `data=[]`.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 
 ##### Mock 정책
 - 없음 (날짜 기반 결정적 셔플은 service 책임이라 mock 불필요).
@@ -638,6 +729,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — ScriptFixture.seedScriptWithSteps(intro=1, record=2) → GET → 200 + `data.steps.length=3` + `jsonPath('$.data.steps[?(@.kind=="INTRO")].targetText').doesNotExist()` + `jsonPath('$.data.steps[?(@.kind=="RECORD")].targetText')` 비-empty.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **SCRIPT_NOT_FOUND** — GET `/api/scripts/999999` → 404 + `error.code="SCRIPT_NOT_FOUND"`.
 
 ##### Mock 정책
@@ -671,6 +763,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (empty)** — `seedUserA()` 만 (세션 0건) → 200 + `data=[]`.
 - **golden (cross-user 격리)** — `seedUserA()` + `seedUserB()` + B의 세션 1건 → A 토큰으로 GET → 200 + `data=[]` (A 의 세션만 반환).
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 
 ##### Mock 정책
 - 없음.
@@ -709,6 +802,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — `seedUserA()` + bearer + POST `{"title":"My Coffee Order"}` → 201 + `data.title="My Coffee Order"` + `data.sentences=[]` + `data.scriptText=""` (또는 null) + `data.favorite=false`. (scriptText 와 sentences 갱신은 PATCH 시나리오 #16 참조.)
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **VALIDATION_FAILED** — `{"title":""}` 또는 100자 초과 → 400 + `VALIDATION_FAILED`.
 
 ##### Mock 정책
@@ -731,6 +825,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — `seedUserA()` + 본인 세션 → bearer + GET → 200 + `data.id=세션ID`.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **SESSION_NOT_FOUND (cross-user)** — `seedUserA() + seedUserB()` + B 의 세션 → A 토큰으로 GET → 404 + `error.code="SESSION_NOT_FOUND"`. (cross-user 도 not-found 로 통합 — 존재 노출 방지.)
 - **SESSION_NOT_FOUND (not-exists)** — GET `/api/sessions/999999` → 404 + `SESSION_NOT_FOUND`.
 
@@ -766,6 +861,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (favorite 토글)** — `{"favorite":true}` → 200 + `data.favorite=true` + 다른 필드 보존.
 - **golden (scriptText 갱신)** — `{"scriptText":"New text. New sentence."}` → 200 + `data.sentences.length=2` (재-split) + 기존 sentence ID 모두 새 ID 로 교체 (orphanRemoval).
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **VALIDATION_FAILED** — `{"title":""}` (NotBlank 가 아니라 Size 만 있어도 빈 문자열은 명시적으로 블랭크 처리 — VALIDATION_FAILED 가 안 떨어지면 본 시나리오는 omit) — 구현 확인 후 적용. 본 plan 에서는 검증 시나리오 한 줄만 명시.
 - **SESSION_NOT_FOUND** — cross-user 또는 not-exists → 404.
 
@@ -783,13 +879,14 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### Request
 - Path: `sessionId`. body 없음.
 
-##### Response (golden 204)
-- 본문: `ApiResponse<Void>` 형태로 `{ "success": true }` (data 키 omit) 또는 HTTP 204 + 빈 body. 실제 컨트롤러가 어느 쪽을 반환하는지에 따라 assertion 분기 — 본 plan 은 **status 가 204 또는 200 + apiSuccess()** 로 너그럽게 검증.
+##### Response (golden 200)
+- 본문: `ApiResponse<Void>` 형태 `{ "success": true }` (data / error 키 모두 omit, `@JsonInclude(NON_NULL)`). HTTP status 200, Content-Type `application/json; charset=UTF-8`. REFINED §1.1 의 void 작업 contract — 204 + 빈 body 반환은 회귀 위반.
 
 ##### 시나리오
-- **golden** — 본인 세션 → DELETE → 204 (또는 200 + apiSuccess) + DB 에 row 없음.
-- **golden (cascade SET NULL)** — 본인 세션 + 그 세션을 참조하는 Recording 1건 시드 → DELETE → 204 + Recording.session_id 가 NULL, 본문 (target_text_snapshot) 보존.
+- **golden** — 본인 세션 → DELETE → 200 + `jsonPath('$.success').value(true)` + `jsonPath('$.data').doesNotExist()` + `jsonPath('$.error').doesNotExist()` + DB 에 row 없음.
+- **golden (cascade SET NULL)** — 본인 세션 + 그 세션을 참조하는 Recording 1건 시드 → DELETE → 200 + 동일 envelope assertion + Recording.session_id 가 NULL, 본문 (target_text_snapshot) 보존.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **SESSION_NOT_FOUND** — cross-user 또는 not-exists → 404.
 
 ##### Mock 정책
@@ -868,6 +965,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden session-free-form** — `sessionId` 만 → 201 + `data.sessionId` 만 + `data.sessionSentenceId` 키 omit.
 - **golden (perfect, errors empty)** — mock `analyze` returns `WATER_PERFECT` (errors=[]) + mock `llm` returns `GUIDANCE_PERFECT` → 201 + `data.errors=[]` + `data.wrongWords=[]`.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **INVALID_REQUEST (mode 위반)** — 다음 케이스 각각 → 400 + `error.code="INVALID_REQUEST"` (본 plan 의 strict 규정):
   - **두 mode 혼합**: `scriptId` + `sessionId` 동시.
   - **컨텍스트 모두 누락**: 4 컨텍스트 query 모두 미지정 (mode 결정 불가).
@@ -947,6 +1045,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden session-flow** — sessionFixture + sessionFlowRecording ×3 → POST `{"sessionId":31, "recordingIds":[...]}` → 200 + `data.sessionId` 반환 + `data.scriptId` 키 omit.
 - **golden (perfect, weakPhoneme omit)** — 모든 recording 의 errors=[] → 200 + `jsonPath('$.data.weakPhoneme').doesNotExist()` + `jsonPath('$.data.practiceWord')` 비-empty + `jsonPath('$.data.guidanceKr')` 비-empty + `data.accuracy=100.0` (REFINED §5.4 non-null fallback 체인 contract).
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **INVALID_REQUEST (XOR 위반)** — `scriptId` + `sessionId` 둘 다 set 또는 둘 다 null → 400 + `INVALID_REQUEST`.
 - **VALIDATION_FAILED** — `{"recordingIds":[]}` → 400 + `VALIDATION_FAILED`.
 - **SCRIPT_NOT_FOUND** — `scriptId=999999` → 404 + `SCRIPT_NOT_FOUND`.
@@ -991,6 +1090,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (correct=true)** — 본인 feedback (practiceWord=water) + `WATER_1S` WAV + mock `g2p` returns `["w","ɔ","t","ɚ"]` + mock `analyze` returns `AnalyzeMockResponses.WATER_PERFECT` + mock `llmClient.retryGuidance(...)` returns `"이번엔 더 가까워졌어요."` → 200 + `data.correct=true` + `data.perceived == data.canonical` + `data.score >= 80.0` + `data.guidanceKr` 비-empty + `data` 키에 `word`/`stepScore` 부재.
 - **golden (correct=false)** — 같은 사전 셋업 + mock `analyze` returns `AnalyzeMockResponses.WATER_WITH_ERROR` (perceived 의 ɔ → ʌ) → 200 + `data.correct=false` + `data.perceived[1]="ʌ"` + `data.canonical[1]="ɔ"` + `data.score < 80.0`.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **FEEDBACK_NOT_FOUND** — feedbackId=999999 또는 cross-user → 404 + `FEEDBACK_NOT_FOUND`.
 - **AUDIO_DECODE_FAILED** — 깨진 audio (헤더 없는 byte[]) → 400 + `AUDIO_DECODE_FAILED`.
 - **INVALID_REQUEST (multipart 위반)** — bearer + 다음 세 케이스 각각 → 400 + `error.code="INVALID_REQUEST"` (REFINED §4.4 의 retry-word 주요 에러 목록 — "빈 파트/사이즈 초과"):
@@ -1027,6 +1127,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (1차 호출, 가산)** — 본인 feedback (completed=false) + `seedUserA()` (exp=0, streak=0) → POST → 200 + `data.exp=10` + `data.streak=1` + DB 의 feedback.completed=true + completed_at 비-null.
 - **golden idempotent (2차 호출, 가산 없음)** — 1차 호출 후 즉시 같은 endpoint 다시 → 200 + `data.exp=10` (변동 없음) + `data.streak=1`.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **FEEDBACK_NOT_FOUND (cross-user)** — user A 토큰으로 user B 의 feedback ID → 404 + `FEEDBACK_NOT_FOUND` (보상 가산 없음).
 - **FEEDBACK_NOT_FOUND (not-exists)** — feedbackId=999999 → 404 + `FEEDBACK_NOT_FOUND`.
 
@@ -1059,6 +1160,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (empty)** — 본인 feedback 0건 → 200 + `data=[]`.
 - **golden (cross-user 격리)** — A 의 feedback 1건 + B 의 feedback 1건 → A 토큰으로 GET → 200 + `data.length=1` + `data[0]` 가 A 것.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 
 ##### Mock 정책
 - 없음.
@@ -1081,6 +1183,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (with-error)** — 본인 feedback (errors 있음) → 200 + `data.weakPhoneme="ɔ"` (키 존재) + `data.practiceWord` 비-empty + `data.guidanceKr` 비-empty + `data.errors.length>=1`.
 - **golden (perfect)** — 본인 perfect feedback (errors=[]) → 200 + `jsonPath('$.data.weakPhoneme').doesNotExist()` + `data.practiceWord` 비-empty (REFINED §5.4 non-null contract) + `data.guidanceKr` 비-empty + `data.errors=[]` + `data.accuracy=100.0`.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **FEEDBACK_NOT_FOUND (cross-user)** — A 토큰 + B 의 feedback ID → 404 + `FEEDBACK_NOT_FOUND`.
 - **FEEDBACK_NOT_FOUND (not-exists)** — 999999 → 404 + `FEEDBACK_NOT_FOUND`.
 
@@ -1128,6 +1231,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (empty)** — completion 0건 → 200 + `data.streak=0` + `data.exp=0` + `data.attendance.days = {}` + `data.weeklyErrors=[]`.
 - **golden (year/month 미지정)** — query 없이 GET → 200 + `data.attendance.year` / `month` 가 KST 현재 연/월.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 - **INVALID_REQUEST (year/month 범위 위반)** — `?month=13` → 400 + `INVALID_REQUEST`.
 - **USER_NOT_FOUND** — `bearer(999999)` → 404 + `USER_NOT_FOUND`.
 
@@ -1168,6 +1272,7 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden** — DemoRankingEntry 시드 + `seedUserA()` 의 본인 점수 → 200 + `data.entries` 비-empty + 본인 entry 의 `isMe=true` 정확히 1개.
 - **golden (본인 미참여)** — `seedUserA()` 만 있고 오늘 학습 0건 → 200 + `data.myRank=null` (또는 omit) + `data.entries` 는 데모만.
 - **unauthorized** — 401.
+- **INVALID_TOKEN** — malformed / expired 토큰 → 401 + `error.code="INVALID_TOKEN"`. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
 
 ##### Mock 정책
 - 없음 (DemoRankingEntry 는 yaml 또는 SQL seed).
@@ -1199,12 +1304,14 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 ##### 시나리오
 - **golden** — `seedUserA()` + `bearer(userA)` + mock `ttsClient.synthesize(text, lang)` returns `byte[] {0x49,0x44,0x33,...}` (MP3 magic) → POST `{"text":"Welcome to the coffee shop."}` (Authorization 헤더 포함) → 200 + `Content-Type: audio/mpeg` + body length > 0.
 - **unauthorized** — Authorization 헤더 미포함 + `{"text":"..."}` → 401 + `apiError("UNAUTHORIZED")`. Content-Type `application/json` (audio 가 아니라 envelope JSON).
-- **VALIDATION_FAILED** — bearer + `{"text":""}` → 400 + `apiError("VALIDATION_FAILED")` JSON envelope.
+- **INVALID_TOKEN** — malformed / expired 토큰 + `{"text":"..."}` → 401 + `apiError("INVALID_TOKEN")` JSON envelope. 일괄 검증은 §1.5.1 parametrized 테스트가 담당 (본 endpoint 도 그 표에 포함).
+- **INVALID_REQUEST (검증 실패)** — bearer + `{"text":""}` (빈 text) 또는 `{"text":"<501자 이상>"}` → 400 + `apiError("INVALID_REQUEST")` JSON envelope. REFINED §4.12 의 endpoint-specific 명세를 따른다 (§부록 A 의 일반 handler 매핑인 `MethodArgumentNotValidException → VALIDATION_FAILED` 보다 endpoint-specific 명세가 우선).
 - **MODEL_SERVER_UNAVAILABLE** — bearer + mock 이 throws `BusinessException(MODEL_SERVER_UNAVAILABLE, ...)` → 503 + `apiError("MODEL_SERVER_UNAVAILABLE")` JSON envelope.
 - **MODEL_SERVER_ERROR** — bearer + mock 이 throws → 502 + `apiError("MODEL_SERVER_ERROR")` JSON envelope.
 
 ##### Mock 정책
 - `ttsClient.synthesize(String text, String lang)`: mock 으로 stub 처리. 정상은 MP3 magic 바이트 배열, 에러는 `BusinessException` throw.
+- **검증 매핑 노트**: TTS 컨트롤러 구현은 `@Valid TtsRequest` 의존 대신 수동 검증으로 `BusinessException(INVALID_REQUEST, ...)` 또는 `IllegalArgumentException` 을 throw 하고, 후자는 GlobalExceptionHandler 가 INVALID_REQUEST 로 매핑하도록 구성해야 한다. `@Valid` 만 의존하면 `MethodArgumentNotValidException → VALIDATION_FAILED` 로 매핑되어 본 plan 의 회귀 기준 위반.
 
 ---
 
@@ -1340,10 +1447,10 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 
 | ErrorCode \ Endpoint (#) | 1 health | 2 signup | 3 login | 4 chk-u | 5 chk-e | 6 oauth-demo | 7 me | 8 nick | 9 trk-list | 10 trk-detail | 11 scr-rec | 12 scr-detail | 13 ses-list | 14 ses-create | 15 ses-detail | 16 ses-patch | 17 ses-delete | 18 rec-upload | 19 fb-gen | 20 fb-retry | 21 fb-complete | 22 fb-list | 23 fb-detail | 24 stats | 25 ranking | 26 tts |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| INVALID_REQUEST           | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mode 위반/multipart 누락 | XOR 위반 | multipart 누락/잘못된 part name/사이즈 초과 | — | — | — | year/month 범위 위반 | — | — |
-| VALIDATION_FAILED         | — | NotBlank/Pattern/AssertTrue | NotBlank | NotBlank | NotBlank | — | — | NotBlank/Size | — | — | — | — | — | NotBlank/Size | — | (옵션) | — | — | recordingIds NotEmpty | — | — | — | — | — | — | NotBlank/Size |
+| INVALID_REQUEST           | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mode 위반/multipart 누락 | XOR 위반 | multipart 누락/잘못된 part name/사이즈 초과 | — | — | — | year/month 범위 위반 | — | NotBlank/Size 검증 실패 |
+| VALIDATION_FAILED         | — | NotBlank/Pattern/AssertTrue | NotBlank | NotBlank | NotBlank | — | — | NotBlank/Size | — | — | — | — | — | NotBlank/Size | — | (옵션) | — | — | recordingIds NotEmpty | — | — | — | — | — | — | — |
 | UNAUTHORIZED              | — | — | — | — | — | — | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 |
-| INVALID_TOKEN             | — | — | — | — | — | — | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 |
+| INVALID_TOKEN             | — | — | — | — | — | — | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) | 변조/만료 토큰 (§1.5.1) |
 | LOGIN_FAILED              | — | — | bad creds | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 | USERNAME_DUPLICATED       | — | dup user | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 | EMAIL_DUPLICATED          | — | dup email | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
@@ -1412,6 +1519,8 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 - [ ] §4 의 15 invariant 시나리오 모두에 사전 셋업 / 호출 / assertion 본문이 풀로 작성됨 (표만 두지 않음).
 - [ ] §부록 B 의 모든 fixture (SEED_USER_A/B, DEMO_GOOGLE, PRESET_SCRIPT_*, SESSION_*, RECORDING_*, FEEDBACK_*, WAV_*, AnalyzeMockResponses, LlmMockResponses, TtsMockResponses) 가 본문 시나리오 어디선가 1회 이상 사용됨.
 - [ ] 본 문서는 `API_SPEC_REFINED.md` 의 contract 차이를 모두 본문에 인라인했다. 외부 cross-ref ("자세한 내용은 SPEC 참조", "다른 브랜치의 코드 참조") 없이 자기완결.
+- [ ] §1.5.1 parametrized 테스트가 20개 보호 endpoint 모두 missing/malformed/expired 3 케이스 일괄 검증. 매트릭스의 `INVALID_TOKEN` 행 모든 셀이 본 테스트로 trigger 됨.
+- [ ] §3.17 DELETE /api/sessions/{id} 골든이 200 + `ApiResponse{success:true}` envelope 만 수용 (204 비수용). REFINED §1.1 void 작업 contract 정합.
 - [ ] §1.8 snippet 명명 규칙과 §3 본문의 모든 snippet 이름이 일치.
 - [ ] CI 에서 `./gradlew test asciidoctor` 한 번에 통과.
 
@@ -1425,3 +1534,4 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 | 2026-05-10 (rev2) | Codex round 1 4 finding 반영 — (F1) §3.14 POST /api/sessions 의 SessionCreateRequest 에서 scriptText 필드 제거 (develop: title 만), sentence split 시나리오는 PATCH 로만. (F2) §3.26 POST /api/tts 인증을 authenticated 로 정정 (§2.3 SecurityConfig 와 일관), unauthorized 시나리오 신설, golden 에 Bearer 추가. (F3) §3.20 RetryWordResponse 를 {correct, perceived, canonical, score, guidanceKr} 5 필드로 정정 (develop record 와 일치, word/stepScore 제거), correct=true/false 두 golden 분기. (F4) §3.1 GET /api/health 응답을 ApiResponse&lt;Map&lt;String,Object&gt;&gt; envelope 으로 정정, data={status:"UP", service:"echo-app-backend", timestamp:ISO}. §부록 A 매트릭스 #26 TTS 행에 UNAUTHORIZED/INVALID_TOKEN trigger 추가. |
 | 2026-05-10 (rev3) | Codex round 2 3 finding 반영 — (F1) develop 참조 제거 + main 의 root Gradle layout 으로 셋업 경로 정정 (`backend/src/test/...` → `src/test/...`, `backend/build.gradle` → root `build.gradle`). 자기완결 약속의 비교 대상 목록에서 develop 단어 제거. §0 메타에 "API_SPEC.md 가 contract source-of-truth" 명시. (F2) §3.19 POST /api/feedback/generate 에 `MODEL_SERVER_UNAVAILABLE` (503) / `MODEL_SERVER_ERROR` (502) 시나리오 신설 + mock 정책 갱신 (구체 컴포넌트 이름 비강제). §부록 A 매트릭스 #19 의 두 셀을 `mock throws` 로 정정. (F3) §3.20 retry-word 에 `INVALID_REQUEST` (multipart missing part / wrong part name / size 초과) 시나리오 신설. §부록 A 매트릭스 #20 의 INVALID_REQUEST 셀 정정. |
 | 2026-05-10 (rev4) | Contract source-of-truth 를 `API_SPEC.md` → `API_SPEC_REFINED.md` 로 전환. (C1) §0 메타에 nullable `?` + `@JsonInclude(NON_NULL)` 키 omission 정책 명시 (REFINED §1.3). (C2) §3.18 Recording 에 strict 규정 노트 ("mode 위반 = 400 INVALID_REQUEST" 를 본 plan 자체 contract 로 유지) + cross-tenant `*_NOT_FOUND` 정책 한 줄 + INVALID_REQUEST 시나리오에 4 케이스 (두 mode 혼합 / 컨텍스트 모두 누락 / 불완전 script-flow / 불완전 session-sentence) 명시. (C3, C4) §3.19 generate 응답 예시에 perfect 케이스 (`weakPhoneme` omit) 추가, perfect / script-flow 골든에 `practiceWord` / `guidanceKr` 비-empty assertion + REFINED §5.4 non-null fallback 체인 contract 노트. (C5) §3.22 list 응답 예시의 `weakPhoneme: null` → 키 omit 정정, perfect 골든 분기 통합. (C6) §3.12 Script detail 응답 예시의 INTRO `targetText: null` → 키 omit 정정, 골든 assertion 을 INTRO `doesNotExist` + RECORD 비-empty 로 강화. §3.23 detail 에 with-error / perfect 두 골든 분기 분할. §3.19 / §3.20 mock 정책의 `API_SPEC §4.4` 잔재를 REFINED §4.4 로 정정. §부록 A 매트릭스 / §4 Tier 2 invariant / 다른 endpoint 변경 없음. |
+| 2026-05-11 (rev5) | Codex round 3 3 finding 반영 — (F1) §1.5 의 401 단일화 (UNAUTHORIZED) 를 REFINED §2.2 분리 (missing → UNAUTHORIZED, malformed/expired → INVALID_TOKEN) 로 정정. §1.5.1 신설: 20개 보호 endpoint (auth/health 제외) 의 (method, path, minimal body) dispatch 표 + JUnit5 parametrized 테스트 명세 (missing/malformed/expired 3 케이스 × 20 endpoint = 60 assertion) 인라인. per-endpoint §3 시나리오 20곳에 `INVALID_TOKEN — see §1.5.1` 한 줄 참조 추가. §부록 A 매트릭스 INVALID_TOKEN 행 셀을 `변조/만료 토큰 (§1.5.1)` 로 강화. (F2) §3.26 TTS 의 VALIDATION_FAILED → INVALID_REQUEST 로 정정 (REFINED §4.12 endpoint-specific 명세가 §부록 A 의 일반 handler 매핑보다 우선이라는 원칙). mock 정책에 "TTS 는 @Valid 대신 수동 검증으로 INVALID_REQUEST 매핑 필수" 한 줄. §부록 A 매트릭스 #26 의 INVALID_REQUEST / VALIDATION_FAILED 두 셀 swap. (F3) §3.17 DELETE /api/sessions/{id} 응답을 200 + `ApiResponse{success:true}` envelope 만 수용으로 strict 화 (204 비수용, REFINED §1.1 void 작업 contract). 시나리오 두 줄에서 "204" 표현 제거. §부록 D 체크리스트 두 줄 추가. |
