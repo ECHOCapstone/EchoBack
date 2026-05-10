@@ -68,7 +68,7 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 | 응답 봉투 | `ApiResponse<T>` 단일화, `@JsonInclude(NON_NULL)` |
 | 봉투 예외 | `POST /api/tts` — 200 응답 시 raw MP3 bytes |
 | 시간 직렬화 | ISO-8601 UTC `Instant` |
-| KST 변환 | Statistics 도메인에서만 (출석 일자 버킷팅) |
+| KST/zone 변환 | `StatsService.attendance` (출석 일자 버킷팅) + `MemberService.awardCompletionRewards`/`User.recordCompletion(...)` (streak day 경계) 가 공통 `ZoneId.of(app.stats.zone)` 사용 — day=N 경계에서 streak 와 attendance 합치 보장 |
 | 인증 | Stateless JWT, `Authorization: Bearer <token>`, HS256 |
 | CORS | `AppProperties.cors.allowedOrigins`, GET/POST/PUT/PATCH/DELETE/OPTIONS, `expose: Authorization, Content-Disposition`, `allowCredentials=true`, `maxAge=1h` |
 | 멀티파트 한도 | 25 MB (max-file/max-request) |
@@ -122,7 +122,9 @@ ECHO 백엔드(영어 발음 학습/평가 서비스)의 전체 구현 로드맵
 | DELETE | `/api/sessions/{sessionId}` | JWT | `SESSION_NOT_FOUND` | 하드 삭제, `{success:true}` |
 
 - **엔티티**: `Track`, `Script`, `LearningStep`, `Session`, `SessionSentence`
-- **리포지터리**: `TrackRepository`, `ScriptRepository`, `LearningStepRepository`, `SessionRepository`, `SessionSentenceRepository` (모두 사용자 스코프 메서드 필수)
+- **리포지터리**:
+  - 글로벌 카탈로그 (user FK 없음): `TrackRepository.findAllByOrderByDisplayOrderAsc()`, `ScriptRepository.findByTrack_IdOrderBy...` / `findByPresetTrue...`, `LearningStepRepository.findByScript_IdOrderBy...`
+  - 사용자 소유 (사용자 스코프 메서드 필수, e.g. `findByIdAndUser_Id`): `SessionRepository`, `SessionSentenceRepository`
 - **핵심 불변식**:
   - 추천은 `RecommendedScriptSelector` 결정론적 셔플(시드: 사용자 ID + KST 일자)
   - `Session.updateScript` 는 sentences 컬렉션을 통째로 교체(orphanRemoval), Recording.session_sentence_id 는 `ON DELETE SET NULL`
