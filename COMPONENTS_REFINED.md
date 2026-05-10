@@ -606,7 +606,7 @@ public class SessionService {
 - 호출하는 entity 도메인 메서드: `Session.rename`, `Session.setFavorite`, `Session.updateScript(scriptText, sentenceTexts)`.
 - 두 단계 검증(ENTITIES_REFINED §5.1): repo 의 `findByIdAndUser_Id` 로 cross-user 차단 → entity 정적 팩토리/도메인 메서드 호출.
 - ErrorCode: `SESSION_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `VALIDATION_FAILED`.
-- `delete` 는 `sessions` 행 hard delete. Recording / PronunciationFeedback 의 `session_id` 는 `ON DELETE SET NULL` 로 끊어지고 본문 보존(ENTITIES_REFINED §2.7, §2.8).
+- `delete` 는 `sessions` 행 hard delete. Recording / PronunciationFeedback 의 `session_id` 는 `ON DELETE SET NULL` 로 끊어지고 본문 보존(ENTITIES_REFINED §2.7, §2.8). session-flow recording / feedback 은 cascade 결과 `script_id` / `session_id` 가 모두 NULL 인 history 행이 되며, 이는 ENTITIES_REFINED §2.7 / §2.8 의 완화된 CHECK 식 (`양쪽 NULL OR XOR`) 을 통과한다. INSERT 시점의 strict XOR 은 Recording / PronunciationFeedback 정적 팩토리가 application-level 로 보장.
 
 ##### Repositories
 
@@ -671,24 +671,29 @@ public class RecordingService {
 }
 ```
 
-- 흐름 (storage 잔존 방지 위해 `RecordingStorage.save` 를 마지막 직전으로 이동, ⑪ 의 DB save 실패 시 `RecordingStorage.delete` 보상):
+- 흐름 (storage 잔존 방지 위해 `RecordingStorage.save` 를 정적 팩토리 직전(⑨)에 두고, ⑩ 의 try 블록이 정적 팩토리 + applyAnalysis + repo.save 를 함께 보호하며 ⑪ 의 catch 가 `RecordingStorage.delete` 보상):
   1. 컨텍스트 mode 분기 (`script-flow` / `session-sentence` / `session-free-form` — API_SPEC_REFINED §4.6). 위반 시 `INVALID_REQUEST`.
   2. user-scope 리포지토리로 부모 엔티티 조회 (`SessionRepository.findByIdAndUser_Id`, `SessionSentenceRepository.findByIdAndSession_User_Id`, `ScriptRepository.findById`, `LearningStepRepository.findById`).
   3. `MultipartAudioReader.read(audio)` — 메모리에서 WAV 변환·duration 추출. 실패 시 `AUDIO_DECODE_FAILED`.
   4. `targetText` snapshot 결정 (mode 별).
-  5. `Recording.validateForScriptStep / validateForSessionSentence / validateForSessionFreeForm` 호출 — 정적 팩토리 invariant (ENTITIES_REFINED §2.7) 와 동일한 cross-parent 검증을 객체 생성 *전에* 한 번 더 수행. 위반 시 `IllegalArgumentException` (`INTERNAL_ERROR` 로 매핑됨 — 두 단계 검증 1단계가 빠진 프로그래밍 에러).
+  5. `Recording.validateForScriptStep / validateForSessionSentence / validateForSessionFreeForm` 호출 — 정적 팩토리 invariant (ENTITIES_REFINED §2.7) 와 동일한 cross-parent 검증을 객체 생성 *전에* 한 번 더 수행 (audioPath 무관). 위반 시 `IllegalArgumentException` (`INTERNAL_ERROR` 로 매핑됨 — 두 단계 검증 1단계가 빠진 프로그래밍 에러).
   6. `ModelServerClient.g2p(targetText)` — canonical 산출 (해당 mode 만, 빈 입력은 `""` 반환).
   7. `ModelServerClient.analyze(wavBytes, canonical)` — perceived/peakSoftmax/errors/durationSec.
   8. `ScoringPolicy`, `WeakPhonemeAnalyzer`, `LlmClient`, `PhonemeErrorMapper` 로 `AnalysisOutcome` 빌드.
-  9. `Recording.forScriptStep / forSessionSentence / forSessionFreeForm` 정적 팩토리 호출 (ENTITIES_REFINED §2.7) — `audioPath` 는 ⑩ 결과를 받아 인자로 전달. 정적 팩토리 본문이 ⑤ 와 동일한 invariant 를 한 번 더 검증 (이중 안전).
-  10. `RecordingStorage.save(userId, wavBytes, originalFilename)` → `audioPath`. 실패 시 그대로 예외 전파 (디스크 잔존 없음 — 아직 파일이 만들어지지 않았거나 storage 가 자체 정리).
-  11. `recording.applyAnalysis(outcome)` 후 `recordingRepository.save(recording)` — try 블록. catch 시 `RecordingStorage.delete(audioPath)` 호출 후 원본 예외 재throw.
+  9. `RecordingStorage.save(userId, wavBytes, originalFilename)` → `audioPath`. 실패 시 그대로 예외 전파 (`LocalRecordingStorage` 는 write-then-rename 패턴 — partial 파일 잔존 없음).
+  10. **try 블록 시작** — 다음 셋을 한 트랜잭션으로 묶어 실패 시 ⑪ catch 가 보상:
+      - `Recording.forScriptStep / forSessionSentence / forSessionFreeForm` 정적 팩토리 호출 (ENTITIES_REFINED §2.7) — 인자에 ⑨ 의 `audioPath` 포함. 정적 팩토리 본문이 ⑤ 와 동일한 invariant 를 한 번 더 검증 (이중 안전).
+      - `recording.applyAnalysis(outcome)`.
+      - `recordingRepository.save(recording)`.
+  11. **catch (Exception e)** — `RecordingStorage.delete(audioPath)` 호출 (멱등 / 실패는 WARN 로그만) 후 `throw e` 로 원본 예외 재전파.
   12. `RecordingResponse.from(recording)`.
 
-  > ① ~ ⑨ 단계는 모두 인-메모리 또는 외부 호출이므로 모델 서버 timeout/에러나 cross-parent 검증 실패가 일어나도 디스크에 orphan WAV 가 남지 않는다. 보상이 필요한 구간은 ⑩ ~ ⑪ 의 windowed write 뿐이고, ⑪ 의 try-catch + `RecordingStorage.delete` 가 그것을 책임진다.
+  > ① ~ ⑧ 단계는 모두 인-메모리 또는 외부 호출이므로 모델 서버 timeout/에러나 cross-parent 검증 실패가 일어나도 storage 호출(⑨) 보다 앞이라 디스크에 orphan WAV 가 남지 않는다. 보상이 필요한 구간은 ⑨ 직후 ⑩–⑪ 의 windowed write 뿐이고, ⑪ 의 try-catch + `RecordingStorage.delete` 가 그것을 책임진다.
+
+  > ⑩ 안의 정적 팩토리는 ⑤ 에서 이미 동일 invariant 를 통과한 상태라 throw 가능성 없음 (이중 안전망). 그럼에도 try 블록에 포함하는 이유는 (a) `recording.applyAnalysis` / `recordingRepository.save` 의 잠재적 예외 (DB 제약 위반 등) 보상과 (b) 미래에 ⑤ 와 정적 팩토리 본문이 분기될 가능성에 대비한 보호.
 
 - 의존: `RecordingRepository`, `MultipartAudioReader`, `RecordingStorage`, `ModelServerClient`, `LlmClient`, `ScoringPolicy`, `WeakPhonemeAnalyzer`, `PhonemeErrorMapper`, `MemberService.loadUser`, `ScriptService.loadScript / loadStep`, `SessionService.loadOwnedSession / loadOwnedSentence`.
-- 발생 ErrorCode: `INVALID_REQUEST`(컨텍스트 조합 위반), `AUDIO_DECODE_FAILED`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `STEP_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `MODEL_SERVER_UNAVAILABLE`, `MODEL_SERVER_ERROR`.
+- 발생 ErrorCode: `INVALID_REQUEST`(컨텍스트 조합 위반), `AUDIO_DECODE_FAILED`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `STEP_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `MODEL_SERVER_UNAVAILABLE`, `MODEL_SERVER_ERROR`. (모델 서버 두 코드는 ⑥/⑦ 단계에서 발생할 수 있고 storage 호출(⑨) 보다 앞이라 디스크 잔존 0.)
 
 ##### Repositories
 
@@ -1048,15 +1053,20 @@ public interface DemoRankingEntryRepository extends JpaRepository<DemoRankingEnt
 ## 5. 트랜잭션 / 동시성 정책
 
 - **모든 쓰기 service 메서드** `@Transactional`. **읽기 전용 메서드** `@Transactional(readOnly = true)`. 컨트롤러는 트랜잭션 어노테이션을 갖지 않는다.
-- **Recording / Feedback 정적 팩토리 검증 시점** = INSERT 한정. ENTITIES_REFINED §2.7 / §2.8 의 invariants 는 신규 객체 생성 경로에서만 검증되며, 이미 저장된 행이 `ON DELETE SET NULL` 로 컬럼 일부가 NULL 이 되는 전이는 정상 상태로 받아들인다(의미 보존은 `Recording.targetTextSnapshot`).
+- **Recording / Feedback 정적 팩토리 검증 시점** = INSERT 한정. ENTITIES_REFINED §2.7 / §2.8 의 strict XOR invariant 는 신규 객체 생성 경로 (정적 팩토리 3종) 에서만 application-level 로 강제하고, DB CHECK 식은 `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` 형태로 완화되어 있어 ON DELETE SET NULL 로 양쪽 NULL 이 되는 history 전이를 정상으로 받아들인다 (의미 보존은 `Recording.targetTextSnapshot` 및 `PronunciationFeedback` 본문 컬럼). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절. 자세한 CHECK 식은 ENTITIES_REFINED §2.7 / §2.8 인용.
 - **두 단계 검증(ENTITIES_REFINED §5.1)**:
   - 1단계 (service): 컨트롤러가 받은 Long ID 들을 user-scope 리포지토리(`findByIdAndUser_Id`, `findByUser_IdAndIdIn`)로 해석. cross-user ID 는 빈 결과 → 해당 도메인의 `*_NOT_FOUND` 변환.
   - 2단계 (entity 정적 팩토리): 주어진 엔티티 참조들이 서로 일관된지(`step.script == script`, `sentence.session == session`, `session.user == user`) 검증. 위반 시 `IllegalArgumentException` → `GlobalExceptionHandler` 가 `INTERNAL_ERROR` 로 매핑(이는 service 가 1단계를 빠뜨렸을 때만 발생하는 프로그래밍 에러).
-- **`FeedbackService.complete` idempotency(ENTITIES_REFINED §5.3)**:
+- **`FeedbackService.complete` idempotency(ENTITIES_REFINED §5.3 + 본 명세서 §3.3.2 보강)**:
   1. `feedbackRepository.markCompletedAtomically(feedbackId, userId)` 호출.
   2. 영향 행 1 → `MemberService.awardCompletionRewards(userId, completionExp)` → 갱신된 `UserResponse`.
-  3. 영향 행 0 → 가산 없이 `MemberService.getMyProfile(userId)`.
+  3. 영향 행 0 → `feedbackRepository.findByIdAndUser_Id(feedbackId, userId)` 추가 read-only 조회로 분기:
+     - present + `completed == true` → 가산 없이 `MemberService.getMyProfile(userId)` 반환 (idempotent — 같은 사용자가 두 번째 호출).
+     - empty → `BusinessException(FEEDBACK_NOT_FOUND)` (cross-user 또는 not-exists; §7 cross-user 차단 시나리오 보존).
+     - present + `completed == false` → `BusinessException(INTERNAL_ERROR)` (race window 가 좁아 발생 가능성 무시; 발생 시 atomic UPDATE 가 1을 반환했어야 하는 경로의 프로그래밍 에러).
   - read-modify-write 패턴 금지. `PronunciationFeedback` 엔티티에 `markCompleted()` 류 도메인 메서드 노출 금지.
+  - zero-row 후의 `findByIdAndUser_Id` 는 read-only 분기 조회이므로 atomic UPDATE 원칙을 깨지 않는다.
+  - 상세 흐름은 §3.3.2 `FeedbackService.complete` 본문 참조.
 - **`Session.updateScript`** 가 sentences 컬렉션을 통째 교체(orphanRemoval) 하면 그 즉시 기존 `Recording.session_sentence_id` 가 NULL 로 끊어진다. `targetTextSnapshot` 으로 의미가 보존되므로 별도 history 테이블 필요 없음.
 
 ---
@@ -1216,7 +1226,8 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 - **`SentenceSplitter.split(scriptText)`** — 종지부호(`.!?`) 와 줄바꿈을 1차 분할 키로 사용. 약어(예: `Mr.`) 는 휴리스틱으로 보존. 결과는 trim, 빈 문장 제거.
 - **`User.streak` 7 캡** — `User.recordCompletion` 본문에서 7 도달 시 더 이상 증가하지 않음. 어제 학습 → +1, 그 외 → 1 리셋.
 - **`RecordingStorage.delete`** — 멱등. 없는 path 도 silent OK. 실패는 WARN 로그만, 본 예외를 throw 하지 않아 보상 경로의 2차 실패가 원본 예외(`RecordingService.upload` 의 DB save 예외 등)를 가리지 않는다.
-- **`Recording.validateForXxx` 정적 메서드** — `RecordingService.upload` 흐름 ⑤ 단계에서 `audioPath` 가 결정되기 전 cross-parent 검증을 수행. 정적 팩토리(`forXxx`) 자체의 invariant (ENTITIES_REFINED §2.7) 는 변경 없이 유지되며, ⑨ 의 객체 생성 시점에 같은 invariant 가 한 번 더 검증됨 (이중 안전).
+- **`RecordingStorage.save` 호출 위치** — `RecordingService.upload` 의 ⑨ 단계. 정적 팩토리(⑩ try 블록) 가 결과 `audioPath` 를 인자로 받으므로 save 가 factory 보다 반드시 앞에 와야 한다. ⑤ 의 `validateForXxx` 가 cross-parent invariant 를 객체 생성 전에 미리 통과시켜 두므로 ⑨–⑩ 사이의 storage write 가 invariant 위반 때문에 orphan 으로 남을 가능성은 없다.
+- **`Recording.validateForXxx` 정적 메서드** — `RecordingService.upload` 흐름 ⑤ 단계에서 `audioPath` 가 결정되기 전 cross-parent 검증을 수행. 정적 팩토리(`forXxx`) 자체의 invariant (ENTITIES_REFINED §2.7) 는 변경 없이 유지되며, ⑩ 의 객체 생성 시점에 같은 invariant 가 한 번 더 검증됨 (이중 안전).
 
 ---
 
@@ -1226,3 +1237,4 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | --- | --- |
 | 2026-05-10 | 초판. 26개 endpoint / 10개 entity / 19개 ErrorCode / 2개 모델 서버 op 전부에 대한 컴포넌트·시그니처 매핑. |
 | 2026-05-10 (rev2) | Codex adversarial review 반영 — (F1) `FeedbackService.generate` 의 컨텍스트 정합 검증을 위해 `RecordingRepository` 에 `findByUser_IdAndScript_IdAndIdIn` / `findByUser_IdAndSession_IdAndIdIn` 신설, (F2) `FeedbackService.complete` 의 atomic UPDATE 영향 행 0 케이스를 not-exists/cross-user(`FEEDBACK_NOT_FOUND`) 와 already-completed(idempotent) 로 분기, (F3) `RecordingService.upload` 흐름 재정렬 (`RecordingStorage.save` 마지막 직전으로 이동) + `RecordingStorage.delete` 보상 메서드 신설 + `Recording.validateForXxx` 검증 전용 정적 메서드 신설. |
+| 2026-05-10 (rev3) | Codex round 2 반영 — (F4) `RecordingService.upload` 흐름 ⑨ ↔ ⑩ 재정렬: `RecordingStorage.save` 가 정적 팩토리보다 앞 (⑨), 정적 팩토리(⑩) 가 결과 `audioPath` 를 인자로 받음. ⑩–⑪ 의 try-catch 가 정적 팩토리 + applyAnalysis + repo.save 를 함께 보호하고 catch 시 `RecordingStorage.delete` 보상. (F5) Recording / PronunciationFeedback 의 CHECK 식 완화 (`(script_id IS NULL AND session_id IS NULL) OR XOR`) — ENTITIES_REFINED §2.7 / §2.8 동시 갱신. INSERT 시점 strict XOR 은 정적 팩토리 3종이 application-level 로 보장. (F6) §5 `FeedbackService.complete` idempotency 4-줄 요약을 §3.3.2 rev2 의 3-way 분기 (present+completed=true / empty / present+completed=false) 로 동기화. |
