@@ -2,9 +2,10 @@
 
 ## §0. 메타
 
-- **목적**: TDD 기반으로 backend 를 새로 구현했을 때, 새 구현이 기존 구현과 동일한 HTTP contract 를 만족함을 자동 검증해 회귀를 막는다.
-- **회귀 방지 정의**: 같은 (HTTP method, path, request body/query/path/headers) 입력에 대해 동일한 (status, response body schema, headers) 가 나오면 회귀 없음.
-- **자기완결 약속**: 본 문서 외부 (`*_REFINED.md`, `develop` 의 controller 본문, GitHub PR 등) 를 한 번도 참조하지 않고도 모든 테스트 작성이 가능해야 한다. 외부 문서가 변경돼도 본 문서가 source-of-truth.
+- **목적**: `main` 브랜치 (root Gradle 프로젝트) 에 새로 구현될 backend 가 `API_SPEC.md` 의 contract 를 회귀 없이 만족함을 자동 검증한다.
+- **Contract source-of-truth**: `API_SPEC.md` (기존 contract). `API_SPEC_REFINED.md` (새 contract) 와 다른 부분이 있다면 본 plan 은 **`API_SPEC.md` 를 따른다**. 새 SPEC 의 차이를 흡수하는 작업은 별도 라운드.
+- **회귀 방지 정의**: 같은 (HTTP method, path, request body/query/path/headers) 입력에 대해 `API_SPEC.md` 가 명시한 (status, response body schema, ErrorCode, headers) 가 나오면 회귀 없음.
+- **자기완결 약속**: 본 문서 외부 (`*_SPEC_REFINED.md`, 다른 브랜치의 코드, GitHub PR 등) 를 한 번도 참조하지 않고도 모든 테스트 작성이 가능해야 한다. 외부 문서가 변경돼도 본 문서가 source-of-truth.
 - **사용 방법**: §3 의 한 endpoint 항목을 한 controller 테스트 클래스로, §4 의 한 invariant 항목을 한 service 테스트 메서드로 그대로 옮긴다.
 - **테스트 스택**: JUnit 5 + Spring Boot Test + MockMvc + Spring REST Docs (MockMvc) + H2 in-memory + Spring Security Test. LLM/모델 서버는 `@MockBean` 으로 격리. 멀티파트는 `MockMultipartFile`.
 - **2-tier 정책**:
@@ -15,9 +16,11 @@
 
 ## §1. 테스트 인프라 셋업
 
-origin/develop 에 `backend/src/test` 디렉토리가 비어 있어 새로 만든다. 본 절은 그 시점의 최소 셋업 본문.
+`main` 브랜치는 root Gradle 프로젝트 (`build.gradle`, `settings.gradle` 옆 `src/main/...`, `src/test/...` 표준 layout) 이며 backend 구현이 비어있는 상태에서 시작한다. 본 절은 그 시점의 최소 테스트 셋업 본문 — 구현팀이 그대로 복사해 시작할 수 있도록.
 
 ### §1.1 build.gradle 의존 + 플러그인 (전체 본문)
+
+`main` 의 root `build.gradle` (settings.gradle 옆) 에 다음 블록을 병합한다. 추가 모듈 / sub-project 없음 — root Gradle 단일 프로젝트.
 
 ```groovy
 plugins {
@@ -48,7 +51,7 @@ asciidoctor {
 
 ### §1.2 application-test.yaml (전체 본문)
 
-`backend/src/test/resources/application-test.yaml`:
+`src/test/resources/application-test.yaml`:
 
 ```yaml
 spring:
@@ -162,6 +165,8 @@ public abstract class AbstractServiceIntegrationTest {
 | `WavFixtures` | `SILENT_1S` (32044 bytes, 16kHz mono PCM), `WATER_1S` | resource `/test-wav/silent-1s.wav` 등 |
 | `AnalyzeMockResponses` | `WATER_PERFECT`, `WATER_WITH_ERROR` | `ModelAnalyzeResponse` 인스턴스 |
 | `LlmMockResponses` | `GUIDANCE_PERFECT`, `GUIDANCE_SIMPLE` | `RecordingGuidance` / `String` |
+
+> Resource 경로 (`/test-wav/silent-1s.wav` 등) 는 root Gradle layout 기준 `src/test/resources/test-wav/...` 로 해석된다.
 
 ### §1.5 JWT 발급 / 인증 contract
 
@@ -926,10 +931,13 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **SESSION_NOT_FOUND** — `sessionId=999999` 또는 cross-user → 404 + `SESSION_NOT_FOUND`.
 - **RECORDING_NOT_FOUND (cross-user)** — `recordingIds` 에 user B 의 recording ID 포함 → 404 + `RECORDING_NOT_FOUND`.
 - **RECORDING_NOT_FOUND (cross-context)** — `scriptId=21` 인데 `recordingIds` 에 session-flow recording 포함 → 404 + `RECORDING_NOT_FOUND`.
+- **MODEL_SERVER_UNAVAILABLE** — golden 사전 셋업 + 모델 서버 의존 컴포넌트가 `BusinessException(MODEL_SERVER_UNAVAILABLE, ...)` throw → 503 + `error.code="MODEL_SERVER_UNAVAILABLE"` (`API_SPEC §4.4` 의 generate 주요 에러 목록).
+- **MODEL_SERVER_ERROR** — 모델 서버 의존 컴포넌트가 `BusinessException(MODEL_SERVER_ERROR, ...)` throw → 502 + `error.code="MODEL_SERVER_ERROR"`.
 
 ##### Mock 정책
-- `llmClient.summarizeFeedback(...)`: stub 으로 `"ɔ 발음을 더 둥글게."` 반환.
-- 모델 서버는 호출 안 함 (recording 의 캐시된 분석을 집계).
+- 새 구현이 LLM 또는 모델 서버 의존을 사용한다면, 그 의존을 `@MockBean` 으로 교체하고 정상 stub 또는 `BusinessException` throw 로 케이스 분기. 본 plan 은 구체 클래스 이름을 강제하지 않는다 — `API_SPEC §4.4` 의 ErrorCode 가 응답에 노출되는지가 회귀 기준.
+- `MODEL_SERVER_UNAVAILABLE` / `MODEL_SERVER_ERROR` 시나리오는 그 의존이 throw 하는 케이스를 mock 으로 강제해 트리거.
+- 정상 (golden) 케이스에서는 LLM 의존이 비-empty `guidanceKr` / `weakPhoneme` 등을 반환하도록 stub.
 
 ---
 
@@ -962,12 +970,16 @@ record ApiResponse<T>(boolean success, T data, ApiError error) {
 - **golden (correct=false)** — 같은 사전 셋업 + mock `analyze` returns `AnalyzeMockResponses.WATER_WITH_ERROR` (perceived 의 ɔ → ʌ) → 200 + `data.correct=false` + `data.perceived[1]="ʌ"` + `data.canonical[1]="ɔ"` + `data.score < 80.0`.
 - **unauthorized** — 401.
 - **FEEDBACK_NOT_FOUND** — feedbackId=999999 또는 cross-user → 404 + `FEEDBACK_NOT_FOUND`.
-- **AUDIO_DECODE_FAILED** — 깨진 audio → 400 + `AUDIO_DECODE_FAILED`.
+- **AUDIO_DECODE_FAILED** — 깨진 audio (헤더 없는 byte[]) → 400 + `AUDIO_DECODE_FAILED`.
+- **INVALID_REQUEST (multipart 위반)** — bearer + 다음 세 케이스 각각 → 400 + `error.code="INVALID_REQUEST"` (`API_SPEC §4.4` 의 retry-word 주요 에러 목록 — "빈 파트/사이즈 초과"):
+  - **missing part**: multipart 본문에 `audio` part 없음 (다른 part 만 또는 part 0개).
+  - **wrong part name**: part name 이 `audio` 가 아닌 `file` / `recording` 등.
+  - **size 초과**: `application-test.yaml` 의 `spring.servlet.multipart.max-file-size` (10MB) 초과 byte[]. 큰 파일을 실제 만드는 대신 `MaxUploadSizeExceededException` 강제 mock 으로 시뮬레이션 가능.
 - **MODEL_SERVER_UNAVAILABLE** — mock 이 throws → 503 + `MODEL_SERVER_UNAVAILABLE`.
 - **MODEL_SERVER_ERROR** — mock 이 throws → 502 + `MODEL_SERVER_ERROR`.
 
 ##### Mock 정책
-- `modelServerClient.g2p(feedback.practiceWord)` / `modelServerClient.analyze(...)` 호출. `llmClient.retryGuidance(...)` 호출.
+- 새 구현이 모델 서버 / LLM 의존을 사용한다면 `@MockBean` 으로 교체. golden 은 정상 stub, MODEL_SERVER_* 시나리오는 의존이 `BusinessException` throw 하도록 강제. INVALID_REQUEST 의 multipart 위반은 mock 없이 `MockMvcRequestBuilders.multipart(...)` 로 직접 잘못된 multipart 요청 빌드.
 
 ---
 
@@ -1305,7 +1317,7 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 
 | ErrorCode \ Endpoint (#) | 1 health | 2 signup | 3 login | 4 chk-u | 5 chk-e | 6 oauth-demo | 7 me | 8 nick | 9 trk-list | 10 trk-detail | 11 scr-rec | 12 scr-detail | 13 ses-list | 14 ses-create | 15 ses-detail | 16 ses-patch | 17 ses-delete | 18 rec-upload | 19 fb-gen | 20 fb-retry | 21 fb-complete | 22 fb-list | 23 fb-detail | 24 stats | 25 ranking | 26 tts |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| INVALID_REQUEST           | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mode 위반/multipart 누락 | XOR 위반 | — | — | — | — | year/month 범위 위반 | — | — |
+| INVALID_REQUEST           | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mode 위반/multipart 누락 | XOR 위반 | multipart 누락/잘못된 part name/사이즈 초과 | — | — | — | year/month 범위 위반 | — | — |
 | VALIDATION_FAILED         | — | NotBlank/Pattern/AssertTrue | NotBlank | NotBlank | NotBlank | — | — | NotBlank/Size | — | — | — | — | — | NotBlank/Size | — | (옵션) | — | — | recordingIds NotEmpty | — | — | — | — | — | — | NotBlank/Size |
 | UNAUTHORIZED              | — | — | — | — | — | — | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 | 헤더 누락 |
 | INVALID_TOKEN             | — | — | — | — | — | — | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 | 변조 토큰 |
@@ -1321,8 +1333,8 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 | RECORDING_NOT_FOUND       | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | x-user/x-context/orphan | — | — | — | — | — | — | — |
 | FEEDBACK_NOT_FOUND        | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | bad/x-user | bad/x-user | — | bad/x-user | — | — | — |
 | AUDIO_DECODE_FAILED       | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | bad WAV | — | bad WAV | — | — | — | — | — | — |
-| MODEL_SERVER_UNAVAILABLE  | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mock throws | — | mock throws | — | — | — | — | — | mock throws |
-| MODEL_SERVER_ERROR        | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mock throws | — | mock throws | — | — | — | — | — | mock throws |
+| MODEL_SERVER_UNAVAILABLE  | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mock throws | mock throws | mock throws | — | — | — | — | — | mock throws |
+| MODEL_SERVER_ERROR        | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | mock throws | mock throws | mock throws | — | — | — | — | — | mock throws |
 | INTERNAL_ERROR            | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | invariant 1단계 누락 | — | — | — | — | — | — | — | — |
 
 > `INTERNAL_ERROR` 는 정상 흐름에서 발생하지 않는 방어적 ErrorCode (서비스가 두 단계 검증 1단계를 빠뜨려 entity invariant 가 throw 한 경우). Tier 2 의 I2 시나리오가 이를 trigger.
@@ -1376,7 +1388,7 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 - [ ] §부록 A 매트릭스의 19 ErrorCode 가 최소 1개 endpoint 에 trigger 됨 (`INTERNAL_ERROR` 는 Tier 2 I2 가 trigger).
 - [ ] §4 의 15 invariant 시나리오 모두에 사전 셋업 / 호출 / assertion 본문이 풀로 작성됨 (표만 두지 않음).
 - [ ] §부록 B 의 모든 fixture (SEED_USER_A/B, DEMO_GOOGLE, PRESET_SCRIPT_*, SESSION_*, RECORDING_*, FEEDBACK_*, WAV_*, AnalyzeMockResponses, LlmMockResponses, TtsMockResponses) 가 본문 시나리오 어디선가 1회 이상 사용됨.
-- [ ] 문서 어디에도 "자세한 내용은 *_REFINED.md 참조", "develop 코드 참조" 같은 외부 cross-ref 가 없다 (자기완결).
+- [ ] 문서 어디에도 "자세한 내용은 *_REFINED.md 참조", "다른 브랜치의 코드 참조" 같은 외부 cross-ref 가 없다 (자기완결).
 - [ ] §1.8 snippet 명명 규칙과 §3 본문의 모든 snippet 이름이 일치.
 - [ ] CI 에서 `./gradlew test asciidoctor` 한 번에 통과.
 
@@ -1388,3 +1400,4 @@ CI 권장: `./gradlew test asciidoctor` 를 PR 별로 실행. snippet 트리가 
 | --- | --- |
 | 2026-05-10 | 초판. TDD 재구현용 자기완결 회귀 방지 테스트 플랜. 26 endpoint × HTTP contract (Tier 1) + 15 도메인 invariant 시나리오 (Tier 2). REST Docs MockMvc 표준. |
 | 2026-05-10 (rev2) | Codex round 1 4 finding 반영 — (F1) §3.14 POST /api/sessions 의 SessionCreateRequest 에서 scriptText 필드 제거 (develop: title 만), sentence split 시나리오는 PATCH 로만. (F2) §3.26 POST /api/tts 인증을 authenticated 로 정정 (§2.3 SecurityConfig 와 일관), unauthorized 시나리오 신설, golden 에 Bearer 추가. (F3) §3.20 RetryWordResponse 를 {correct, perceived, canonical, score, guidanceKr} 5 필드로 정정 (develop record 와 일치, word/stepScore 제거), correct=true/false 두 golden 분기. (F4) §3.1 GET /api/health 응답을 ApiResponse&lt;Map&lt;String,Object&gt;&gt; envelope 으로 정정, data={status:"UP", service:"echo-app-backend", timestamp:ISO}. §부록 A 매트릭스 #26 TTS 행에 UNAUTHORIZED/INVALID_TOKEN trigger 추가. |
+| 2026-05-10 (rev3) | Codex round 2 3 finding 반영 — (F1) develop 참조 제거 + main 의 root Gradle layout 으로 셋업 경로 정정 (`backend/src/test/...` → `src/test/...`, `backend/build.gradle` → root `build.gradle`). 자기완결 약속의 비교 대상 목록에서 develop 단어 제거. §0 메타에 "API_SPEC.md 가 contract source-of-truth" 명시. (F2) §3.19 POST /api/feedback/generate 에 `MODEL_SERVER_UNAVAILABLE` (503) / `MODEL_SERVER_ERROR` (502) 시나리오 신설 + mock 정책 갱신 (구체 컴포넌트 이름 비강제). §부록 A 매트릭스 #19 의 두 셀을 `mock throws` 로 정정. (F3) §3.20 retry-word 에 `INVALID_REQUEST` (multipart missing part / wrong part name / size 초과) 시나리오 신설. §부록 A 매트릭스 #20 의 INVALID_REQUEST 셀 정정. |
