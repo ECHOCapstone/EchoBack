@@ -263,7 +263,7 @@ com.capstoneecho.echo_back
 
 | 인터페이스 | 책임 |
 |---|---|
-| `LlmClient` | `summarizeRecording(...)` → `RecordingGuidance(guidanceKr, wrongWords[])`. `guidanceKr` 폴백 non-empty, `wrongWords` 는 빈 배열 허용. |
+| `LlmClient` | 4개 메서드: `summarizeRecording(LlmContext)` → `RecordingGuidance(guidanceKr, wrongWords[])` (RecordingService.upload), `summarizeFeedback(LlmContext)` → `String guidanceKr` (FeedbackService.generate), `retryGuidance(LlmContext)` → `String guidanceKr` (FeedbackService.retryWord), `suggestPracticeWord(LlmContext)` → `String` (PracticeWordResolver fallback). `guidanceKr` 항상 non-empty 폴백, `wrongWords` 는 빈 배열 허용. |
 | `RecordingStorage` | 오디오 파일 저장/삭제. `userId/yyyyMM/uuid.wav` 패턴. delete 는 idempotent. |
 | `TtsClient` | 영문 → 오디오 바이트(MP3). 1차는 로컬 스텁. |
 
@@ -330,7 +330,7 @@ com.capstoneecho.echo_back
 - **목표**: 녹음 업로드(3-mode) → 분석 → 피드백 → 완료 보상 → 리트라이 → TTS.
 - **작업**:
   - `Recording`, `PronunciationFeedback`, `PhonemeError`
-  - `RecordingService` 8단계 (parent resolution → mode detect → cross-parent invariant → /g2p (canonical 산출) → /analyze (canonical 포함 호출) → LLM guidance → storage save → entity persist + 동기화 클린업)
+  - `RecordingService` 단계 (parent resolution → mode detect → cross-parent invariant → /g2p (canonical 산출) → /analyze (canonical 포함 호출) → LLM guidance → storage save → **TransactionSynchronization 등록(즉시, entity persist 앞)** → entity 정적 팩터리 + `recordingRepository.save(...)`). storage save 이후 발생하는 모든 실패(entity 생성 예외, JPA flush DB constraint 위반, commit 실패)는 등록된 `afterCompletion(status)` 콜백이 `status != STATUS_COMMITTED` 일 때 `recordingStorage.delete(audioPath)` 로 정리.
   - `FeedbackService.generate / retryWord / complete` (`markCompletedAtomically` 단일 UPDATE)
   - `RecordingStorage` interface + `LocalRecordingStorage`
   - `ModelServerClient`, `LlmClient` 양 구현 + 룰 기반 default
