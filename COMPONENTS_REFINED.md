@@ -329,7 +329,8 @@ com.capstoneecho.echo_back
       Feedback feedback,
       Storage storage,
       Llm llm,
-      Tts tts
+      Tts tts,
+      Stats stats
   ) {
       public record Cors(List<String> allowedOrigins) {}
       public record Jwt(String secret, long accessTokenTtlSec) {}
@@ -338,8 +339,17 @@ com.capstoneecho.echo_back
       public record Storage(String localRoot) {}
       public record Llm(String provider) {}
       public record Tts(String provider) {}
+      public record Stats(String zone) {}   // StatsService.attendance 의 ZoneId. yaml 기본 Asia/Seoul (Codex finding F11 반영).
   }
   ```
+
+  > yaml 기본 (`application.yaml`):
+  > ```yaml
+  > app:
+  >   stats:
+  >     zone: Asia/Seoul
+  > ```
+  > Bean Validation 강제 안 함 — config 누락 시 `ZoneId.of(null)` 가 즉시 NPE 로 실패하므로 fail-fast 가 충분히 명시적.
 
 ### 2.12 `global.config.HttpClientConfig`
 
@@ -845,22 +855,20 @@ public interface FeedbackRepository extends JpaRepository<PronunciationFeedback,
                                 @Param("userId") Long userId,
                                 @Param("now") Instant now);
 
-    // StatsService.attendance group-by — completed_at 기반 일자별 count.
-    // 인덱스 (user_id, completed_at) 가 not-null 부분만 효율적으로 처리.
+    // StatsService.attendance 계산용. DB 함수 호출 없이 raw Instant 만 fetch — DB 세션 tz 와 무관하게 결정적.
+    // 인덱스 (user_id, completed_at) 가 그대로 효율적으로 처리 (range 스캔). day bucketing 은 service 책임.
+    // 호출부는 month boundary 를 zone-aware 로 환산해 half-open [start, end) 로 전달 (월 경계 자정 중복 방지 — BETWEEN 금지).
     @Query("""
-        SELECT FUNCTION('DATE', f.completedAt) AS day, COUNT(f) AS cnt
+        SELECT f.completedAt
           FROM PronunciationFeedback f
          WHERE f.user.id = :userId
            AND f.completed = true
            AND f.completedAt >= :startInclusive
            AND f.completedAt <  :endExclusive
-         GROUP BY FUNCTION('DATE', f.completedAt)
     """)
-    List<DayCount> findCompletedDaysInMonth(@Param("userId") Long userId,
-                                            @Param("startInclusive") Instant startInclusive,
-                                            @Param("endExclusive")  Instant endExclusive);
-
-    interface DayCount { LocalDate getDay(); long getCnt(); }
+    List<Instant> findCompletedAtInRange(@Param("userId") Long userId,
+                                         @Param("startInclusive") Instant startInclusive,
+                                         @Param("endExclusive")   Instant endExclusive);
 }
 ```
 
@@ -959,10 +967,16 @@ public class StatsService {
 }
 ```
 
-- 의존: `UserRepository`, `RecordingRepository`(주간 약점 음소 집계용), `FeedbackRepository`(누적 완료 수 집계, 월간 출석), `BadgePolicy`, `WeakPhonemeAnalyzer`.
+- 의존: `UserRepository`, `RecordingRepository`(주간 약점 음소 집계용), `FeedbackRepository.findCompletedAtInRange`(월간 attendance), `FeedbackRepository`(누적 완료 수), `BadgePolicy`, `WeakPhonemeAnalyzer`, `AppProperties`(`stats.zone`).
 - ErrorCode: `USER_NOT_FOUND`, `INVALID_REQUEST`(year/month 범위 위반).
 - 정책: streak 7 캡, 배지 임계, 주간 약점 top-N 은 §부록 D.
-- **Attendance 계산 (Codex finding F8 반영)**: `feedbackRepository.findCompletedDaysInMonth(userId, monthStartUtc, monthEndUtc)` 가 `completed_at` 컬럼 기반 일자별 count 를 반환 → service 가 해당 month 의 day 시퀀스를 훑어 누적 streak 변환 (출석 없는 날은 응답 map 에서 키 omit). 타임존 환산은 service 책임 — controller 가 받은 `year`/`month` + `app.stats.zone` (기본 `Asia/Seoul`) 으로 `monthStartUtc` / `monthEndUtc` 계산. NULL `completed_at` (rev4 이전 history 행 — 마이그레이션 전) 은 자동 제외. 자세한 정책은 §부록 D.
+- **Attendance 계산 (Codex finding F8 + F10 반영, Java-side bucketing)**:
+  1. `ZoneId zone = ZoneId.of(props.stats().zone())` — `app.stats.zone` 기본 `Asia/Seoul` (§2.11 AppProperties.Stats).
+  2. `YearMonth ym = YearMonth.of(year, month)` — controller 가 받은 query parameter (미지정 시 현재 KST 기준).
+  3. `Instant start = ym.atDay(1).atStartOfDay(zone).toInstant()`, `Instant end = ym.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()` — half-open `[start, end)` (월 경계 자정 중복 방지, `BETWEEN` 금지).
+  4. `List<Instant> instants = feedbackRepository.findCompletedAtInRange(userId, start, end)` — DB 함수 호출 없이 raw Instant 만 fetch.
+  5. `Map<Integer, Long> dayCounts = instants.stream().collect(groupingBy(i -> i.atZone(zone).getDayOfMonth(), counting()))` — application-side bucketing. DB 세션 tz / Hibernate `jdbc.time_zone` 와 무관하게 결정적 (H2 ↔ MySQL 결과 일치).
+  6. day=1..`ym.lengthOfMonth()` 순회: `dayCounts` 키 존재하면 streak++ 하여 `attendance.days[d]` 에 기록, 없으면 streak=0 reset 하고 키 omit (API_SPEC_REFINED §5.13 의 "출석이 없는 날은 키 자체가 생략" 계약).
 
 ##### Support
 
@@ -1186,7 +1200,7 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | Cross-user complete 거절 (user A 의 토큰으로 user B 의 feedbackId 호출 → 404 `FEEDBACK_NOT_FOUND`, 보상 가산 없음. Codex finding F2 회귀 방지) | service (atomic UPDATE 0 → existence check empty → 404) | `@SpringBootTest` + MockMvc |
 | Recording upload 부분 실패 시 storage 정리 (model server timeout / 정적 팩토리 검증 실패 / DB save 실패 각각 케이스 → 디스크에 orphan WAV 잔존 0. Codex finding F3 회귀 방지) | service + storage | `@SpringBootTest` + 임시 디렉토리 + 모델 서버 mock |
 | Recording upload commit-time 실패 시 storage 정리 (Recording flush 시 DB constraint 위반 / 트랜잭션 매니저 commit 강제 실패 → afterCompletion(STATUS_ROLLED_BACK) → 디스크에 orphan WAV 잔존 0. Codex finding F7 회귀 방지) | service + storage | `@SpringBootTest` + 임시 디렉토리 + 강제 실패 `TransactionSynchronization` 또는 mocked DataIntegrityViolation |
-| Attendance 일자 정확도 (day=N 에 generate 한 feedback 을 day=N+2 에 complete → `/api/stats/me?year=Y&month=M` 의 `attendance.days` 가 N+2 위치에서 누적 streak 1 증가, [N] 영향 없음. Codex finding F8 회귀 방지) | service + repository | `@SpringBootTest` + Clock 주입, `FeedbackRepository.findCompletedDaysInMonth` 직접 검증 |
+| Attendance 일자 정확도 + KST 자정 경계 (day=N 생성 → day=N+2 KST 23:59 에 complete → `/api/stats/me?year=Y&month=M` 의 `attendance.days[N+2]` 가 streak 증가; day=N+3 KST 00:30 에 complete 한 별도 feedback 은 `[N+3]` 로 분류 — DB 세션 tz 가 UTC 여도 결과 동일. `[N]` 위치 영향 없음. Codex finding F8 + F10 회귀 방지) | service + repository | `@SpringBootTest` + Clock 주입 + `FeedbackRepository.findCompletedAtInRange` 직접 검증 + DB 세션 tz 를 의도적으로 UTC 로 설정한 별도 프로파일에서 동일 결과 검증 |
 | wrongWords 비/empty (errors 가 있는 녹음의 응답 `wrongWords` 가 비-empty / errors 가 빈 녹음의 응답이 `[]`. Codex finding F9 회귀 방지) | service | `@SpringBootTest` + LLM mock, `RecordingResponse.wrongWords` 검증 |
 
 추가로 controller 별 REST Docs 스니펫 테스트를 작성해 `API_SPEC_REFINED.md` 응답 예시와 일치 여부를 회귀 방지.
@@ -1222,7 +1236,7 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | 21 | Pronunciation | GET | `/api/feedbacks` | `FeedbacksReadController.list` | `FeedbackService.listMine` | `FeedbackRepository.findByUser_IdOrderByCreatedAtDesc` | `PronunciationFeedback` |
 | 22 | Pronunciation | GET | `/api/feedbacks/{feedbackId}` | `FeedbacksReadController.detail` | `FeedbackService.getMine` | `FeedbackRepository.findByIdAndUser_Id` | `PronunciationFeedback`, `PhonemeError` |
 | 23 | Pronunciation | POST | `/api/tts` | `TtsController.synthesize` | `TtsService.synthesize` | (없음) | (없음) |
-| 24 | Statistics | GET | `/api/stats/me` | `StatsController.me` | `StatsService.getMyStats` | `UserRepository.findById`, `RecordingRepository.*` (주간 약점 음소), `FeedbackRepository.findCompletedDaysInMonth` (월간 attendance group-by), `FeedbackRepository.*` (누적 완료 수) | `User`, `Recording`, `PronunciationFeedback`, `PhonemeError` |
+| 24 | Statistics | GET | `/api/stats/me` | `StatsController.me` | `StatsService.getMyStats` | `UserRepository.findById`, `RecordingRepository.*` (주간 약점 음소), `FeedbackRepository.findCompletedAtInRange` (월간 attendance — Java-side bucketing), `FeedbackRepository.*` (누적 완료 수) | `User`, `Recording`, `PronunciationFeedback`, `PhonemeError` |
 | 25 | Statistics | GET | `/api/ranking/today` | `RankingController.today` | `RankingService.today` | `DemoRankingEntryRepository.findAll`, `FeedbackRepository.*` | `DemoRankingEntry`, `PronunciationFeedback`, `User` |
 | 26 | System | GET | `/api/health` | `HealthController.health` | (없음) | (없음) | (없음) |
 
@@ -1287,7 +1301,7 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 - **`RecordingStorage` commit-time 보상** — `RecordingService.upload` ⑨ 단계에서 등록한 `TransactionSynchronization.afterCompletion(int status)` 가 `status != STATUS_COMMITTED` 일 때 `recordingStorage.delete(audioPath)` 호출. 본문 예외 / flush 예외 / commit 예외 / 알 수 없는 결과 모두 같은 경로로 정리됨. cleanup 자체의 2차 실패는 try-catch 로 삼키고 WARN 로그만 — 원본 트랜잭션 결과를 가리지 않도록.
 - **`Recording.validateForXxx` 정적 메서드** — `RecordingService.upload` 흐름 ④ 단계에서 `audioPath` 가 결정되기 전 cross-parent 검증을 수행. 정적 팩토리(`forXxx`) 자체의 invariant (ENTITIES_REFINED §2.7) 는 변경 없이 유지되며, ⑩ 의 객체 생성 시점에 같은 invariant 가 한 번 더 검증됨 (이중 안전).
 - **`LlmClient.summarizeRecording`** — `RecordingGuidance(guidanceKr, wrongWords)` 반환. rule-based 구현은 `errors.canonicalIndex` + `targetText` word boundary 역산으로 wrongWords 채움 (LLM 호출 없이도 비-empty 가능). gemini provider 는 LLM 응답 파싱. 두 구현 모두 빈 배열 fallback 보장 (API_SPEC_REFINED §5.3 contract: "없으면 `[]`").
-- **`StatsService.attendance` group-by** — `FeedbackRepository.findCompletedDaysInMonth(userId, monthStartUtc, monthEndUtc)` 가 `completed_at` 컬럼 기반 일자별 count 반환 → service 가 누적 streak 변환 (출석 없는 날은 응답 map 에서 키 omit). 타임존 환산 (`year`/`month` → `monthStartUtc`/`monthEndUtc`) 은 service 책임, `app.stats.zone` 기본 `Asia/Seoul`. NULL `completed_at` (rev4 이전 history 행) 자동 제외.
+- **`StatsService.attendance` Java-side bucketing** — `feedbackRepository.findCompletedAtInRange(userId, monthStartUtc, monthEndUtc)` 가 raw `Instant` 만 반환하면 service 가 `ZoneId.of(props.stats().zone())` (기본 `Asia/Seoul`) 으로 `LocalDate` 변환 후 day-of-month 집계, day=1..N 순회로 누적 streak 산출 (출석 없는 날은 키 omit). DB 세션 tz / Hibernate `jdbc.time_zone` 와 무관하게 결정적 — H2(테스트) 와 MySQL(prod) 결과 일치 보장. range 는 half-open `[start, end)` 로 월 경계 자정 중복 방지 (`BETWEEN` 금지).
 - **`FeedbackService.complete` now 주입** — `Instant.now()` 를 service 에서 만들어 `markCompletedAtomically(id, userId, now)` 인자로 전달. 같은 SQL 안에서 `completed=true` 와 `completed_at=:now` 가 동시에 set 되어 보상 시점과 attendance 캘린더 일자가 정확히 일치 (ENTITIES_REFINED §5.2).
 - **`resolveParents` 책임** — `RecordingService.upload` 흐름 ① 단계의 단일 helper. `memberService.loadUser` (USER_NOT_FOUND) → `detectMode` (INVALID_REQUEST) → mode 별 user-scope 부모 조회 (`*_NOT_FOUND`) 를 순서대로 수행하고 `sealed interface ResolvedParents` 의 3 record 변종 중 하나로 반환. cross-parent 일관성은 ④ `validateForXxx` 와 ⑩ 정적 팩토리가 책임.
 
@@ -1301,3 +1315,4 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | 2026-05-10 (rev2) | Codex adversarial review 반영 — (F1) `FeedbackService.generate` 의 컨텍스트 정합 검증을 위해 `RecordingRepository` 에 `findByUser_IdAndScript_IdAndIdIn` / `findByUser_IdAndSession_IdAndIdIn` 신설, (F2) `FeedbackService.complete` 의 atomic UPDATE 영향 행 0 케이스를 not-exists/cross-user(`FEEDBACK_NOT_FOUND`) 와 already-completed(idempotent) 로 분기, (F3) `RecordingService.upload` 흐름 재정렬 (`RecordingStorage.save` 마지막 직전으로 이동) + `RecordingStorage.delete` 보상 메서드 신설 + `Recording.validateForXxx` 검증 전용 정적 메서드 신설. |
 | 2026-05-10 (rev3) | Codex round 2 반영 — (F4) `RecordingService.upload` 흐름 ⑨ ↔ ⑩ 재정렬: `RecordingStorage.save` 가 정적 팩토리보다 앞 (⑨), 정적 팩토리(⑩) 가 결과 `audioPath` 를 인자로 받음. ⑩–⑪ 의 try-catch 가 정적 팩토리 + applyAnalysis + repo.save 를 함께 보호하고 catch 시 `RecordingStorage.delete` 보상. (F5) Recording / PronunciationFeedback 의 CHECK 식 완화 (`(script_id IS NULL AND session_id IS NULL) OR XOR`) — ENTITIES_REFINED §2.7 / §2.8 동시 갱신. INSERT 시점 strict XOR 은 정적 팩토리 3종이 application-level 로 보장. (F6) §5 `FeedbackService.complete` idempotency 4-줄 요약을 §3.3.2 rev2 의 3-way 분기 (present+completed=true / empty / present+completed=false) 로 동기화. |
 | 2026-05-10 (rev4) | Codex round 3 반영 — (F7) `RecordingService.upload` 의 본문 try-catch 를 제거하고 ⑨ 단계에서 `TransactionSynchronization.afterCompletion` 등록으로 commit-time 실패까지 (본문 / flush / commit / unknown) 단일 정책으로 storage 정리. `resolveParents` helper (sealed interface `ResolvedParents` + 3 record + `detectMode` private) 도입으로 ① mode 분기 + user-scope 부모 조회 + 사용자 로드를 단일 경로로 통합. 흐름이 12-step → 11-step 으로 정리. (F8) `PronunciationFeedback.completed_at` 컬럼 + `(user_id, completed_at)` 인덱스 신설, `markCompletedAtomically` 가 `now` 인자 받아 같은 UPDATE 에서 set, `StatsService.attendance` 는 `findCompletedDaysInMonth` group-by 로 정확한 일자 산출. ENTITIES_REFINED §2.8 / §5.2 / §5.3 / §5.4 동시 갱신. (F9) `LlmClient.summarizeRecording` 신설 — `RecordingGuidance(guidanceKr, wrongWords)` 반환. `Recording.wrong_words_json` 컬럼 + `AnalysisOutcome.wrongWordsJson` 추가 (ENTITIES_REFINED §2.7 동시 갱신). `RecordingResponse.from` 이 JSON 역직렬화로 `WrongWord[]` 노출, NULL/실패는 빈 배열 fallback. |
+| 2026-05-10 (rev5) | Codex round 4 반영 — (F10) `StatsService.attendance` 의 day bucketing 을 Java-side 로 이동: `FeedbackRepository.findCompletedDaysInMonth` (DB DATE 함수 — DB 세션 tz 종속) → `findCompletedAtInRange` (raw `Instant` range 반환). service 가 `ZoneId.of(props.stats().zone())` 로 결정적 변환·집계. DB 세션 tz / Hibernate `jdbc.time_zone` 와 무관하게 H2(테스트) ↔ MySQL(prod) 결과 일치 보장. half-open `[start, end)` range 로 월 경계 자정 중복 방지. (F11) `AppProperties.Stats(String zone)` record 신설 — `app.stats.zone` 기본 `Asia/Seoul`, `StatsService` 가 typed 접근. 운영 invariant 가 4–5군데 (DB 세션 tz / JDBC URL / Hibernate / RDS parameter group / JVM tz) 분산 안 되고 application 안에 응축. ENTITIES_REFINED 변경 없음. |
