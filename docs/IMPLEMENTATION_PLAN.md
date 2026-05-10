@@ -275,7 +275,7 @@ com.capstoneecho.echo_back
 - **목표**: 어떤 도메인이든 PR을 시작할 수 있게 글로벌 골격을 깐다.
 - **작업**:
   - `AppProperties`(`@ConfigurationProperties("app")`), `application-local.yaml`, `application-test.yaml` 분리
-  - `SecurityConfig`(stateless, CSRF off, `/api/auth/**`/`/api/health` permitAll, 그 외 JWT)
+  - `SecurityConfig`(stateless, CSRF off, `/api/auth/**`/`/api/health`/`/error`/`/actuator/health` permitAll, 그 외 `/api/**` JWT)
   - `ApiResponse<T>`, `ErrorCode`(19종), `BusinessException`, `GlobalExceptionHandler`
   - `JwtProvider`(HS256, exp=1h), `JwtAuthFilter`, `JwtAuthEntryPoint`
   - `CurrentUserArgumentResolver` + `@CurrentUser`
