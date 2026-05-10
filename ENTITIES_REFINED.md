@@ -201,9 +201,9 @@ Ranking       : DemoRankingEntry
   - `sessionSentence : SessionSentence` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
   - 위 nullable 관계는 모두 부모 엔티티가 삭제되면 컬럼이 NULL 로 끊어지고, `targetTextSnapshot` 으로 의미가 보존된다.
 - **DB 레벨 정합성 (CHECK 제약)** — Hibernate 의 `@org.hibernate.annotations.Check` (또는 `@Checks` 묶음) 로 엔티티 클래스에 선언하여 DDL 레벨 CHECK 제약으로 생성한다:
-  - `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 은 정확히 하나만 NOT NULL.
-  - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 script 도 동반.
-  - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 session 도 동반.
+  - `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` — INSERT 시점에는 정적 팩토리 3종 (`forScriptStep` / `forSessionSentence` / `forSessionFreeForm`) 이 strict XOR (script 와 session 은 정확히 하나만 NOT NULL) 을 application-level 로 보장. 양쪽 NULL 상태는 Session/Script 가 hard-delete 되어 ON DELETE SET NULL 로 부모가 끊긴 history 행에서만 발생하며 정상으로 받아들인다 (`targetTextSnapshot` 으로 의미 보존). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절.
+  - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 script 도 동반. (Script hard-delete 시 step_id 도 함께 NULL 로 끊겨 본 식이 유지된다.)
+  - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 session 도 동반. (Session hard-delete 시 session_sentence_id 도 함께 NULL 로 끊겨 본 식이 유지된다.)
 - **신규 INSERT 시 정적 팩토리가 추가로 강제하는 invariant** (DB CHECK 만으로 표현 불가능한 동일성 규칙). 세 팩토리가 다음 셋 중 하나의 모드를 만들고, 각 모드별 명시 검증을 통과해야만 객체가 생성된다. 위반 시 `IllegalArgumentException`.
 
   | 팩토리 / 모드 | 시그니처가 강제 (NULL 패턴) | 명시 검증 |
@@ -250,7 +250,7 @@ Ranking       : DemoRankingEntry
   - `session : Session` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
   - `errors : List<PhonemeError>` — `@OneToMany`, mappedBy=`feedback`, cascade=ALL, orphanRemoval=true.
   - Script/Session 이 삭제되면 해당 FK 는 NULL 로 끊어지지만 `title` / `accuracy` / `weakPhoneme` 등 본문 데이터는 보존된다.
-- **DB 레벨 정합성 (CHECK 제약):** `(script_id IS NULL) <> (session_id IS NULL)` — script 와 session 정확히 하나만 NOT NULL. Hibernate 의 `@org.hibernate.annotations.Check` 로 엔티티 클래스에 선언, DDL 레벨 CHECK 제약으로 생성한다.
+- **DB 레벨 정합성 (CHECK 제약):** `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` — INSERT 시점에는 정적 팩토리 (`create`) 가 strict XOR (script 와 session 은 정확히 하나만 NOT NULL) 을 application-level 로 보장. 양쪽 NULL 상태는 Script/Session 이 hard-delete 되어 ON DELETE SET NULL 로 부모가 끊긴 history 행에서만 발생하며 정상으로 받아들인다 (`title` / `accuracy` / `weakPhoneme` 등 본문 데이터로 의미 보존). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절. Hibernate 의 `@org.hibernate.annotations.Check` 로 엔티티 클래스에 선언, DDL 레벨 CHECK 제약으로 생성한다.
 - **신규 INSERT 시 정적 팩토리(`create`)가 추가로 강제하는 invariant**:
   - `(script != null) XOR (session != null)` — 시그니처와 동일성 규칙으로 강제.
   - session-flow 인 경우 `session.user == user` (script-flow 는 user 일관성 검증 없음 — Script 는 전역 콘텐츠).
@@ -400,7 +400,7 @@ int markCompletedAtomically(@Param("id") Long id, @Param("userId") Long userId);
   - `forSessionSentence` 에 `sentence.session != session` 또는 `session.user != user` 인 조합 → `IllegalArgumentException`.
   - `forSessionFreeForm` 에 `session.user != user` → `IllegalArgumentException`.
 - **Cross-parent 거절 (`PronunciationFeedback.create`)**: session-flow 에서 `session.user != user` → `IllegalArgumentException`.
-- **Recording 정합성 CHECK 제약**: 잘못된 조합(예: script 와 session 동시 NOT NULL, step 만 NOT NULL 이고 script 가 NULL) 으로 raw INSERT 시 DB 에서 거절된다.
+- **Recording 정합성 CHECK 제약**: 양쪽 NOT NULL, step 만 NOT NULL 이고 script 가 NULL 같은 명백한 misuse 는 raw INSERT 시 DB 에서 거절된다. 단 ON DELETE SET NULL 로 양쪽 NULL 이 되는 history 전이는 허용한다 (CHECK 식이 `양쪽 NULL OR XOR` 형태로 완화되어 있음 — §2.7 참조). INSERT 시점의 strict XOR 은 정적 팩토리 3종이 application-level 로 보장.
 - **Session 대본 갱신 후 녹음 보존**: `Session.updateScript` 가 SessionSentence 행을 새로 교체한 직후, 기존 `Recording.session_sentence_id` 는 NULL 로 끊어지지만 `target_text_snapshot` 은 그대로 남아 어떤 문장에 대한 녹음이었는지 추적 가능하다.
 - **Session 하드 삭제 후 history 보존**: 사용자가 `DELETE /api/sessions/{id}` 로 세션을 지운 뒤에도, 해당 세션을 참조하던 `Recording.session_id` / `PronunciationFeedback.session_id` 는 NULL 로 끊어지고 행 자체와 본문 데이터는 살아 있다.
 - **완료 동시성**: 동일한 `feedbackId` 에 대해 `complete` 를 두 스레드가 동시에 호출해도 EXP 가 정확히 한 번만 가산된다 (CountDownLatch 기반 동시성 테스트).
