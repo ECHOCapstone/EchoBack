@@ -328,7 +328,7 @@ com.capstoneecho.echo_back
 - **목표**: 녹음 업로드(3-mode) → 분석 → 피드백 → 완료 보상 → 리트라이 → TTS.
 - **작업**:
   - `Recording`, `PronunciationFeedback`, `PhonemeError`
-  - `RecordingService` 8단계 (parent resolution → mode detect → cross-parent invariant → /analyze → /g2p → LLM guidance → storage save → entity persist + 동기화 클린업)
+  - `RecordingService` 8단계 (parent resolution → mode detect → cross-parent invariant → /g2p (canonical 산출) → /analyze (canonical 포함 호출) → LLM guidance → storage save → entity persist + 동기화 클린업)
   - `FeedbackService.generate / retryWord / complete` (`markCompletedAtomically` 단일 UPDATE)
   - `RecordingStorage` interface + `LocalRecordingStorage`
   - `ModelServerClient`, `LlmClient` 양 구현 + 룰 기반 default
@@ -471,14 +471,15 @@ Phase 별 PR 머지 전에 게이트 통과를 강제한다.
 ### 8.3 파일 저장
 
 - `LocalRecordingStorage`:
-  - 경로 `app.storage.root/userId/yyyyMM/uuid.wav`
+  - 경로: yaml `app.storage.local-root` (Java field `app.storage.localRoot`) 아래 `userId/yyyyMM/uuid.wav` 패턴
   - `delete` 는 존재하지 않아도 예외 없음
   - 트랜잭션 동기화: `TransactionSynchronizationManager.registerSynchronization` 으로 롤백/커밋 시점 정리
 
 ### 8.4 TTS
 
 - `TtsClient.synthesize(String text, Locale locale) → byte[]`
-- 1차 구현: 로컬 스텁(고정 mp3 또는 빈 바이트), Phase 6 이후 외부 프로바이더 어댑터 추가
+- 1차 구현: 로컬 스텁이 ID3 magic(`0x49 0x44 0x33 ...`) 포함 **non-empty 고정 MP3 바이트**(~100 bytes)를 반환. 빈 바이트는 금지 — `API_TEST_PLAN §3.26` 골든 테스트가 `body length > 0` 검증.
+- Phase 6 이후 외부 프로바이더 어댑터 추가.
 
 ---
 
