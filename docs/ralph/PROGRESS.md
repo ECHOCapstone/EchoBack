@@ -1,6 +1,6 @@
 # ECHO Backend — Ralph Loop Progress
 
-Last updated: 2026-05-12T08:36:00Z
+Last updated: 2026-05-12T08:44:00Z
 
 | ID  | Title                                         | Phase | Status | Depends         | Commit |
 |-----|-----------------------------------------------|-------|--------|-----------------|--------|
@@ -31,7 +31,7 @@ Last updated: 2026-05-12T08:36:00Z
 | 024 | recording-controller-restdocs                 | 4     | DONE   | 023,017         | 9f21f61 |
 | 025 | feedback-service-generate-retry-complete      | 4     | DONE   | 019,022,008     | 8cee8cd |
 | 026 | feedback-controllers-restdocs                 | 4     | DONE   | 025,024         | 839443f |
-| 027 | tts-client-service-controller-restdocs        | 4     | TODO   | 021,006         | -      |
+| 027 | tts-client-service-controller-restdocs        | 4     | DONE   | 021,006         | b5accda |
 | 028 | stats-demo-ranking-entity-seed                | 5     | TODO   | 007             | -      |
 | 029 | stats-service-controller-restdocs             | 5     | TODO   | 025,028         | -      |
 | 030 | ranking-service-controller-restdocs           | 5     | TODO   | 028,029         | -      |
