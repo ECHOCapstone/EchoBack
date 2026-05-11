@@ -40,21 +40,22 @@ extract_json_field() {
   fi
   local py
   if py="$(detect_python)"; then
-    printf '%s' "$INPUT" | PYTHONPATH= "$py" - "$path" <<'PY' 2>/dev/null || true
+    # JSON 과 path 를 argv 로 전달 (heredoc + stdin 충돌 회피).
+    PYTHONPATH= "$py" -c '
 import sys, json
-path = sys.argv[1].lstrip('.').split('.')
 try:
-    data = json.load(sys.stdin)
-    for key in path:
+    data = json.loads(sys.argv[1])
+    keys = sys.argv[2].lstrip(".").split(".")
+    for key in keys:
         if isinstance(data, dict):
-            data = data.get(key, '')
+            data = data.get(key, "")
         else:
-            data = ''
+            data = ""
             break
-    print(data if isinstance(data, str) else '')
+    print(data if isinstance(data, str) else "")
 except Exception:
     pass
-PY
+' "$INPUT" "$path" 2>/dev/null || true
     return
   fi
   echo "[test.sh] jq 또는 python(3) 중 하나가 필요합니다." >&2
