@@ -1,6 +1,6 @@
 # ECHO Backend — Ralph Loop Progress
 
-Last updated: 2026-05-11T22:40:00Z
+Last updated: 2026-05-12T07:50:00Z
 
 | ID  | Title                                         | Phase | Status | Depends         | Commit |
 |-----|-----------------------------------------------|-------|--------|-----------------|--------|
@@ -26,7 +26,7 @@ Last updated: 2026-05-11T22:40:00Z
 | 019 | feedback-phoneme-entities-atomic-update       | 4     | DONE   | 018             | 23530b4 |
 | 020 | recording-storage-interface-local-impl        | 4     | DONE   | 000             | 9a921c8 |
 | 021 | model-server-client-analyze-g2p               | 4     | DONE   | 005             | faee125 |
-| 022 | llm-client-rule-based-default                 | 4     | TODO   | 019             | -      |
+| 022 | llm-client-rule-based-default                 | 4     | DONE   | 019             | 4d0375d |
 | 023 | recording-service-upload-txn-sync             | 4     | TODO   | 018,020,021,022 | -      |
 | 024 | recording-controller-restdocs                 | 4     | TODO   | 023,017         | -      |
 | 025 | feedback-service-generate-retry-complete      | 4     | TODO   | 019,022,008     | -      |
