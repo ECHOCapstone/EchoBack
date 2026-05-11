@@ -17,6 +17,33 @@ public interface FeedbackRepository extends JpaRepository<PronunciationFeedback,
 
     List<PronunciationFeedback> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
 
+    long countByUser_IdAndCompletedTrue(Long userId);
+
+    @Query("""
+            SELECT f.completedAt FROM PronunciationFeedback f
+             WHERE f.user.id = :userId
+               AND f.completed = true
+               AND f.completedAt >= :start
+               AND f.completedAt < :end
+            """)
+    List<Instant> findCompletedAtInRange(
+            @Param("userId") Long userId,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
+    @Query("""
+            SELECT f.weakPhoneme FROM PronunciationFeedback f
+             WHERE f.user.id = :userId
+               AND f.completed = true
+               AND f.completedAt >= :start
+               AND f.completedAt < :end
+               AND f.weakPhoneme IS NOT NULL
+            """)
+    List<String> findWeakPhonemesInRange(
+            @Param("userId") Long userId,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
     @Modifying
     @Query("""
             UPDATE PronunciationFeedback f
