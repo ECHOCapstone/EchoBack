@@ -17,6 +17,7 @@ import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.member.service.MemberService;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeOp;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
@@ -155,6 +156,20 @@ public class FeedbackService {
                 feedback.getWeakPhoneme());
         String guidance = safeRetryGuidance(context);
         feedback.updateGuidance(guidance);
+        return FeedbackDetailResponse.from(feedback);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FeedbackSummaryResponse> list(Long userId) {
+        return feedbackRepository.findAllByUser_IdOrderByCreatedAtDesc(userId).stream()
+                .map(FeedbackSummaryResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public FeedbackDetailResponse get(Long userId, Long feedbackId) {
+        PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
         return FeedbackDetailResponse.from(feedback);
     }
 

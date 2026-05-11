@@ -15,6 +15,8 @@ public interface FeedbackRepository extends JpaRepository<PronunciationFeedback,
 
     List<PronunciationFeedback> findAllByUser_IdOrderByCompletedAtDesc(Long userId);
 
+    List<PronunciationFeedback> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
+
     @Modifying
     @Query("""
             UPDATE PronunciationFeedback f
