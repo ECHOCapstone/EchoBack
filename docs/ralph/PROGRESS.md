@@ -1,6 +1,6 @@
 # ECHO Backend — Ralph Loop Progress
 
-Last updated: 2026-05-11T10:33:00Z
+Last updated: 2026-05-11T10:40:00Z
 
 | ID  | Title                                         | Phase | Status | Depends         | Commit |
 |-----|-----------------------------------------------|-------|--------|-----------------|--------|
@@ -17,7 +17,7 @@ Last updated: 2026-05-11T10:33:00Z
 | 010 | auth-service-oauth2-google-demo               | 1     | DONE   | 009             | 5f562d5 |
 | 011 | member-controllers-restdocs                   | 1     | DONE   | 008,010,006     | 32af305 |
 | 012 | learning-track-script-step-entities           | 2     | DONE   | 007             | 104b975 |
-| 013 | learning-track-service-controller-restdocs    | 2     | TODO   | 012,011         | -      |
+| 013 | learning-track-service-controller-restdocs    | 2     | DONE   | 012,011         | 6abc230 |
 | 014 | learning-script-service-recommender-restdocs  | 2     | TODO   | 013             | -      |
 | 015 | session-entities-user-scoped-repository       | 3     | TODO   | 012             | -      |
 | 016 | session-service-update-script-orphan          | 3     | TODO   | 015             | -      |
