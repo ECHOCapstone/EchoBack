@@ -167,6 +167,20 @@ public class PronunciationFeedback {
         this.errors.add(phonemeError);
     }
 
+    public PhonemeError recordPhonemeError(
+            PhonemeOp op, String canonical, String perceived, Integer canonicalIndex) {
+        PhonemeError error = PhonemeError.create(op, canonical, perceived, canonicalIndex);
+        attach(error);
+        return error;
+    }
+
+    public void updateGuidance(String newGuidance) {
+        if (newGuidance == null || newGuidance.isBlank()) {
+            return;
+        }
+        this.guidanceKr = newGuidance;
+    }
+
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
