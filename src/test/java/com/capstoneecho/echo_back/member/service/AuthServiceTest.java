@@ -165,4 +165,49 @@ class AuthServiceTest {
         assertThat(taken.available()).isFalse();
         assertThat(free.available()).isTrue();
     }
+
+    @Test
+    @DisplayName("loginWithGoogleDemo 는 신규 데모 이메일이면 사용자를 한 번만 생성하고 JWT 를 발급한다")
+    void loginWithGoogleDemoCreatesUserOnce() {
+        AuthTokenResponse first = authService.loginWithGoogleDemo();
+        AuthTokenResponse second = authService.loginWithGoogleDemo();
+
+        assertThat(first.token()).isNotBlank();
+        assertThat(second.token()).isNotBlank();
+        assertThat(first.profile().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
+        assertThat(second.profile().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
+        assertThat(first.profile().id()).isEqualTo(second.profile().id());
+
+        long demoRowCount = userRepository.findAll().stream()
+                .filter(u -> AuthService.DEMO_GOOGLE_EMAIL.equals(u.getEmail()))
+                .count();
+        assertThat(demoRowCount).isEqualTo(1L);
+
+        User saved = userRepository.findByEmail(AuthService.DEMO_GOOGLE_EMAIL).orElseThrow();
+        assertThat(saved.getPasswordHash()).isNull();
+        assertThat(saved.getNickname()).isEqualTo(AuthService.DEMO_GOOGLE_NICKNAME);
+    }
+
+    @Test
+    @DisplayName("loginWithGoogleDemo 는 동일 이메일의 기존 표준 가입자를 머지하고 동일 row 로 JWT 를 발급한다")
+    void loginWithGoogleDemoMergesExistingEmail() {
+        AuthTokenResponse standard = authService.signup(
+                new SignupRequest("existing", AuthService.DEMO_GOOGLE_EMAIL, "Password!1", "Existing"));
+        Long existingId = standard.profile().id();
+
+        AuthTokenResponse demo = authService.loginWithGoogleDemo();
+
+        assertThat(demo.token()).isNotBlank();
+        assertThat(demo.profile().id()).isEqualTo(existingId);
+        assertThat(demo.profile().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
+
+        long demoRowCount = userRepository.findAll().stream()
+                .filter(u -> AuthService.DEMO_GOOGLE_EMAIL.equals(u.getEmail()))
+                .count();
+        assertThat(demoRowCount).isEqualTo(1L);
+
+        User merged = userRepository.findById(existingId).orElseThrow();
+        assertThat(merged.getUsername()).isEqualTo("existing");
+        assertThat(merged.getPasswordHash()).isNotNull();
+    }
 }

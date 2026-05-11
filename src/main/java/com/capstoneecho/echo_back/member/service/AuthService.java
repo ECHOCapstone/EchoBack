@@ -23,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class AuthService {
 
+    public static final String DEMO_GOOGLE_EMAIL = "demo+google@echo.app";
+    public static final String DEMO_GOOGLE_NICKNAME = "GoogleDemo";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
@@ -73,6 +76,17 @@ public class AuthService {
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
         }
 
+        return issueToken(user);
+    }
+
+    public AuthTokenResponse loginWithGoogleDemo() {
+        User user = userRepository.findByEmail(DEMO_GOOGLE_EMAIL)
+                .map(existing -> {
+                    existing.mergeOAuth2Login();
+                    return existing;
+                })
+                .orElseGet(() -> userRepository.save(
+                        User.fromOAuth2(DEMO_GOOGLE_EMAIL, DEMO_GOOGLE_NICKNAME)));
         return issueToken(user);
     }
 
