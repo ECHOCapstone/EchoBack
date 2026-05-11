@@ -22,7 +22,7 @@ Last updated: 2026-05-11T17:14:00Z
 | 015 | session-entities-user-scoped-repository       | 3     | DONE   | 012             | 4070a7a |
 | 016 | session-service-update-script-orphan          | 3     | DONE   | 015             | 4b56063 |
 | 017 | session-controller-restdocs                   | 3     | DONE   | 016,014         | ffc6500 |
-| 018 | recording-entity-3mode-factories-checks       | 4     | TODO   | 015             | -      |
+| 018 | recording-entity-3mode-factories-checks       | 4     | DONE   | 015             | 2296d23 |
 | 019 | feedback-phoneme-entities-atomic-update       | 4     | TODO   | 018             | -      |
 | 020 | recording-storage-interface-local-impl        | 4     | TODO   | 000             | -      |
 | 021 | model-server-client-analyze-g2p               | 4     | TODO   | 005             | -      |
