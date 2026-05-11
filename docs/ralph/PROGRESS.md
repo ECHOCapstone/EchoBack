@@ -1,13 +1,13 @@
 # ECHO Backend — Ralph Loop Progress
 
-Last updated: 2026-05-11T08:46:00Z
+Last updated: 2026-05-11T09:11:00Z
 
 | ID  | Title                                         | Phase | Status | Depends         | Commit |
 |-----|-----------------------------------------------|-------|--------|-----------------|--------|
 | 000 | foundation-app-properties                     | 0     | DONE   | -               | 2c900b1 |
 | 001 | foundation-api-response-errors                | 0     | DONE   | 000             | ba27c4d |
 | 002 | foundation-jwt-provider                       | 0     | DONE   | 001             | 87aed45 |
-| 003 | foundation-jwt-auth-filter                    | 0     | TODO   | 002             | -      |
+| 003 | foundation-jwt-auth-filter                    | 0     | DONE   | 002             | e03ff0c |
 | 004 | foundation-security-config                    | 0     | TODO   | 003             | -      |
 | 005 | foundation-http-client-config                 | 0     | TODO   | 000             | -      |
 | 006 | foundation-health-controller-restdocs         | 0     | TODO   | 004             | -      |
