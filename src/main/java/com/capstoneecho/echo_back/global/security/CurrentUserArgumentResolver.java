@@ -12,13 +12,9 @@ import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-import java.util.List;
 
 @Component
-public class CurrentUserArgumentResolver
-        implements HandlerMethodArgumentResolver, WebMvcConfigurer {
+public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
     private static final String ANONYMOUS_PRINCIPAL = "anonymousUser";
 
@@ -47,10 +43,5 @@ public class CurrentUserArgumentResolver
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return jwtPrincipal;
-    }
-
-    @Override
-    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
-        resolvers.add(this);
     }
 }
