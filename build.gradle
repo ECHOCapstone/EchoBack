@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.asciidoctor.jvm.convert' version '4.0.5'
@@ -51,9 +52,73 @@ dependencies {
 tasks.named('test') {
     outputs.dir snippetsDir
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
 }
 
+// ---- JaCoCo coverage gate ------------------------------------------------
+//
+// Java 25 class files (major 69) require JaCoCo 0.8.13+. Gradle 9.4.x ships
+// an older default tool version, so pin explicitly.
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+// Exclusions: Lombok-generated boilerplate (DTOs / JPA entities), Spring
+// configuration glue, and the application bootstrap class. These carry few
+// instructions of real logic — coverage on them is noise, not signal.
+def jacocoExcludePatterns = [
+        '**/EchoBackApplication.*',
+        '**/dto/**',
+        '**/entity/**',
+        '**/global/config/**',
+]
+
+tasks.named('jacocoTestReport') {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+    dependsOn jacocoTestReport
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+// `classDirectories` resolution needs the source sets to be fully wired, so
+// apply exclusions in a project-level afterEvaluate hook rather than inline
+// inside each task configuration block (Task has no afterEvaluate).
+project.afterEvaluate {
+    [jacocoTestReport, jacocoTestCoverageVerification].each { jt ->
+        jt.classDirectories.setFrom(
+                files(jt.classDirectories.files.collect {
+                    fileTree(dir: it, exclude: jacocoExcludePatterns)
+                })
+        )
+    }
+}
+
+tasks.named('check') {
+    dependsOn jacocoTestCoverageVerification
+}
+
+// ---- REST Docs → Asciidoctor → single HTML --------------------------------
 tasks.named('asciidoctor') {
     inputs.dir snippetsDir
     dependsOn test
+    attributes 'snippets': snippetsDir,
+            'source-highlighter': 'highlightjs',
+            'toc': 'left',
+            'toclevels': '3',
+            'sectlinks': '',
+            'sectnums': ''
 }

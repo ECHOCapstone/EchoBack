@@ -1,0 +1,162 @@
+= ECHO Backend API
+:doctype: book
+:icons: font
+
+== 개요
+
+본 문서는 ECHO 백엔드의 공개 API 레퍼런스다. Spring REST Docs 가 컨트롤러 테스트
+실행 시 `build/generated-snippets/` 에 산출한 스니펫들을 도메인별로 묶어 단일
+HTML 산출물(`build/docs/asciidoc/index.html`)로 통합한다.
+
+도메인 구성은 `docs/API_SPEC_REFINED.md` §3·§4 의 5-도메인 분류
+(Member / Learning / Pronunciation / Statistics / System) 를 따른다.
+
+== Member
+
+회원 계정 및 인증(표준 가입/로그인, OAuth2 데모, 중복 체크, 프로필 조회/수정).
+
+=== 회원가입
+
+include::{snippets}/auth/post-signup/http-request.adoc[]
+include::{snippets}/auth/post-signup/http-response.adoc[]
+
+=== 로그인
+
+include::{snippets}/auth/post-login/http-request.adoc[]
+include::{snippets}/auth/post-login/http-response.adoc[]
+
+=== 사용자명 중복 체크
+
+include::{snippets}/auth/post-check-username/http-request.adoc[]
+include::{snippets}/auth/post-check-username/http-response.adoc[]
+
+=== 이메일 중복 체크
+
+include::{snippets}/auth/post-check-email/http-request.adoc[]
+include::{snippets}/auth/post-check-email/http-response.adoc[]
+
+=== Google OAuth2 데모
+
+include::{snippets}/auth/get-oauth2-google-demo/http-request.adoc[]
+include::{snippets}/auth/get-oauth2-google-demo/http-response.adoc[]
+
+=== 내 프로필 조회
+
+include::{snippets}/members/get-me/http-request.adoc[]
+include::{snippets}/members/get-me/http-response.adoc[]
+
+=== 닉네임 수정
+
+include::{snippets}/members/patch-me-nickname/http-request.adoc[]
+include::{snippets}/members/patch-me-nickname/http-response.adoc[]
+
+== Learning
+
+학습 카탈로그(트랙/스크립트), 오늘의 추천, 사용자 커스텀 세션.
+
+=== 트랙 목록
+
+include::{snippets}/tracks/list/http-request.adoc[]
+include::{snippets}/tracks/list/http-response.adoc[]
+
+=== 트랙 상세
+
+include::{snippets}/tracks/get/http-request.adoc[]
+include::{snippets}/tracks/get/http-response.adoc[]
+
+=== 스크립트 상세
+
+include::{snippets}/scripts/get/http-request.adoc[]
+include::{snippets}/scripts/get/http-response.adoc[]
+
+=== 오늘의 추천 스크립트
+
+include::{snippets}/scripts/recommended-today/http-request.adoc[]
+include::{snippets}/scripts/recommended-today/http-response.adoc[]
+
+=== 세션 생성
+
+include::{snippets}/sessions/create/http-request.adoc[]
+include::{snippets}/sessions/create/http-response.adoc[]
+
+=== 세션 목록
+
+include::{snippets}/sessions/list/http-request.adoc[]
+include::{snippets}/sessions/list/http-response.adoc[]
+
+=== 세션 상세
+
+include::{snippets}/sessions/get/http-request.adoc[]
+include::{snippets}/sessions/get/http-response.adoc[]
+
+=== 세션 수정 (즐겨찾기 토글 / 부분 수정)
+
+include::{snippets}/sessions/patch/http-request.adoc[]
+include::{snippets}/sessions/patch/http-response.adoc[]
+
+=== 세션 삭제
+
+include::{snippets}/sessions/delete/http-request.adoc[]
+include::{snippets}/sessions/delete/http-response.adoc[]
+
+== Pronunciation
+
+녹음 업로드 및 모델 서버 분석, 피드백 집계·약점 단어 재시도·완료, TTS 합성.
+
+=== 녹음 업로드
+
+include::{snippets}/recordings/upload/http-request.adoc[]
+include::{snippets}/recordings/upload/http-response.adoc[]
+
+=== 피드백 생성
+
+include::{snippets}/feedback/generate/http-request.adoc[]
+include::{snippets}/feedback/generate/http-response.adoc[]
+
+=== 약점 단어 재시도
+
+include::{snippets}/feedback/retry-word/http-request.adoc[]
+include::{snippets}/feedback/retry-word/http-response.adoc[]
+
+=== 피드백 완료 (보상 확정)
+
+include::{snippets}/feedback/complete/http-request.adoc[]
+include::{snippets}/feedback/complete/http-response.adoc[]
+
+=== 피드백 히스토리 목록
+
+include::{snippets}/feedbacks/list/http-request.adoc[]
+include::{snippets}/feedbacks/list/http-response.adoc[]
+
+=== 피드백 히스토리 상세
+
+include::{snippets}/feedbacks/get/http-request.adoc[]
+include::{snippets}/feedbacks/get/http-response.adoc[]
+
+=== TTS 합성
+
+include::{snippets}/tts/synthesize/http-request.adoc[]
+include::{snippets}/tts/synthesize/http-response.adoc[]
+
+== Statistics
+
+사용자 통계(스트릭/경험치/출석/약점 음소/뱃지)와 일일 학습 단위 랭킹.
+
+=== 내 통계
+
+include::{snippets}/stats/me/http-request.adoc[]
+include::{snippets}/stats/me/http-response.adoc[]
+
+=== 오늘의 랭킹
+
+include::{snippets}/ranking/today/http-request.adoc[]
+include::{snippets}/ranking/today/http-response.adoc[]
+
+== System
+
+부팅 검증용 공용 health 엔드포인트.
+
+=== Health
+
+include::{snippets}/system/get-health/http-request.adoc[]
+include::{snippets}/system/get-health/http-response.adoc[]
