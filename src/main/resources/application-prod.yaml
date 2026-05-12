@@ -1,9 +1,82 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: echo-prod-pool
   jpa:
     hibernate:
       ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+  jackson:
+    time-zone: UTC
   web:
     error:
       include-stacktrace: never
+
+logging:
+  level:
+    root: INFO
+    com.capstoneecho: INFO
+  # 운영 로그는 UTC 로 기록한다 (stats 집계는 별도로 KST 변환).
+  pattern:
+    dateformat: "yyyy-MM-dd'T'HH:mm:ss.SSSXXX,UTC"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 86400000
+  cors:
+    allowed-origins:
+      - ${APP_CORS_ALLOWED_ORIGIN:https://echo.example.com}
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    exposed-headers:
+      - Authorization
+    allow-credentials: true
+    max-age-sec: 3600
+  model-server:
+    base-url: ${MODEL_SERVER_BASE_URL}
+    timeout-ms: 10000
+  llm:
+    provider: rule-based
+  storage:
+    local-root: ${APP_STORAGE_LOCAL_ROOT:/var/echo/storage}
+  tts:
+    provider: local-stub
+  # stats 집계는 사용자 출석 도메인 특성상 KST 고정.
+  stats:
+    zone: Asia/Seoul

@@ -45,12 +45,19 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Liveness/readiness probes are open so load balancers and
+                        // orchestrators can ping the app without credentials.
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/health",
                                 "/error",
-                                "/actuator/health"
+                                "/actuator/health",
+                                "/actuator/health/**"
                         ).permitAll()
+                        // Other Actuator endpoints (info/metrics/...) carry
+                        // operational metadata and stay behind ROLE_ADMIN until
+                        // we split them off onto a separate management port.
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )
