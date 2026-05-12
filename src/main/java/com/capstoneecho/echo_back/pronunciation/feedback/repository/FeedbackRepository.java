@@ -32,6 +32,18 @@ public interface FeedbackRepository extends JpaRepository<PronunciationFeedback,
             @Param("end") Instant end);
 
     @Query("""
+            SELECT f FROM PronunciationFeedback f
+              JOIN FETCH f.user
+              LEFT JOIN FETCH f.script
+             WHERE f.completed = true
+               AND f.completedAt >= :start
+               AND f.completedAt < :end
+            """)
+    List<PronunciationFeedback> findCompletedInRange(
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
+    @Query("""
             SELECT f.weakPhoneme FROM PronunciationFeedback f
              WHERE f.user.id = :userId
                AND f.completed = true
