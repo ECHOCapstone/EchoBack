@@ -57,7 +57,8 @@ public class User {
     @Column(name = "last_study_at")
     private Instant lastStudyAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false,
+            columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
     private Instant createdAt;
 
     private User(String username, String email, String passwordHash, String nickname) {
