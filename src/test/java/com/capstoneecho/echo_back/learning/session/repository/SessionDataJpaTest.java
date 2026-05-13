@@ -44,18 +44,24 @@ class SessionDataJpaTest {
     }
 
     @Test
-    @DisplayName("findAllByUser_IdOrderByUpdatedAtDesc 는 최신 updatedAt 순으로 정렬된다")
-    void findAllByUserOrderedByUpdatedAtDesc() throws InterruptedException {
+    @DisplayName("findByUser_IdOrderByFavoriteDescUpdatedAtDesc 는 favorite DESC, updatedAt DESC 순으로 정렬된다")
+    void findByUserOrderedByFavoriteThenUpdatedAtDesc() throws InterruptedException {
         User user = User.fromOAuth2("carol@example.com", "Carol");
         em.persist(user);
 
         Session older = sessionRepository.saveAndFlush(Session.create(user, "Older"));
         Thread.sleep(25);
         Session newer = sessionRepository.saveAndFlush(Session.create(user, "Newer"));
+        Thread.sleep(25);
+        Session favored = Session.create(user, "Favored");
+        favored.setFavorite(true);
+        Session favoredSaved = sessionRepository.saveAndFlush(favored);
 
-        List<Session> sessions = sessionRepository.findAllByUser_IdOrderByUpdatedAtDesc(user.getId());
+        List<Session> sessions = sessionRepository
+                .findByUser_IdOrderByFavoriteDescUpdatedAtDesc(user.getId());
 
-        assertThat(sessions).extracting(Session::getId).containsExactly(newer.getId(), older.getId());
+        assertThat(sessions).extracting(Session::getId)
+                .containsExactly(favoredSaved.getId(), newer.getId(), older.getId());
     }
 
     @Test

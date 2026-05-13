@@ -8,7 +8,6 @@ import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
 import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
 import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
-import com.capstoneecho.echo_back.learning.session.dto.SessionSummaryResponse;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.repository.SessionSentenceRepository;
@@ -204,8 +203,8 @@ class SessionServiceTest {
     }
 
     @Test
-    @DisplayName("list 는 본인의 세션만 updatedAt 내림차순으로 반환한다")
-    void listReturnsOwnedSessionsOrderedByUpdatedAtDesc() throws InterruptedException {
+    @DisplayName("list 는 본인의 세션만 favorite DESC, updatedAt DESC 순으로 detail 형태로 반환한다")
+    void listReturnsOwnedSessionsOrderedByFavoriteThenUpdatedAtDesc() throws InterruptedException {
         User user = newUser("liam");
         User stranger = newUser("mia");
 
@@ -214,11 +213,22 @@ class SessionServiceTest {
         Thread.sleep(25);
         SessionDetailResponse newer = sessionService.create(
                 user.getId(), new SessionCreateRequest("Newer"));
+        Thread.sleep(25);
+        SessionDetailResponse favored = sessionService.create(
+                user.getId(), new SessionCreateRequest("Favored"));
+        sessionService.patch(user.getId(), favored.id(),
+                new SessionPatchRequest(null, "Body sentence one. Body sentence two.", true));
         sessionService.create(stranger.getId(), new SessionCreateRequest("Outsider"));
 
-        List<SessionSummaryResponse> mine = sessionService.list(user.getId());
+        List<SessionDetailResponse> mine = sessionService.list(user.getId());
 
-        assertThat(mine).extracting(SessionSummaryResponse::id)
-                .containsExactly(newer.id(), older.id());
+        assertThat(mine).extracting(SessionDetailResponse::id)
+                .containsExactly(favored.id(), newer.id(), older.id());
+        SessionDetailResponse favoredDto = mine.get(0);
+        assertThat(favoredDto.favorite()).isTrue();
+        assertThat(favoredDto.scriptText()).isEqualTo("Body sentence one. Body sentence two.");
+        assertThat(favoredDto.sentences()).hasSize(2);
+        assertThat(favoredDto.sentences().get(0).sentenceIndex()).isZero();
+        assertThat(favoredDto.sentences().get(0).text()).isEqualTo("Body sentence one.");
     }
 }

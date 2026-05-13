@@ -5,7 +5,6 @@ import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
 import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
 import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
-import com.capstoneecho.echo_back.learning.session.dto.SessionSummaryResponse;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.support.SentenceSplitter;
@@ -39,9 +38,9 @@ public class SessionService {
         this.validator = validator;
     }
 
-    public List<SessionSummaryResponse> list(Long userId) {
-        return sessionRepository.findAllByUser_IdOrderByUpdatedAtDesc(userId).stream()
-                .map(SessionSummaryResponse::from)
+    public List<SessionDetailResponse> list(Long userId) {
+        return sessionRepository.findByUser_IdOrderByFavoriteDescUpdatedAtDesc(userId).stream()
+                .map(SessionDetailResponse::from)
                 .toList();
     }
 

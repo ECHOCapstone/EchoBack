@@ -6,7 +6,6 @@ import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
 import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
 import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
-import com.capstoneecho.echo_back.learning.session.dto.SessionSummaryResponse;
 import com.capstoneecho.echo_back.learning.session.service.SessionService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -32,7 +31,7 @@ public class SessionController {
     }
 
     @GetMapping
-    public ApiResponse<List<SessionSummaryResponse>> list(@CurrentUser JwtPrincipal principal) {
+    public ApiResponse<List<SessionDetailResponse>> list(@CurrentUser JwtPrincipal principal) {
         return ApiResponse.success(sessionService.list(principal.userId()));
     }
 

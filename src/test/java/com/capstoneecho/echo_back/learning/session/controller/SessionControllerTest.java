@@ -45,11 +45,13 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
     private SentenceSplitter sentenceSplitter;
 
     @Test
-    @DisplayName("GET /api/sessions → 200 + 본인 세션만 + REST Docs 스니펫")
-    void listReturnsOwnSessionsOnly() throws Exception {
+    @DisplayName("GET /api/sessions → 200 + 본인 세션만 (전체 detail 모양: scriptText/sentences/timestamps) + REST Docs 스니펫")
+    void listReturnsOwnSessionsAsFullDetail() throws Exception {
         User owner = savedUser("sessuser1", "sessuser1@test.com");
         User other = savedUser("sessother1", "sessother1@test.com");
-        sessionRepository.save(Session.create(owner, "My First"));
+        Session first = Session.create(owner, "My First");
+        first.updateScript("Hello world. Practice English.", sentenceSplitter);
+        sessionRepository.save(first);
         sessionRepository.save(Session.create(owner, "My Second"));
         sessionRepository.save(Session.create(other, "Other's Session"));
 
@@ -62,9 +64,53 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[*].title",
                         Matchers.everyItem(Matchers.not(Matchers.equalTo("Other's Session")))))
+                .andExpect(jsonPath("$.data[*].id", Matchers.everyItem(Matchers.notNullValue())))
+                .andExpect(jsonPath("$.data[*].scriptText", Matchers.notNullValue()))
+                .andExpect(jsonPath("$.data[*].favorite",
+                        Matchers.everyItem(Matchers.anyOf(Matchers.is(true), Matchers.is(false)))))
+                .andExpect(jsonPath("$.data[*].sentences", Matchers.notNullValue()))
+                .andExpect(jsonPath("$.data[*].createdAt", Matchers.notNullValue()))
+                .andExpect(jsonPath("$.data[*].updatedAt", Matchers.notNullValue()))
+                .andExpect(jsonPath("$.data[?(@.title=='My First')].scriptText",
+                        Matchers.contains("Hello world. Practice English.")))
+                .andExpect(jsonPath("$.data[?(@.title=='My First')].sentences[0].text",
+                        Matchers.contains("Hello world.")))
+                .andExpect(jsonPath("$.data[?(@.title=='My First')].sentences[0].sentenceIndex",
+                        Matchers.contains(0)))
                 .andDo(document("sessions/list"));
 
         assertSnippetCreated("sessions/list");
+    }
+
+    @Test
+    @DisplayName("GET /api/sessions → 본인 세션이 없으면 빈 배열")
+    void listReturnsEmptyArrayWhenNoSessions() throws Exception {
+        User user = savedUser("sessempty", "sessempty@test.com");
+        String token = issueToken(user);
+
+        mockMvc.perform(get("/api/sessions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/sessions → 타사용자 세션은 응답에서 격리된다 (cross-user)")
+    void listIsolatesCrossUserSessions() throws Exception {
+        User aUser = savedUser("sessiso_a", "sessiso_a@test.com");
+        User bUser = savedUser("sessiso_b", "sessiso_b@test.com");
+        sessionRepository.save(Session.create(aUser, "A only"));
+        sessionRepository.save(Session.create(bUser, "B private"));
+
+        String tokenA = issueToken(aUser);
+
+        mockMvc.perform(get("/api/sessions")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("A only"));
     }
 
     @Test
