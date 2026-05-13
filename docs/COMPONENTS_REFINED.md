@@ -263,7 +263,7 @@ com.capstoneecho.echo_back
 
   @Bean PasswordEncoder passwordEncoder();   // BCryptPasswordEncoder
   ```
-- **공개/보호 경로 매트릭스:** `/api/auth/**`, `/api/health`, `/error`, `/actuator/health` 공개. 그 외 `/api/**` JWT 필수. 그 외 모든 경로 공개.
+- **공개/보호 경로 매트릭스:** `/api/auth/**`, `/api/tts`, `/api/health`, `/error`, `/actuator/health` 공개. 그 외 `/api/**` JWT 필수. 그 외 모든 경로 공개. (`/api/tts` 는 FRONT_API_SPEC §11 / API_SPEC_REFINED §2.1 — 클라이언트가 토큰을 함께 보내더라도 백엔드는 무시. **백엔드 코드 gap (rev7 기준):** 현재 `SecurityConfig` 는 `requestMatchers("/api/**").authenticated()` 만 두어 `/api/tts` 가 여전히 보호 영역. 후속 정렬은 본 브랜치 `fix/api-align-to-front` — 자세한 후속 punch list 는 §3.3.4 TtsController 인라인 노트 및 §부록 E rev7 참조.)
 - **만족하는 절:** API_SPEC_REFINED §2, §2.1.
 
 ### 2.6 `global.security.JwtAuthFilter`
@@ -661,7 +661,9 @@ public interface SessionSentenceRepository extends JpaRepository<SessionSentence
 
 | 메서드 | HTTP | 경로 | 요청 | 응답 | 호출 service | 인용 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `upload` | POST | `` | `multipart/form-data` part `audio` + query `scriptId?`, `sessionId?`, `stepId?`, `sessionSentenceId?` | `ApiResponse<RecordingResponse>` (201) | `RecordingService.upload(userId, audio, ctx)` | §4.6 |
+| `upload` | POST | `` | `multipart/form-data` parts: `audio` (file) + form 필드 `scriptId?`, `sessionId?`, `stepId?`, `sessionSentenceId?` (모두 동일 multipart 본문) | `ApiResponse<RecordingResponse>` (201) | `RecordingService.upload(userId, audio, ctx)` | §4.6 |
+
+> **백엔드 코드 gap (rev7 기준):** 현재 `RecordingController.upload` 는 4개 ID 를 `@RequestParam(value = ..., required = false) Long` 로 받는다 — Spring 의 `@RequestParam` 은 multipart 요청에서 form 필드도 해석하므로 본 contract (form 필드 전송) 와 호환되지만, 표면적으로는 query param 도 함께 수용된다. FRONT 가 form 필드로만 보내는 한 동작은 일치. 또한 `RecordingService.detectMode` 가 `sessionId`-only 케이스를 `Mode.SESSION_FREE_FORM` 으로 받아 처리하므로 D3 (free-form 제거) 의 후속 backend 정렬이 필요. 본 브랜치 `fix/api-align-to-front` 에서 처리 예정.
 
 ##### Services
 
@@ -681,18 +683,17 @@ public class RecordingService {
 
     // 흐름 ① — 사용자 + 부모 엔티티 조회 + 컨텍스트 ID 조합 검증을 단일 helper 로 묶음.
     // 결과는 sealed interface 로 mode 별 타입 안전성 확보 → ⑩ 의 정적 팩토리 호출이 패턴 매칭으로 분기 가능.
-    private enum Mode { SCRIPT_FLOW, SESSION_SENTENCE, SESSION_FREE_FORM }
+    private enum Mode { SCRIPT_FLOW, SESSION_SENTENCE }
 
     private sealed interface ResolvedParents
-            permits ScriptStep, SessionSentenceParents, SessionFreeForm {
+            permits ScriptStep, SessionSentenceParents {
         User user();
     }
     private record ScriptStep            (User user, Script script, LearningStep step)         implements ResolvedParents {}
     private record SessionSentenceParents(User user, Session session, SessionSentence sentence) implements ResolvedParents {}
-    private record SessionFreeForm       (User user, Session session)                          implements ResolvedParents {}
 
     private ResolvedParents resolveParents(Long userId, RecordingContext ctx);   // ① user 로드 + detectMode + user-scope 부모 조회
-    private Mode            detectMode    (RecordingContext ctx);                // 4 ID set/null 패턴 → canonical 3-mode (그 외 INVALID_REQUEST)
+    private Mode            detectMode    (RecordingContext ctx);                // 4 ID set/null 패턴 → canonical 2-mode (그 외 INVALID_REQUEST: `sessionId`-only / `scriptId`-only / 두 mode 혼합 / 컨텍스트 누락)
 }
 ```
 
@@ -708,13 +709,13 @@ public class RecordingService {
   1. `parents = resolveParents(userId, ctx)` — 사용자 로드 + 컨텍스트 mode 분기 + user-scope 부모 엔티티 조회. `USER_NOT_FOUND` / `INVALID_REQUEST` / `SCRIPT_NOT_FOUND` / `STEP_NOT_FOUND` / `SESSION_NOT_FOUND` / `SESSION_SENTENCE_NOT_FOUND`.
   2. `decoded = multipartAudioReader.read(audio)` — 메모리에서 WAV 변환·duration 추출. 실패 시 `AUDIO_DECODE_FAILED`.
   3. `targetText` snapshot 결정 (mode 별 — `parents` 의 record 변종 패턴 매칭).
-  4. `Recording.validateForScriptStep / validateForSessionSentence / validateForSessionFreeForm` 호출 — 정적 팩토리 invariant (ENTITIES_REFINED §2.7) 와 동일한 cross-parent 검증을 객체 생성 *전에* 한 번 더 수행. 위반 시 `IllegalArgumentException` (`INTERNAL_ERROR` 로 매핑 — 두 단계 검증 1단계가 빠진 프로그래밍 에러).
+  4. `Recording.validateForScriptStep / validateForSessionSentence` 호출 — 정적 팩토리 invariant (ENTITIES_REFINED §2.7) 와 동일한 cross-parent 검증을 객체 생성 *전에* 한 번 더 수행. 위반 시 `IllegalArgumentException` (`INTERNAL_ERROR` 로 매핑 — 두 단계 검증 1단계가 빠진 프로그래밍 에러).
   5. `ModelServerClient.g2p(targetText)` — canonical 산출 (해당 mode 만, 빈 입력은 `""` 반환).
   6. `ModelServerClient.analyze(decoded.wavBytes(), canonical)` — perceived/peakSoftmax/errors/durationSec.
   7. `outcome = buildOutcome(targetText, analyze, parents)` — `ScoringPolicy` + `WeakPhonemeAnalyzer` + `LlmClient.summarizeRecording(...)` (`RecordingGuidance(guidanceKr, wrongWords)` 반환 — wrongWords 의 JSON 직렬화도 본 단계에서 수행해 `outcome.wrongWordsJson` 채움) + `PhonemeErrorMapper` 로 `AnalysisOutcome` 빌드.
   8. `audioPath = recordingStorage.save(userId, decoded.wavBytes(), audio.getOriginalFilename())` — 디스크 저장. 실패 시 그대로 예외 전파 (`LocalRecordingStorage` 는 write-then-rename 패턴 — partial 파일 잔존 없음).
   9. **`TransactionSynchronizationManager.registerSynchronization(...)`** — `afterCompletion(int status)` 콜백 등록. `status != STATUS_COMMITTED` 이면 `recordingStorage.delete(audioPath)` 호출 (try-catch 로 감싸 2차 실패는 WARN 로그만). 본문/flush/commit/unknown 모든 비-commit 결과를 동일 경로로 정리.
-  10. `Recording.forScriptStep / forSessionSentence / forSessionFreeForm` 정적 팩토리 호출 (ENTITIES_REFINED §2.7) — 인자에 ⑧ 의 `audioPath` 포함 + ⑦ 의 `outcome` 적용 + 저장. 본문 try-catch 없음 (⑨ 의 동기화가 모든 실패 경로 책임):
+  10. `Recording.forScriptStep / forSessionSentence` 정적 팩토리 호출 (ENTITIES_REFINED §2.7 — `forSessionFreeForm` 은 entity 에는 존재하지만 본 contract 에서 호출하지 않음. ENTITIES_REFINED 정합 정리는 별도 후속 과제). 인자에 ⑧ 의 `audioPath` 포함 + ⑦ 의 `outcome` 적용 + 저장. 본문 try-catch 없음 (⑨ 의 동기화가 모든 실패 경로 책임):
       - `recording = Recording.forXxx(parents..., audioPath, targetText)`.
       - `recording.applyAnalysis(outcome)`.
       - `recordingRepository.save(recording)`.
@@ -759,10 +760,11 @@ public interface RecordingRepository extends JpaRepository<Recording, Long> {
 // 객체를 생성하지 않고 invariant 만 검증. 위반 시 IllegalArgumentException.
 public static void validateForScriptStep(User user, Script script, LearningStep step);
 public static void validateForSessionSentence(User user, Session session, SessionSentence sentence);
-public static void validateForSessionFreeForm(User user, Session session);
+// validateForSessionFreeForm 은 entity 에 존재하지만 본 contract (2-mode) 에서는 호출하지 않음.
+// ENTITIES_REFINED §2.7 의 forSessionFreeForm 제거는 별도 후속 과제.
 ```
 
-정적 팩토리 본문은 변경하지 않는다 (생성 시점에 같은 invariant 를 한 번 더 검증 — 이중 안전). 검증 로직을 위 3개 정적 메서드와 정적 팩토리가 공유하도록 구현한다.
+정적 팩토리 본문은 변경하지 않는다 (생성 시점에 같은 invariant 를 한 번 더 검증 — 이중 안전). 검증 로직을 위 2개 정적 메서드와 정적 팩토리가 공유하도록 구현한다.
 
 - `pronunciation.recording.support.RecordingStorage` (인터페이스) + `LocalRecordingStorage`.
   ```java
@@ -910,7 +912,9 @@ public interface PhonemeErrorRepository extends JpaRepository<PhonemeError, Long
 
 ##### Controllers
 
-`pronunciation.tts.controller.TtsController` (base `/api/tts`, JWT 필수)
+`pronunciation.tts.controller.TtsController` (base `/api/tts`, 공개 — 클라이언트가 토큰을 함께 보내더라도 백엔드는 무시. FRONT_API_SPEC §11 / API_SPEC_REFINED §2.1)
+
+> **백엔드 코드 gap (rev7 기준):** 현재 `TtsController.synthesize` 는 `@CurrentUser JwtPrincipal principal` 파라미터를 받고, `global.security.SecurityConfig` 의 `requestMatchers("/api/**").authenticated()` 가 `/api/tts` 를 보호 영역에 포함시키므로 실 응답은 401. API_TEST_PLAN §3.26 / §부록 A 의 골든도 본 contract 와 일치하지만, 실 backend 가 아직 정렬되지 않음. 후속 정렬: ① SecurityConfig 매트릭스에 `"/api/tts"` permitAll 추가, ② `TtsController.synthesize` 시그니처에서 `@CurrentUser` 제거. 본 브랜치 `fix/api-align-to-front` 에서 처리 예정.
 
 | 메서드 | HTTP | 경로 | 요청 | 응답 | 호출 service | 인용 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1319,3 +1323,4 @@ ENTITIES_REFINED §5.4 의 6개 검증 시나리오가 어느 컴포넌트 경�
 | 2026-05-10 (rev4) | Codex round 3 반영 — (F7) `RecordingService.upload` 의 본문 try-catch 를 제거하고 ⑨ 단계에서 `TransactionSynchronization.afterCompletion` 등록으로 commit-time 실패까지 (본문 / flush / commit / unknown) 단일 정책으로 storage 정리. `resolveParents` helper (sealed interface `ResolvedParents` + 3 record + `detectMode` private) 도입으로 ① mode 분기 + user-scope 부모 조회 + 사용자 로드를 단일 경로로 통합. 흐름이 12-step → 11-step 으로 정리. (F8) `PronunciationFeedback.completed_at` 컬럼 + `(user_id, completed_at)` 인덱스 신설, `markCompletedAtomically` 가 `now` 인자 받아 같은 UPDATE 에서 set, `StatsService.attendance` 는 `findCompletedDaysInMonth` group-by 로 정확한 일자 산출. ENTITIES_REFINED §2.8 / §5.2 / §5.3 / §5.4 동시 갱신. (F9) `LlmClient.summarizeRecording` 신설 — `RecordingGuidance(guidanceKr, wrongWords)` 반환. `Recording.wrong_words_json` 컬럼 + `AnalysisOutcome.wrongWordsJson` 추가 (ENTITIES_REFINED §2.7 동시 갱신). `RecordingResponse.from` 이 JSON 역직렬화로 `WrongWord[]` 노출, NULL/실패는 빈 배열 fallback. |
 | 2026-05-10 (rev5) | Codex round 4 반영 — (F10) `StatsService.attendance` 의 day bucketing 을 Java-side 로 이동: `FeedbackRepository.findCompletedDaysInMonth` (DB DATE 함수 — DB 세션 tz 종속) → `findCompletedAtInRange` (raw `Instant` range 반환). service 가 `ZoneId.of(props.stats().zone())` 로 결정적 변환·집계. DB 세션 tz / Hibernate `jdbc.time_zone` 와 무관하게 H2(테스트) ↔ MySQL(prod) 결과 일치 보장. half-open `[start, end)` range 로 월 경계 자정 중복 방지. (F11) `AppProperties.Stats(String zone)` record 신설 — `app.stats.zone` 기본 `Asia/Seoul`, `StatsService` 가 typed 접근. 운영 invariant 가 4–5군데 (DB 세션 tz / JDBC URL / Hibernate / RDS parameter group / JVM tz) 분산 안 되고 application 안에 응축. ENTITIES_REFINED 변경 없음. |
 | 2026-05-10 (rev6) | Codex round 5 의 F13 만 반영 — `MemberService` 에 `AppProperties` 의존 추가, `awardCompletionRewards` 가 `ZoneId.of(props.stats().zone())` 을 `User.recordCompletion` 에 명시 전달. streak (`UserResponse.streak`) 와 attendance (`StatsResponse.attendance`) 가 KST 자정 경계에서도 항상 일치하도록 두 곳의 ZoneId source 를 `app.stats.zone` 으로 통일. ENTITIES_REFINED 변경 없음. (F12 long-running transaction / F14 signup duplicate races 는 본 라운드 비-목표 — 다음 라운드 처리 후보.) |
+| 2026-05-13 (rev7) | API_SPEC_REFINED rev6 (FRONT 정렬) 반영 — (1) §2.5 SecurityConfig 공개 매트릭스에 `/api/tts` 추가, §3.3.4 TtsController 인증을 "공개"로 정정 (FRONT_API_SPEC §11). (2) §3.3.1 RecordingController.upload 컨텍스트 ID 위치를 query → multipart form 필드 로 정정 (FRONT_API_SPEC §7). (3) §3.3.1 RecordingService 의 `Mode` enum / `sealed interface ResolvedParents` / `validateForXxx` / `forXxx` 호출 / 흐름 단계 ④·⑩ 에서 `SESSION_FREE_FORM` 제거 (FRONT_API_SPEC §7 의 2-mode 계약). **백엔드 코드 / 다른 spec 과의 gap 명시 (모두 본 브랜치 `fix/api-align-to-front` 후속 과제):** (D1) `TtsController.synthesize` 의 `@CurrentUser` 와 `SecurityConfig` 의 `/api/**` authenticated 가 `/api/tts` 를 보호 영역에 포함 → 후속에서 SecurityConfig 에 `/api/tts` permitAll 추가 + `@CurrentUser` 제거. (D2) `RecordingController.upload` 의 `@RequestParam` 은 form 필드도 해석하므로 contract 와 동작 호환 — 표면적 query 도 수용되지만 FRONT 가 form 필드로만 보내는 한 무해. (D3) `RecordingService.detectMode` 의 `Mode.SESSION_FREE_FORM` 분기, `Recording.forSessionFreeForm` / `validateForSessionFreeForm`, ENTITIES_REFINED §2.7 의 세 번째 정적 팩토리 — 모두 entity 와 service 양쪽에서 후속 제거. 각 backend 정렬 지점은 §2.5 / §3.3.1 / §3.3.4 의 인라인 "백엔드 코드 gap" 노트에 명시. |
