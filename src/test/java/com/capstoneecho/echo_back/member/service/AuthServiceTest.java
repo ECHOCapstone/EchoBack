@@ -39,12 +39,13 @@ class AuthServiceTest {
         AuthTokenResponse response = authService.signup(
                 new SignupRequest("alice", "alice@example.com", "Password!1", "Alice"));
 
-        assertThat(response.token()).isNotBlank();
-        assertThat(response.expiresAt()).isNotNull();
-        assertThat(response.profile()).isNotNull();
-        assertThat(response.profile().username()).isEqualTo("alice");
-        assertThat(response.profile().email()).isEqualTo("alice@example.com");
-        assertThat(response.profile().nickname()).isEqualTo("Alice");
+        assertThat(response.accessToken()).isNotBlank();
+        assertThat(response.tokenType()).isEqualTo("Bearer");
+        assertThat(response.expiresInSec()).isPositive();
+        assertThat(response.user()).isNotNull();
+        assertThat(response.user().username()).isEqualTo("alice");
+        assertThat(response.user().email()).isEqualTo("alice@example.com");
+        assertThat(response.user().nickname()).isEqualTo("Alice");
 
         User saved = userRepository.findByUsername("alice").orElseThrow();
         assertThat(saved.getPasswordHash())
@@ -88,21 +89,21 @@ class AuthServiceTest {
         AuthTokenResponse response = authService.login(
                 new LoginRequest("dan", "Password!1"));
 
-        assertThat(response.token()).isNotBlank();
-        assertThat(response.profile().username()).isEqualTo("dan");
+        assertThat(response.accessToken()).isNotBlank();
+        assertThat(response.user().username()).isEqualTo("dan");
     }
 
     @Test
-    @DisplayName("login 은 email 로 인증에 성공하면 JWT 를 반환한다")
-    void loginByEmailSucceeds() {
+    @DisplayName("login 은 email 로 로그인 시도하면 LOGIN_FAILED (spec: username only)")
+    void loginByEmailFailsBecauseSpecIsUsernameOnly() {
         authService.signup(
                 new SignupRequest("eve", "eve@example.com", "Password!1", "Eve"));
 
-        AuthTokenResponse response = authService.login(
-                new LoginRequest("eve@example.com", "Password!1"));
-
-        assertThat(response.token()).isNotBlank();
-        assertThat(response.profile().email()).isEqualTo("eve@example.com");
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("eve@example.com", "Password!1")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getCode())
+                .isEqualTo(ErrorCode.LOGIN_FAILED);
     }
 
     @Test
@@ -172,11 +173,12 @@ class AuthServiceTest {
         AuthTokenResponse first = authService.loginWithGoogleDemo();
         AuthTokenResponse second = authService.loginWithGoogleDemo();
 
-        assertThat(first.token()).isNotBlank();
-        assertThat(second.token()).isNotBlank();
-        assertThat(first.profile().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
-        assertThat(second.profile().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
-        assertThat(first.profile().id()).isEqualTo(second.profile().id());
+        assertThat(first.accessToken()).isNotBlank();
+        assertThat(second.accessToken()).isNotBlank();
+        assertThat(first.tokenType()).isEqualTo("Bearer");
+        assertThat(first.user().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
+        assertThat(second.user().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
+        assertThat(first.user().id()).isEqualTo(second.user().id());
 
         long demoRowCount = userRepository.findAll().stream()
                 .filter(u -> AuthService.DEMO_GOOGLE_EMAIL.equals(u.getEmail()))
@@ -193,13 +195,13 @@ class AuthServiceTest {
     void loginWithGoogleDemoMergesExistingEmail() {
         AuthTokenResponse standard = authService.signup(
                 new SignupRequest("existing", AuthService.DEMO_GOOGLE_EMAIL, "Password!1", "Existing"));
-        Long existingId = standard.profile().id();
+        Long existingId = standard.user().id();
 
         AuthTokenResponse demo = authService.loginWithGoogleDemo();
 
-        assertThat(demo.token()).isNotBlank();
-        assertThat(demo.profile().id()).isEqualTo(existingId);
-        assertThat(demo.profile().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
+        assertThat(demo.accessToken()).isNotBlank();
+        assertThat(demo.user().id()).isEqualTo(existingId);
+        assertThat(demo.user().email()).isEqualTo(AuthService.DEMO_GOOGLE_EMAIL);
 
         long demoRowCount = userRepository.findAll().stream()
                 .filter(u -> AuthService.DEMO_GOOGLE_EMAIL.equals(u.getEmail()))

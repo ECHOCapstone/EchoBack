@@ -3,7 +3,7 @@ package com.capstoneecho.echo_back.member.service;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
-import com.capstoneecho.echo_back.member.dto.MemberProfileResponse;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.dto.NicknameUpdateRequest;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
@@ -31,13 +31,13 @@ public class MemberService {
         this.appProperties = appProperties;
     }
 
-    public MemberProfileResponse findMe(Long userId) {
+    public UserResponse findMe(Long userId) {
         User user = loadUser(userId);
-        return MemberProfileResponse.from(user);
+        return UserResponse.from(user);
     }
 
     @Transactional
-    public MemberProfileResponse updateNickname(Long userId, NicknameUpdateRequest request) {
+    public UserResponse updateNickname(Long userId, NicknameUpdateRequest request) {
         if (request == null) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
@@ -51,17 +51,17 @@ public class MemberService {
 
         User user = loadUser(userId);
         user.updateNickname(request.nickname());
-        return MemberProfileResponse.from(user);
+        return UserResponse.from(user);
     }
 
     @Transactional
-    public MemberProfileResponse awardCompletionRewards(Long userId, int expReward) {
+    public UserResponse awardCompletionRewards(Long userId, int expReward) {
         if (expReward < 0) {
             throw new IllegalArgumentException("expReward must be >= 0");
         }
         User user = loadUser(userId);
         user.recordCompletion(Instant.now(), expReward, statsZone());
-        return MemberProfileResponse.from(user);
+        return UserResponse.from(user);
     }
 
     private ZoneId statsZone() {

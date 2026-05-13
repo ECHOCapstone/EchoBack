@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.member.dto.MemberProfileResponse;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.dto.NicknameUpdateRequest;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
@@ -36,7 +36,7 @@ class MemberServiceTest {
         User saved = userRepository.save(
                 User.signup("alice", "alice@example.com", VALID_BCRYPT, "Alice"));
 
-        MemberProfileResponse response = memberService.findMe(saved.getId());
+        UserResponse response = memberService.findMe(saved.getId());
 
         assertThat(response.id()).isEqualTo(saved.getId());
         assertThat(response.username()).isEqualTo("alice");
@@ -62,7 +62,7 @@ class MemberServiceTest {
         User saved = userRepository.save(
                 User.signup("bob", "bob@example.com", VALID_BCRYPT, "Bob"));
 
-        MemberProfileResponse response = memberService.updateNickname(
+        UserResponse response = memberService.updateNickname(
                 saved.getId(), new NicknameUpdateRequest("Bobby"));
 
         assertThat(response.nickname()).isEqualTo("Bobby");

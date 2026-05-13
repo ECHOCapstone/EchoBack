@@ -3,7 +3,7 @@ package com.capstoneecho.echo_back.member.dto;
 import com.capstoneecho.echo_back.member.entity.User;
 import java.time.Instant;
 
-public record MemberProfileResponse(
+public record UserResponse(
         Long id,
         String username,
         String email,
@@ -13,8 +13,8 @@ public record MemberProfileResponse(
         Instant lastStudyAt
 ) {
 
-    public static MemberProfileResponse from(User user) {
-        return new MemberProfileResponse(
+    public static UserResponse from(User user) {
+        return new UserResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),

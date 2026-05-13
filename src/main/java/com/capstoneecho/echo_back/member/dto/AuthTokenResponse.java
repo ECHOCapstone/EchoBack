@@ -1,10 +1,15 @@
 package com.capstoneecho.echo_back.member.dto;
 
-import java.time.Instant;
-
 public record AuthTokenResponse(
-        String token,
-        Instant expiresAt,
-        MemberProfileResponse profile
+        String accessToken,
+        String tokenType,
+        long expiresInSec,
+        UserResponse user
 ) {
+
+    public static final String BEARER = "Bearer";
+
+    public static AuthTokenResponse of(String accessToken, long expiresInSec, UserResponse user) {
+        return new AuthTokenResponse(accessToken, BEARER, expiresInSec, user);
+    }
 }

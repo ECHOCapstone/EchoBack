@@ -7,14 +7,12 @@ import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.member.dto.AuthTokenResponse;
 import com.capstoneecho.echo_back.member.dto.AvailabilityResponse;
 import com.capstoneecho.echo_back.member.dto.LoginRequest;
-import com.capstoneecho.echo_back.member.dto.MemberProfileResponse;
 import com.capstoneecho.echo_back.member.dto.SignupRequest;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,7 +63,7 @@ public class AuthService {
         if (request == null) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
-        User user = findByUsernameOrEmail(request.usernameOrEmail())
+        User user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
 
         String storedHash = user.getPasswordHash();
@@ -106,20 +104,12 @@ public class AuthService {
         return new AvailabilityResponse(!userRepository.existsByEmail(email));
     }
 
-    private Optional<User> findByUsernameOrEmail(String value) {
-        Optional<User> byUsername = userRepository.findByUsername(value);
-        if (byUsername.isPresent()) {
-            return byUsername;
-        }
-        return userRepository.findByEmail(value);
-    }
-
     private AuthTokenResponse issueToken(User user) {
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("username", user.getUsername());
         claims.put("email", user.getEmail());
         String token = jwtProvider.issue(user.getId(), claims);
-        Instant expiresAt = Instant.now().plusMillis(jwtExpirationMs);
-        return new AuthTokenResponse(token, expiresAt, MemberProfileResponse.from(user));
+        long expiresInSec = Math.max(0L, jwtExpirationMs / 1000L);
+        return AuthTokenResponse.of(token, expiresInSec, UserResponse.from(user));
     }
 }

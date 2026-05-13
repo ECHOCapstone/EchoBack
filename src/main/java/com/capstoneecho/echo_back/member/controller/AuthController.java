@@ -42,13 +42,13 @@ public class AuthController {
     @PostMapping("/check-username")
     public ApiResponse<AvailabilityResponse> checkUsername(
             @Valid @RequestBody UsernameCheckRequest request) {
-        return ApiResponse.success(authService.checkUsername(request.username()));
+        return ApiResponse.success(authService.checkUsername(request.value()));
     }
 
     @PostMapping("/check-email")
     public ApiResponse<AvailabilityResponse> checkEmail(
             @Valid @RequestBody EmailCheckRequest request) {
-        return ApiResponse.success(authService.checkEmail(request.email()));
+        return ApiResponse.success(authService.checkEmail(request.value()));
     }
 
     @GetMapping("/oauth2/google/demo")

@@ -45,11 +45,12 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.token").isNotEmpty())
-                .andExpect(jsonPath("$.data.expiresAt").exists())
-                .andExpect(jsonPath("$.data.profile.username").value("alice"))
-                .andExpect(jsonPath("$.data.profile.email").value("alice@test.com"))
-                .andExpect(jsonPath("$.data.profile.nickname").value("Alice"))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresInSec").isNumber())
+                .andExpect(jsonPath("$.data.user.username").value("alice"))
+                .andExpect(jsonPath("$.data.user.email").value("alice@test.com"))
+                .andExpect(jsonPath("$.data.user.nickname").value("Alice"))
                 .andDo(document("auth/post-signup"));
 
         assertSnippetCreated("auth/post-signup");
@@ -108,7 +109,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
 
         String body = """
                 {
-                  "usernameOrEmail": "bob",
+                  "username": "bob",
                   "password": "Password1!"
                 }
                 """;
@@ -118,8 +119,10 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.token").isNotEmpty())
-                .andExpect(jsonPath("$.data.profile.username").value("bob"))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresInSec").isNumber())
+                .andExpect(jsonPath("$.data.user.username").value("bob"))
                 .andDo(document("auth/post-login"));
 
         assertSnippetCreated("auth/post-login");
@@ -133,7 +136,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
 
         String body = """
                 {
-                  "usernameOrEmail": "carol",
+                  "username": "carol",
                   "password": "WrongPass1!"
                 }
                 """;
@@ -150,7 +153,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
     @DisplayName("POST /api/auth/check-username → 200 + {available} 봉투 + REST Docs 스니펫")
     void checkUsernameReturns200AndEnvelope() throws Exception {
         String body = """
-                {"username": "freshname"}
+                {"value": "freshname"}
                 """;
 
         mockMvc.perform(post("/api/auth/check-username")
@@ -171,7 +174,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                 "taken", "taken@test.com", passwordEncoder.encode("Password1!"), "Taken"));
 
         String body = """
-                {"email": "taken@test.com"}
+                {"value": "taken@test.com"}
                 """;
 
         mockMvc.perform(post("/api/auth/check-email")
@@ -191,13 +194,15 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(get("/api/auth/oauth2/google/demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.token").isNotEmpty())
-                .andExpect(jsonPath("$.data.profile.email").value(AuthService.DEMO_GOOGLE_EMAIL))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresInSec").isNumber())
+                .andExpect(jsonPath("$.data.user.email").value(AuthService.DEMO_GOOGLE_EMAIL))
                 .andDo(document("auth/get-oauth2-google-demo"));
 
         mockMvc.perform(get("/api/auth/oauth2/google/demo"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.profile.email").value(AuthService.DEMO_GOOGLE_EMAIL));
+                .andExpect(jsonPath("$.data.user.email").value(AuthService.DEMO_GOOGLE_EMAIL));
 
         assertSnippetCreated("auth/get-oauth2-google-demo");
         assertThat(userRepository.findByEmail(AuthService.DEMO_GOOGLE_EMAIL))

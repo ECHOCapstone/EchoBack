@@ -3,7 +3,7 @@ package com.capstoneecho.echo_back.member.controller;
 import com.capstoneecho.echo_back.global.common.ApiResponse;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
-import com.capstoneecho.echo_back.member.dto.MemberProfileResponse;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.dto.NicknameUpdateRequest;
 import com.capstoneecho.echo_back.member.service.MemberService;
 import jakarta.validation.Valid;
@@ -24,12 +24,12 @@ public class MemberController {
     }
 
     @GetMapping("/me")
-    public ApiResponse<MemberProfileResponse> getMe(@CurrentUser JwtPrincipal principal) {
+    public ApiResponse<UserResponse> getMe(@CurrentUser JwtPrincipal principal) {
         return ApiResponse.success(memberService.findMe(principal.userId()));
     }
 
     @PatchMapping("/me/nickname")
-    public ApiResponse<MemberProfileResponse> updateNickname(
+    public ApiResponse<UserResponse> updateNickname(
             @CurrentUser JwtPrincipal principal,
             @Valid @RequestBody NicknameUpdateRequest request) {
         return ApiResponse.success(memberService.updateNickname(principal.userId(), request));
