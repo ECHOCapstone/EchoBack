@@ -143,9 +143,6 @@ public class RecordingService {
         if (!hasScript && !hasStep && hasSession && hasSentence) {
             return Mode.SESSION_SENTENCE;
         }
-        if (!hasScript && !hasStep && hasSession && !hasSentence) {
-            return Mode.SESSION_FREE_FORM;
-        }
         throw new BusinessException(ErrorCode.INVALID_REQUEST);
     }
 
@@ -176,11 +173,6 @@ public class RecordingService {
                 }
                 yield new ResolvedParents(user, null, null, session, sentence);
             }
-            case SESSION_FREE_FORM -> {
-                Session session = sessionRepository.findByIdAndUser_Id(r.sessionId(), userId)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-                yield new ResolvedParents(user, null, null, session, null);
-            }
         };
     }
 
@@ -207,8 +199,6 @@ public class RecordingService {
                     p.user(), p.script(), p.step(), audioPath, targetText);
             case SESSION_SENTENCE -> Recording.forSessionSentence(
                     p.user(), p.session(), p.sentence(), audioPath, targetText);
-            case SESSION_FREE_FORM -> Recording.forSessionFreeForm(
-                    p.user(), p.session(), audioPath, targetText);
         };
     }
 
@@ -252,8 +242,7 @@ public class RecordingService {
 
     private enum Mode {
         SCRIPT_FLOW,
-        SESSION_SENTENCE,
-        SESSION_FREE_FORM
+        SESSION_SENTENCE
     }
 
     private record ResolvedParents(

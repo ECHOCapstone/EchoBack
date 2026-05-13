@@ -123,30 +123,4 @@ class RecordingFactoryTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    @DisplayName("forSessionFreeForm 은 session 만 세팅하고 sentence/script/step 는 NULL")
-    void sessionFreeFormFactoryHasNoSentence() {
-        User user = user("u6@example.com");
-        Session session = Session.create(user, "T");
-
-        Recording recording = Recording.forSessionFreeForm(user, session, AUDIO_PATH, SNAPSHOT);
-
-        assertThat(recording.getUser()).isSameAs(user);
-        assertThat(recording.getScript()).isNull();
-        assertThat(recording.getStep()).isNull();
-        assertThat(recording.getSession()).isSameAs(session);
-        assertThat(recording.getSessionSentence()).isNull();
-    }
-
-    @Test
-    @DisplayName("forSessionFreeForm 는 session.user 가 인자 user 와 다르면 거부")
-    void sessionFreeFormFactoryRejectsSessionFromOtherUser() {
-        User owner = user("owner2@example.com");
-        User intruder = user("intruder2@example.com");
-        Session session = Session.create(owner, "T");
-
-        assertThatThrownBy(() ->
-                Recording.forSessionFreeForm(intruder, session, AUDIO_PATH, SNAPSHOT))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
 }

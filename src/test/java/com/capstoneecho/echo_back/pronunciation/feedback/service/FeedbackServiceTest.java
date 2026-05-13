@@ -142,8 +142,9 @@ class FeedbackServiceTest {
         SessionFixture sf = seedSession(script.user, "MyTalk", "Hello world.");
         Recording sessionRec = transactionTemplate.execute(status ->
                 recordingRepository.save(
-                        Recording.forSessionFreeForm(
-                                sf.user, sf.session, "u/s.wav", "Hello world.")));
+                        Recording.forSessionSentence(
+                                sf.user, sf.session, sf.firstSentence(),
+                                "u/s.wav", "Hello world.")));
 
         FeedbackGenerateRequest mixedReq = new FeedbackGenerateRequest(
                 script.script.getId(), null, List.of(sessionRec.getId()));
@@ -152,33 +153,6 @@ class FeedbackServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.RECORDING_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("#9 generate 는 session-free-form (sentence NULL) 녹음을 정상적으로 누적한다")
-    void orphanRecordingsAreAggregatedSuccessfully() {
-        User user = newUser("orphan");
-        SessionFixture sf = seedSession(user, "FreeFormTalk", "Hello world.");
-        Recording sentenceRec = transactionTemplate.execute(status ->
-                recordingRepository.save(
-                        Recording.forSessionSentence(
-                                sf.user, sf.session, sf.firstSentence(),
-                                "u/sentence.wav", "Hello world.")));
-        Recording freeFormRec = transactionTemplate.execute(status ->
-                recordingRepository.save(
-                        Recording.forSessionFreeForm(
-                                sf.user, sf.session, "u/free.wav", "Hello world.")));
-
-        FeedbackDetailResponse response = feedbackService.generate(
-                sf.user.getId(),
-                new FeedbackGenerateRequest(
-                        null, sf.session.getId(),
-                        List.of(sentenceRec.getId(), freeFormRec.getId())));
-
-        assertThat(response.id()).isNotNull();
-        assertThat(response.sessionId()).isEqualTo(sf.session.getId());
-        assertThat(response.scriptId()).isNull();
-        assertThat(response.title()).isEqualTo("FreeFormTalk");
     }
 
     @Test

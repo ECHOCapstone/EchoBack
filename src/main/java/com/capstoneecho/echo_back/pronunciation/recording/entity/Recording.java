@@ -159,21 +159,6 @@ public class Recording {
         return new Recording(user, null, null, session, sentence, audioPath, targetTextSnapshot);
     }
 
-    public static Recording forSessionFreeForm(
-            User user,
-            Session session,
-            String audioPath,
-            String targetTextSnapshot
-    ) {
-        requireNonNull(user, "user");
-        requireNonNull(session, "session");
-        requireNonBlank(audioPath, "audioPath");
-        if (session.getUser() != user) {
-            throw new IllegalArgumentException("session.user must equal the supplied user");
-        }
-        return new Recording(user, null, null, session, null, audioPath, targetTextSnapshot);
-    }
-
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();

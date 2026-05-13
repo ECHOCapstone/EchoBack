@@ -121,8 +121,8 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/recordings (session-free-form) → 201 + sessionId 만 채움")
-    void sessionFreeFormReturns201() throws Exception {
+    @DisplayName("POST /api/recordings sessionId 만 (sessionSentenceId 누락) → 400 INVALID_REQUEST")
+    void missingSessionSentenceReturns400InvalidRequest() throws Exception {
         User user = savedUser("recuser3");
         Session saved = sessionRepository.save(Session.create(user, "Free"));
 
@@ -132,11 +132,9 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .file(audioPart(WavFixtures.VALID_WAV))
                         .param("sessionId", String.valueOf(saved.getId()))
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.sessionId").value(saved.getId()))
-                .andExpect(jsonPath("$.data.sessionSentenceId").doesNotExist())
-                .andExpect(jsonPath("$.data.scriptId").doesNotExist());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -210,6 +208,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(multipartUpload()
                         .file(audioPart(WavFixtures.VALID_WAV))
                         .param("sessionId", "999999")
+                        .param("sessionSentenceId", "999998")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));

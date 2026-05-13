@@ -202,16 +202,15 @@ Ranking       : DemoRankingEntry
   - `sessionSentence : SessionSentence` — `@ManyToOne(LAZY)` + `@OnDelete(action = OnDeleteAction.SET_NULL)`, nullable.
   - 위 nullable 관계는 모두 부모 엔티티가 삭제되면 컬럼이 NULL 로 끊어지고, `targetTextSnapshot` 으로 의미가 보존된다.
 - **DB 레벨 정합성 (CHECK 제약)** — Hibernate 의 `@org.hibernate.annotations.Check` (또는 `@Checks` 묶음) 로 엔티티 클래스에 선언하여 DDL 레벨 CHECK 제약으로 생성한다:
-  - `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` — INSERT 시점에는 정적 팩토리 3종 (`forScriptStep` / `forSessionSentence` / `forSessionFreeForm`) 이 strict XOR (script 와 session 은 정확히 하나만 NOT NULL) 을 application-level 로 보장. 양쪽 NULL 상태는 Session/Script 가 hard-delete 되어 ON DELETE SET NULL 로 부모가 끊긴 history 행에서만 발생하며 정상으로 받아들인다 (`targetTextSnapshot` 으로 의미 보존). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절.
+  - `(script_id IS NULL AND session_id IS NULL) OR ((script_id IS NULL) <> (session_id IS NULL))` — INSERT 시점에는 정적 팩토리 2종 (`forScriptStep` / `forSessionSentence`) 이 strict XOR (script 와 session 은 정확히 하나만 NOT NULL) 을 application-level 로 보장. 양쪽 NULL 상태는 Session/Script 가 hard-delete 되어 ON DELETE SET NULL 로 부모가 끊긴 history 행에서만 발생하며 정상으로 받아들인다 (`targetTextSnapshot` 으로 의미 보존). 양쪽 NOT NULL 같은 raw misuse 는 여전히 DB 가 거절.
   - `step_id IS NULL OR script_id IS NOT NULL` — step 이 있으면 script 도 동반. (Script hard-delete 시 step_id 도 함께 NULL 로 끊겨 본 식이 유지된다.)
   - `session_sentence_id IS NULL OR session_id IS NOT NULL` — sentence 가 있으면 session 도 동반. (Session hard-delete 시 session_sentence_id 도 함께 NULL 로 끊겨 본 식이 유지된다.)
-- **신규 INSERT 시 정적 팩토리가 추가로 강제하는 invariant** (DB CHECK 만으로 표현 불가능한 동일성 규칙). 세 팩토리가 다음 셋 중 하나의 모드를 만들고, 각 모드별 명시 검증을 통과해야만 객체가 생성된다. 위반 시 `IllegalArgumentException`.
+- **신규 INSERT 시 정적 팩토리가 추가로 강제하는 invariant** (DB CHECK 만으로 표현 불가능한 동일성 규칙). 두 팩토리가 다음 둘 중 하나의 모드를 만들고, 각 모드별 명시 검증을 통과해야만 객체가 생성된다. 위반 시 `IllegalArgumentException`.
 
   | 팩토리 / 모드 | 시그니처가 강제 (NULL 패턴) | 명시 검증 |
   | --- | --- | --- |
   | `forScriptStep(user, script, step, ...)` | script ✓ / step ✓ / session ✗ / sentence ✗ | `step.script == script` |
   | `forSessionSentence(user, session, sentence, ...)` | script ✗ / step ✗ / session ✓ / sentence ✓ | `sentence.session == session` 그리고 `session.user == user` |
-  | `forSessionFreeForm(user, session, ...)` | script ✗ / step ✗ / session ✓ / sentence ✗ | `session.user == user` |
 
   - script-flow 에는 user 일관성 검증이 없다 (Script/Track 은 전역 콘텐츠로 user 소유 개념이 없다).
   - 검증 위치는 서비스가 아닌 **정적 팩토리 본문**. 이유: `@NoArgsConstructor(access = PROTECTED)` 로 외부에서 무인자 생성을 막아두므로 정적 팩토리가 유일한 합법 생성 경로다. 어떤 서비스/테스트/마이그레이션도 invariant 를 우회할 수 없다.
@@ -220,8 +219,9 @@ Ranking       : DemoRankingEntry
 - **도메인 메서드:**
   - `static Recording forScriptStep(User user, Script script, LearningStep step, String audioPath, String targetTextSnapshot)` — 추천 학습 트랙의 한 step 에 대한 녹음.
   - `static Recording forSessionSentence(User user, Session session, SessionSentence sentence, String audioPath, String targetTextSnapshot)` — 사용자 맞춤 세션의 한 문장에 대한 녹음.
-  - `static Recording forSessionFreeForm(User user, Session session, String audioPath, String targetTextSnapshot)` — 사용자 맞춤 세션을 한 호흡으로 통째 녹음(sentence 분리 없음).
   - `void applyAnalysis(AnalysisOutcome outcome)` — perceived/canonical/peakSoftmax/errorsJson/guidanceKr/durationSec/stepScore/wrongWordsJson 한 번에 반영.
+
+  > 개정 이력: 2026-05-13 (D3 / Ralph 103) — `forSessionFreeForm` 정적 팩토리 제거. 녹음 모드는 `script-flow` + `session-sentence` 2종으로 단일화 (FRONT_API_SPEC §7 정렬).
 - **값 객체:** 본 클래스 안의 `record AnalysisOutcome(perceivedJoined, canonicalJoined, peakSoftmaxJoined, errorsJson, guidanceKr, durationSec, stepScore, wrongWordsJson)` 은 분석 결과를 한 번에 들고 다니는 묶음 값이며 JPA 매핑 대상 아님. `wrongWordsJson` 은 `LlmClient.summarizeRecording` 의 `RecordingGuidance.wrongWords` 를 JSON 직렬화한 문자열 (NULL 가능 — 응답 매핑이 빈 배열로 변환).
 
 ### 2.8 `PronunciationFeedback` — 종합 피드백 한 건
@@ -404,7 +404,6 @@ int markCompletedAtomically(@Param("id") Long id,
 - **Cross-parent 거절 (Recording 정적 팩토리)**:
   - `forScriptStep` 에 `step.script != script` 인 조합 → `IllegalArgumentException`.
   - `forSessionSentence` 에 `sentence.session != session` 또는 `session.user != user` 인 조합 → `IllegalArgumentException`.
-  - `forSessionFreeForm` 에 `session.user != user` → `IllegalArgumentException`.
 - **Cross-parent 거절 (`PronunciationFeedback.create`)**: session-flow 에서 `session.user != user` → `IllegalArgumentException`.
 - **Recording 정합성 CHECK 제약**: 양쪽 NOT NULL, step 만 NOT NULL 이고 script 가 NULL 같은 명백한 misuse 는 raw INSERT 시 DB 에서 거절된다. 단 ON DELETE SET NULL 로 양쪽 NULL 이 되는 history 전이는 허용한다 (CHECK 식이 `양쪽 NULL OR XOR` 형태로 완화되어 있음 — §2.7 참조). INSERT 시점의 strict XOR 은 정적 팩토리 3종이 application-level 로 보장.
 - **Session 대본 갱신 후 녹음 보존**: `Session.updateScript` 가 SessionSentence 행을 새로 교체한 직후, 기존 `Recording.session_sentence_id` 는 NULL 로 끊어지지만 `target_text_snapshot` 은 그대로 남아 어떤 문장에 대한 녹음이었는지 추적 가능하다.
