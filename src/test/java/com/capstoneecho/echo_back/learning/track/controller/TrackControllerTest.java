@@ -42,11 +42,15 @@ class TrackControllerTest extends AbstractControllerIntegrationTest {
     private JwtProvider jwtProvider;
 
     @Test
-    @DisplayName("GET /api/tracks → 200 + displayOrder 오름차순 + REST Docs 스니펫")
+    @DisplayName("GET /api/tracks → 200 + displayOrder 오름차순 + chapterCount + REST Docs 스니펫")
     void listReturnsByDisplayOrder() throws Exception {
+        Track alpha = trackRepository.save(Track.create("Alpha", "a-desc", 1));
         trackRepository.save(Track.create("Bravo", "b-desc", 2));
-        trackRepository.save(Track.create("Alpha", "a-desc", 1));
         trackRepository.save(Track.create("Charlie", "c-desc", 3));
+        scriptRepository.save(
+                Script.createChapter(alpha, 1, "Alpha-Ch1", "c1", Difficulty.EASY, "a", null));
+        scriptRepository.save(
+                Script.createChapter(alpha, 2, "Alpha-Ch2", "c2", Difficulty.MEDIUM, "b", null));
 
         String token = issueToken(savedUser("trackuser1", "trackuser1@test.com"));
 
@@ -57,8 +61,11 @@ class TrackControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.length()").value(3))
                 .andExpect(jsonPath("$.data[0].title").value("Alpha"))
                 .andExpect(jsonPath("$.data[0].displayOrder").value(1))
+                .andExpect(jsonPath("$.data[0].chapterCount").value(2))
                 .andExpect(jsonPath("$.data[1].title").value("Bravo"))
+                .andExpect(jsonPath("$.data[1].chapterCount").value(0))
                 .andExpect(jsonPath("$.data[2].title").value("Charlie"))
+                .andExpect(jsonPath("$.data[2].chapterCount").value(0))
                 .andDo(document("tracks/list"));
 
         assertSnippetCreated("tracks/list");
