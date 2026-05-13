@@ -30,7 +30,7 @@
 
 권위 입력 문서 (필요할 때만 부분 Read):
 
-- `docs/IMPLEMENTATION_PLAN.md` §6 (Phase 카드), §7.2 (서비스 도메인 불변식 #1~#15), §3 (도메인 매트릭스).
+- `docs/IMPLEMENTATION_PLAN.md` — 현재 진행 중인 FRONT_API_SPEC contract 정렬 plan (rev6 D1-D3 + Codex 2026-05-13 D4-D12). 그린필드 Phase 0~6 의 §6 / §7.2 / §3 archive 는 `docs/legacy/IMPLEMENTATION_PLAN.md` 참조.
 - `docs/API_SPEC_REFINED.md`, `docs/ENTITIES_REFINED.md`, `docs/COMPONENTS_REFINED.md`, `docs/MODEL_SERVER_API_SPEC.md`, `docs/API_TEST_PLAN.md`.
 - `CLAUDE.md` — 패키지/도메인/빌드 규약.
 
@@ -71,7 +71,7 @@ task 파일의 모든 `- [ ]` 항목이 객관적으로 통과해야 한다. 미
 
 갱신 내용:
 - PROGRESS.md 해당 row: `Status=DONE`, `Commit=<구현 최종 commit SHA 7자리>`. `Last updated:` 헤더의 ISO-8601 UTC 갱신.
-- ID 가 정확히 `033` 인 경우에만: `docs/ralph/STATUS.md` 파일 내용을 정확히 `ALL DONE\n` (단일 라인 + LF 1개) 로 교체.
+- ID 가 본 시리즈의 마지막 ID (현재 `docs/ralph/PROGRESS.md` 의 최대 ID — rev6+Codex 시리즈에서는 `107`) 인 경우에만: `docs/ralph/STATUS.md` 파일 내용을 정확히 `ALL DONE\n` (단일 라인 + LF 1개) 로 교체.
 - 갱신 commit 메시지 예: `chore(ralph): mark <NNN> DONE`.
 
 ## 7. Push & PR (자동화)
