@@ -75,7 +75,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("USERNAME_DUPLICATED"));
+                .andExpect(jsonPath("$.error.code").value("USERNAME_DUPLICATED"));
     }
 
     @Test
@@ -97,7 +97,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                         .contentType(APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_DUPLICATED"));
+                .andExpect(jsonPath("$.error.code").value("EMAIL_DUPLICATED"));
     }
 
     @Test
@@ -143,7 +143,7 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("LOGIN_FAILED"));
+                .andExpect(jsonPath("$.error.code").value("LOGIN_FAILED"));
     }
 
     @Test

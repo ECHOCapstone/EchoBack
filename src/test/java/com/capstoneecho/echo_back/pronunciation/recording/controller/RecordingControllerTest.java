@@ -150,7 +150,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -165,7 +165,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("stepId", String.valueOf(f.stepId()))
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("AUDIO_DECODE_FAILED"));
+                .andExpect(jsonPath("$.error.code").value("AUDIO_DECODE_FAILED"));
     }
 
     @Test
@@ -183,7 +183,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("stepId", String.valueOf(step.getId()))
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("SCRIPT_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SCRIPT_NOT_FOUND"));
     }
 
     @Test
@@ -198,7 +198,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("stepId", "999999")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("STEP_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("STEP_NOT_FOUND"));
     }
 
     @Test
@@ -212,7 +212,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("sessionId", "999999")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("SESSION_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
     }
 
     @Test
@@ -228,7 +228,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("sessionSentenceId", "999999")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("SESSION_SENTENCE_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SESSION_SENTENCE_NOT_FOUND"));
     }
 
     @Test
@@ -245,7 +245,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("stepId", String.valueOf(f.stepId()))
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.errorCode").value("MODEL_SERVER_ERROR"));
+                .andExpect(jsonPath("$.error.code").value("MODEL_SERVER_ERROR"));
     }
 
     @Test
@@ -262,7 +262,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .param("stepId", String.valueOf(f.stepId()))
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.errorCode").value("MODEL_SERVER_UNAVAILABLE"));
+                .andExpect(jsonPath("$.error.code").value("MODEL_SERVER_UNAVAILABLE"));
     }
 
     @Test
@@ -272,7 +272,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         .file(audioPart(WavFixtures.VALID_WAV))
                         .param("sessionId", "1"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     // ---------- helpers ----------

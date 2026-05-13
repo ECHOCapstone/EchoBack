@@ -88,7 +88,7 @@ class ScriptControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("SCRIPT_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SCRIPT_NOT_FOUND"));
     }
 
     @Test
@@ -102,7 +102,7 @@ class ScriptControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("STEP_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("STEP_NOT_FOUND"));
     }
 
     @Test
@@ -140,7 +140,7 @@ class ScriptControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(get("/api/scripts/{scriptId}", 1L))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     private User savedUser(String username, String email) {

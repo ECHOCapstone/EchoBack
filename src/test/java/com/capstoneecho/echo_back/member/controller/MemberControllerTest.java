@@ -58,7 +58,7 @@ class MemberControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(get("/api/members/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -70,7 +70,7 @@ class MemberControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(get("/api/members/me")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("USER_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"));
     }
 
     @Test
@@ -113,7 +113,7 @@ class MemberControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
 
     private String issueToken(User user) {

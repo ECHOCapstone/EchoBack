@@ -66,7 +66,7 @@ class JwtProviderTest {
 
         assertThatThrownBy(() -> provider.parse(token))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.INVALID_TOKEN);
     }
 
@@ -89,7 +89,7 @@ class JwtProviderTest {
 
         assertThatThrownBy(() -> provider.parse(tampered))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.INVALID_TOKEN);
     }
 
@@ -100,12 +100,12 @@ class JwtProviderTest {
 
         assertThatThrownBy(() -> provider.parse("not-a-jwt"))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.INVALID_TOKEN);
 
         assertThatThrownBy(() -> provider.parse(""))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.INVALID_TOKEN);
     }
 }

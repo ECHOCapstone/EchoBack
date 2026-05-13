@@ -115,7 +115,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -175,7 +175,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
     void completeWithoutTokenReturns401() throws Exception {
         mockMvc.perform(post("/api/feedback/1/complete"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     // ---------- helpers ----------

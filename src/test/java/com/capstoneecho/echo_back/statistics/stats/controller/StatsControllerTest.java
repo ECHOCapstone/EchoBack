@@ -72,7 +72,7 @@ class StatsControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -80,7 +80,7 @@ class StatsControllerTest extends AbstractControllerIntegrationTest {
     void missingAuthReturns401() throws Exception {
         mockMvc.perform(get("/api/stats/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     // ---------- helpers ----------

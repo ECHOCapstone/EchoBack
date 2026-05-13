@@ -26,8 +26,8 @@ public class JwtAuthEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException {
-        ErrorCode errorCode = resolveErrorCode(request);
-        ApiResponse<Void> body = ApiResponse.failure(errorCode, errorCode.getDefaultMessage());
+        ErrorCode code = resolveCode(request);
+        ApiResponse<Void> body = ApiResponse.failure(code, code.getDefaultMessage());
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -35,7 +35,7 @@ public class JwtAuthEntryPoint implements AuthenticationEntryPoint {
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 
-    private static ErrorCode resolveErrorCode(HttpServletRequest request) {
+    private static ErrorCode resolveCode(HttpServletRequest request) {
         Object attribute = request.getAttribute(JwtAuthFilter.ERROR_ATTRIBUTE);
         if (attribute instanceof ErrorCode code) {
             return code;

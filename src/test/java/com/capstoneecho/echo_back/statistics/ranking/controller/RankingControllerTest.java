@@ -97,7 +97,7 @@ class RankingControllerTest extends AbstractControllerIntegrationTest {
     void missingAuthReturns401() throws Exception {
         mockMvc.perform(get("/api/ranking/today"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     private User newUser(String localPart) {

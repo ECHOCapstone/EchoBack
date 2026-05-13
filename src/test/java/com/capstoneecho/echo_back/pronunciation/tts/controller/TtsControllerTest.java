@@ -67,7 +67,7 @@ class TtsControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST"));
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -77,7 +77,7 @@ class TtsControllerTest extends AbstractControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"Hello.\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     private User savedUser(String localPart) {

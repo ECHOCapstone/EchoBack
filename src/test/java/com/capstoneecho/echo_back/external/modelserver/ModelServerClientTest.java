@@ -184,8 +184,8 @@ class ModelServerClientTest {
         ModelServerClient client = newClient(5000);
         assertThatThrownBy(() -> client.g2p("hello"))
                 .isInstanceOfSatisfying(BusinessException.class, ex -> {
-                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.MODEL_SERVER_ERROR);
-                    assertThat(ex.getErrorCode().getStatusCode()).isEqualTo(502);
+                    assertThat(ex.getCode()).isEqualTo(ErrorCode.MODEL_SERVER_ERROR);
+                    assertThat(ex.getCode().getStatusCode()).isEqualTo(502);
                 });
     }
 
@@ -204,8 +204,8 @@ class ModelServerClientTest {
         ModelServerClient client = newClient(200);
         assertThatThrownBy(() -> client.g2p("hello"))
                 .isInstanceOfSatisfying(BusinessException.class, ex -> {
-                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.MODEL_SERVER_UNAVAILABLE);
-                    assertThat(ex.getErrorCode().getStatusCode()).isEqualTo(503);
+                    assertThat(ex.getCode()).isEqualTo(ErrorCode.MODEL_SERVER_UNAVAILABLE);
+                    assertThat(ex.getCode().getStatusCode()).isEqualTo(503);
                 });
     }
 }

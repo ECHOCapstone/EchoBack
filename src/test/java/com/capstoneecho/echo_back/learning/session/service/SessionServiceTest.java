@@ -73,7 +73,7 @@ class SessionServiceTest {
         assertThatThrownBy(() -> sessionService.create(
                 user.getId(), new SessionCreateRequest("   ")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 
@@ -87,12 +87,12 @@ class SessionServiceTest {
 
         assertThatThrownBy(() -> sessionService.get(stranger.getId(), created.id()))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.SESSION_NOT_FOUND);
 
         assertThatThrownBy(() -> sessionService.get(owner.getId(), 999_999L))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.SESSION_NOT_FOUND);
     }
 
@@ -171,7 +171,7 @@ class SessionServiceTest {
 
         assertThatThrownBy(() -> sessionService.delete(user.getId(), 999_999L))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.SESSION_NOT_FOUND);
     }
 
@@ -185,7 +185,7 @@ class SessionServiceTest {
 
         assertThatThrownBy(() -> sessionService.delete(stranger.getId(), created.id()))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.SESSION_NOT_FOUND);
         assertThat(sessionRepository.findById(created.id())).isPresent();
     }

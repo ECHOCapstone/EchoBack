@@ -127,7 +127,7 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("SESSION_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
     }
 
     @Test
@@ -175,7 +175,7 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
     }
 
     @Test
@@ -189,7 +189,7 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
                         .contentType(APPLICATION_JSON)
                         .content("{\"favorite\": true}"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("SESSION_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
     }
 
     @Test
@@ -224,7 +224,7 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("SESSION_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
 
         assertThat(sessionRepository.findById(saved.getId()))
                 .as("타사용자 세션은 절대 삭제되면 안 됨")
@@ -237,7 +237,7 @@ class SessionControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(get("/api/sessions"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     private User savedUser(String username, String email) {

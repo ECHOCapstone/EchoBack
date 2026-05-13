@@ -129,13 +129,13 @@ class RecordingServiceTest {
 
         assertThatThrownBy(() -> recordingService.upload(f.userId(), req, new byte[0]))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.AUDIO_DECODE_FAILED);
 
         assertThatThrownBy(() ->
                 recordingService.upload(f.userId(), req, new byte[] {'X', 'Y', 'Z', 'Z'}))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.AUDIO_DECODE_FAILED);
     }
 
@@ -157,7 +157,7 @@ class RecordingServiceTest {
 
         assertThatThrownBy(() -> recordingService.upload(stranger.getId(), req, VALID_WAV))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.SESSION_NOT_FOUND);
     }
 

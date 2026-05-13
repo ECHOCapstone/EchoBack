@@ -62,7 +62,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.signup(
                 new SignupRequest("bob", "bob2@example.com", "Password!1", "Bob2")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.USERNAME_DUPLICATED);
     }
 
@@ -75,7 +75,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.signup(
                 new SignupRequest("carol2", "shared@example.com", "Password!1", "Carol2")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.EMAIL_DUPLICATED);
     }
 
@@ -114,7 +114,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.login(
                 new LoginRequest("frank", "WrongPassword!9")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.LOGIN_FAILED);
     }
 
@@ -124,7 +124,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.login(
                 new LoginRequest("ghost", "Password!1")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.LOGIN_FAILED);
     }
 
@@ -136,7 +136,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.login(
                 new LoginRequest("oauth@example.com", "Password!1")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.LOGIN_FAILED);
     }
 

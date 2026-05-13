@@ -48,14 +48,14 @@ class GlobalExceptionHandlerSliceTest {
 
     @ParameterizedTest(name = "{0} maps to its declared HTTP status with envelope")
     @EnumSource(ErrorCode.class)
-    @DisplayName("BusinessException → ApiResponse envelope (status + errorCode + errorMessage)")
-    void mapsBusinessExceptionToEnvelope(ErrorCode errorCode) throws Exception {
-        mockMvc.perform(get("/__test/business/" + errorCode.name()))
-                .andExpect(status().is(errorCode.getStatusCode()))
+    @DisplayName("BusinessException → ApiResponse envelope (status + error.code + error.message)")
+    void mapsBusinessExceptionToEnvelope(ErrorCode code) throws Exception {
+        mockMvc.perform(get("/__test/business/" + code.name()))
+                .andExpect(status().is(code.getStatusCode()))
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value(errorCode.name()))
-                .andExpect(jsonPath("$.errorMessage").value(errorCode.getDefaultMessage()))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .andExpect(jsonPath("$.error.code").value(code.name()))
+                .andExpect(jsonPath("$.error.message").value(code.getDefaultMessage()))
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test
@@ -66,8 +66,8 @@ class GlobalExceptionHandlerSliceTest {
                         .content("{\"name\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value(ErrorCode.VALIDATION_FAILED.name()))
-                .andExpect(jsonPath("$.errorMessage").exists());
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -76,8 +76,8 @@ class GlobalExceptionHandlerSliceTest {
         mockMvc.perform(get("/__test/multipart-overflow"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value(ErrorCode.INVALID_REQUEST.name()))
-                .andExpect(jsonPath("$.errorMessage").exists());
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_REQUEST.name()))
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -86,8 +86,8 @@ class GlobalExceptionHandlerSliceTest {
         mockMvc.perform(get("/__test/boom"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value(ErrorCode.INTERNAL_ERROR.name()))
-                .andExpect(jsonPath("$.errorMessage").value(ErrorCode.INTERNAL_ERROR.getDefaultMessage()));
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INTERNAL_ERROR.name()))
+                .andExpect(jsonPath("$.error.message").value(ErrorCode.INTERNAL_ERROR.getDefaultMessage()));
     }
 
     @RestController

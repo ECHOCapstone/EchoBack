@@ -19,7 +19,7 @@ import java.util.List;
 
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    public static final String ERROR_ATTRIBUTE = "jwtAuthErrorCode";
+    public static final String ERROR_ATTRIBUTE = "jwtAuthError";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtProvider jwtProvider;
@@ -53,7 +53,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (BusinessException ex) {
             SecurityContextHolder.clearContext();
-            request.setAttribute(ERROR_ATTRIBUTE, ex.getErrorCode());
+            request.setAttribute(ERROR_ATTRIBUTE, ex.getCode());
         } catch (RuntimeException ex) {
             SecurityContextHolder.clearContext();
             request.setAttribute(ERROR_ATTRIBUTE, ErrorCode.INVALID_TOKEN);

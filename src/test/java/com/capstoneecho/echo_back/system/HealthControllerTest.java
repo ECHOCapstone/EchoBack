@@ -27,8 +27,7 @@ class HealthControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.timestamp").value(
                         org.hamcrest.Matchers.matchesRegex(
                                 "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$")))
-                .andExpect(jsonPath("$.errorCode").doesNotExist())
-                .andExpect(jsonPath("$.errorMessage").doesNotExist())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(result -> {
                     String timestamp = com.jayway.jsonpath.JsonPath.read(
                             result.getResponse().getContentAsString(), "$.data.timestamp");

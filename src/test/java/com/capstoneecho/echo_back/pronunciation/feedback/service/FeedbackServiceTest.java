@@ -136,7 +136,7 @@ class FeedbackServiceTest {
 
         assertThatThrownBy(() -> feedbackService.generate(script.user.getId(), req))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.RECORDING_NOT_FOUND);
 
         SessionFixture sf = seedSession(script.user, "MyTalk", "Hello world.");
@@ -150,7 +150,7 @@ class FeedbackServiceTest {
 
         assertThatThrownBy(() -> feedbackService.generate(script.user.getId(), mixedReq))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.RECORDING_NOT_FOUND);
     }
 
@@ -194,7 +194,7 @@ class FeedbackServiceTest {
 
         assertThatThrownBy(() -> feedbackService.complete(other.getId(), fb.getId()))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.FEEDBACK_NOT_FOUND);
 
         User reloaded = userRepository.findById(other.getId()).orElseThrow();
@@ -261,7 +261,7 @@ class FeedbackServiceTest {
         assertThatThrownBy(() ->
                 feedbackService.retryWord(other.getId(), fb.getId(), VALID_WAV, null))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.FEEDBACK_NOT_FOUND);
     }
 

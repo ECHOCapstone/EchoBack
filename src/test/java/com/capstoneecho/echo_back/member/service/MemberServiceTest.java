@@ -52,7 +52,7 @@ class MemberServiceTest {
     void findMeUnknownIdThrowsUserNotFound() {
         assertThatThrownBy(() -> memberService.findMe(999_999L))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
 
@@ -81,7 +81,7 @@ class MemberServiceTest {
         assertThatThrownBy(() -> memberService.updateNickname(
                 saved.getId(), new NicknameUpdateRequest("   ")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 
@@ -94,7 +94,7 @@ class MemberServiceTest {
         assertThatThrownBy(() -> memberService.updateNickname(
                 saved.getId(), new NicknameUpdateRequest("a".repeat(21))))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 
@@ -104,7 +104,7 @@ class MemberServiceTest {
         assertThatThrownBy(() -> memberService.updateNickname(
                 999_999L, new NicknameUpdateRequest("Whoever")))
                 .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
 }

@@ -1,23 +1,21 @@
 package com.capstoneecho.echo_back.global.common;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(
         boolean success,
         T data,
-        String errorCode,
-        String errorMessage
+        ApiError error
 ) {
 
+    public record ApiError(String code, String message) {}
+
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, data, null, null);
+        return new ApiResponse<>(true, data, null);
     }
 
-    public static <T> ApiResponse<T> failure(ErrorCode errorCode, String errorMessage) {
-        String message = (errorMessage == null || errorMessage.isBlank())
-                ? errorCode.getDefaultMessage()
-                : errorMessage;
-        return new ApiResponse<>(false, null, errorCode.name(), message);
+    public static <T> ApiResponse<T> failure(ErrorCode code, String message) {
+        String resolved = (message == null || message.isBlank())
+                ? code.getDefaultMessage()
+                : message;
+        return new ApiResponse<>(false, null, new ApiError(code.name(), resolved));
     }
 }

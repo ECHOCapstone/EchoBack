@@ -60,7 +60,7 @@ class JwtAuthFilterTest {
         assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
         String body = response.getContentAsString();
         assertThat(body).contains("\"success\":false");
-        assertThat(body).contains("\"errorCode\":\"UNAUTHORIZED\"");
+        assertThat(body).contains("\"error\":{\"code\":\"UNAUTHORIZED\"");
     }
 
     @Test
@@ -87,7 +87,7 @@ class JwtAuthFilterTest {
         assertThat(response.getStatus()).isEqualTo(401);
         String body = response.getContentAsString();
         assertThat(body).contains("\"success\":false");
-        assertThat(body).contains("\"errorCode\":\"INVALID_TOKEN\"");
+        assertThat(body).contains("\"error\":{\"code\":\"INVALID_TOKEN\"");
     }
 
     @Test
@@ -118,7 +118,7 @@ class JwtAuthFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(401);
         String body = response.getContentAsString();
-        assertThat(body).contains("\"errorCode\":\"INVALID_TOKEN\"");
+        assertThat(body).contains("\"error\":{\"code\":\"INVALID_TOKEN\"");
     }
 
     @Test

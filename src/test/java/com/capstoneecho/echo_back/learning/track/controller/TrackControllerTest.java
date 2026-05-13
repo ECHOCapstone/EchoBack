@@ -102,7 +102,7 @@ class TrackControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("TRACK_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("TRACK_NOT_FOUND"));
     }
 
     @Test
@@ -111,7 +111,7 @@ class TrackControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(get("/api/tracks"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     private User savedUser(String username, String email) {

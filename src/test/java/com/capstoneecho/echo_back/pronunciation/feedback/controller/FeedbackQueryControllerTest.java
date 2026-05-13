@@ -105,7 +105,7 @@ class FeedbackQueryControllerTest extends AbstractControllerIntegrationTest {
 
         mockMvc.perform(get("/api/feedbacks/999999").header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("FEEDBACK_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("FEEDBACK_NOT_FOUND"));
     }
 
     @Test
@@ -122,7 +122,7 @@ class FeedbackQueryControllerTest extends AbstractControllerIntegrationTest {
 
         mockMvc.perform(get("/api/feedbacks/" + fbId).header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("FEEDBACK_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("FEEDBACK_NOT_FOUND"));
     }
 
     @Test

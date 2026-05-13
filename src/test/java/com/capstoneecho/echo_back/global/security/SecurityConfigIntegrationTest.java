@@ -51,7 +51,7 @@ class SecurityConfigIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().string(containsString("\"success\":false")))
-                .andExpect(content().string(containsString("\"errorCode\":\"UNAUTHORIZED\"")));
+                .andExpect(content().string(containsString("\"error\":{\"code\":\"UNAUTHORIZED\"")));
     }
 
     @Test

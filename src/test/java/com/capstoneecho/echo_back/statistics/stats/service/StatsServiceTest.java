@@ -125,11 +125,11 @@ class StatsServiceTest {
 
         assertThatThrownBy(() -> statsService.getMyStats(user.getId(), 2026, 13))
                 .isInstanceOfSatisfying(BusinessException.class,
-                        e -> assertThat(e.getErrorCode())
+                        e -> assertThat(e.getCode())
                                 .isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatThrownBy(() -> statsService.getMyStats(user.getId(), 1900, 5))
                 .isInstanceOfSatisfying(BusinessException.class,
-                        e -> assertThat(e.getErrorCode())
+                        e -> assertThat(e.getCode())
                                 .isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
@@ -153,7 +153,7 @@ class StatsServiceTest {
     void unknownUserThrowsUserNotFound() {
         assertThatThrownBy(() -> statsService.getMyStats(999_999_999L, 2026, 5))
                 .isInstanceOfSatisfying(BusinessException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
+                        e -> assertThat(e.getCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
     }
 
     // ---------- helpers ----------
