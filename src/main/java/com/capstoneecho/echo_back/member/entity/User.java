@@ -57,6 +57,9 @@ public class User {
     @Column(name = "last_study_at")
     private Instant lastStudyAt;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
     private User(String username, String email, String passwordHash, String nickname) {
         this.username = username;
         this.email = email;
@@ -65,6 +68,7 @@ public class User {
         this.streak = 0;
         this.exp = 0;
         this.lastStudyAt = null;
+        this.createdAt = Instant.now();
     }
 
     public static User signup(String username, String email, String passwordHashBCrypt, String nickname) {

@@ -44,7 +44,7 @@ class MemberServiceTest {
         assertThat(response.nickname()).isEqualTo("Alice");
         assertThat(response.streak()).isZero();
         assertThat(response.exp()).isZero();
-        assertThat(response.lastStudyAt()).isNull();
+        assertThat(response.createdAt()).isNotNull();
     }
 
     @Test
