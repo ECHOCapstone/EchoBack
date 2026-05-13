@@ -1,6 +1,6 @@
 # ECHO Backend — Ralph Loop Progress (FRONT_API_SPEC contract alignment)
 
-Last updated: 2026-05-13T07:55:00Z
+Last updated: 2026-05-13T17:30:00Z
 Source plan: docs/IMPLEMENTATION_PLAN.md
 Greenfield series (000–033, completed): docs/legacy/ralph/
 
@@ -12,5 +12,5 @@ Greenfield series (000–033, completed): docs/legacy/ralph/
 | 103 | recording-remove-free-form     | D3       | DONE   | 100       | 9ad47af |
 | 104 | recording-wrong-words          | D10      | DONE   | 100       | 08b2600 |
 | 105 | feedback-response-shapes       | D9       | DONE   | 100, 101  | a94c201 |
-| 106 | session-list-response          | D11      | TODO   | 100       | -      |
+| 106 | session-list-response          | D11      | DONE   | 100       | 38e5e90 |
 | 107 | script-track-dto-fields        | D12      | TODO   | 100       | -      |
