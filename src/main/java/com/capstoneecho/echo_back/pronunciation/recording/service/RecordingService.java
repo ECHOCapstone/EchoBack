@@ -94,6 +94,7 @@ public class RecordingService {
                 .perceived(analyze.perceived())
                 .canonical(analyze.canonical().orElse(List.of()))
                 .errors(analyze.errors())
+                .g2pWords(g2p.words())
                 .build();
         RecordingGuidance guidance = llmClient.summarizeRecording(context);
 

@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,16 +31,18 @@ class RuleBasedLlmFeedbackGeneratorTest {
     }
 
     @Test
-    @DisplayName("summarizeRecording: errors at canonicalIndex resolve words from targetText")
+    @DisplayName("summarizeRecording: errors at canonicalIndex resolve words via real g2p word boundaries")
     void errorsAtCanonicalIndexResolveWordsFromTargetText() {
-        // targetText: 2 words, canonical: 8 phonemes (≈4 per word).
-        // canonicalIndex=5 → wordIdx = floor(5*2/8) = 1 → "world".
+        // Hello: phonemes[0..3], world: phonemes[4..7]. canonicalIndex=5 falls into word 1 "world".
         AnalyzeError err = new AnalyzeError("sub", 5, "EH", "ER");
         LlmContext context = LlmContext.builder()
                 .targetText("Hello world")
                 .perceived(List.of("HH", "AH", "L", "OW", "W", "EH", "L", "D"))
                 .canonical(List.of("HH", "AH", "L", "OW", "W", "ER", "L", "D"))
                 .errors(List.of(err))
+                .g2pWords(List.of(
+                        new G2pWord("Hello", List.of("HH", "AH", "L", "OW")),
+                        new G2pWord("world", List.of("W", "ER", "L", "D"))))
                 .build();
 
         RecordingGuidance result = generator.summarizeRecording(context);
@@ -51,17 +54,36 @@ class RuleBasedLlmFeedbackGeneratorTest {
     @Test
     @DisplayName("summarizeRecording: 여러 error 가 같은 단어를 가리키면 중복 제거")
     void duplicateWordHitsAreDeduplicated() {
+        // canonicalIndex 1 and 2 both fall into word 0 "Hello" (phonemes 0..3).
         AnalyzeError e1 = new AnalyzeError("sub", 1, "EH", "AH");
         AnalyzeError e2 = new AnalyzeError("del", 2, null, "L");
         LlmContext context = LlmContext.builder()
                 .targetText("Hello world")
                 .canonical(List.of("HH", "AH", "L", "OW", "W", "ER", "L", "D"))
                 .errors(List.of(e1, e2))
+                .g2pWords(List.of(
+                        new G2pWord("Hello", List.of("HH", "AH", "L", "OW")),
+                        new G2pWord("world", List.of("W", "ER", "L", "D"))))
                 .build();
 
         RecordingGuidance result = generator.summarizeRecording(context);
 
         assertThat(result.wrongWords()).containsExactly(new WrongWord("Hello", 0));
+    }
+
+    @Test
+    @DisplayName("summarizeRecording: g2pWords 없으면 비례 매핑 추측 없이 빈 리스트 반환")
+    void withoutG2pWordsReturnsEmpty() {
+        AnalyzeError err = new AnalyzeError("sub", 5, "EH", "ER");
+        LlmContext context = LlmContext.builder()
+                .targetText("Hello world")
+                .canonical(List.of("HH", "AH", "L", "OW", "W", "ER", "L", "D"))
+                .errors(List.of(err))
+                .build();
+
+        RecordingGuidance result = generator.summarizeRecording(context);
+
+        assertThat(result.wrongWords()).isEmpty();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -59,19 +60,26 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
         if (words.length == 0) {
             return List.of();
         }
-        int canonicalSize = context.canonical().size();
-        if (canonicalSize <= 0) {
+        int[] boundaries = cumulativePhonemeBoundaries(context.g2pWords());
+        if (boundaries.length == 0) {
+            // 단어 경계 정보 없이 추측하지 않는다 — FRONT_API_SPEC §12 의 0-based
+            // target-word index 정확성을 깨뜨리는 비례 매핑 폴백은 사용하지 않음.
             return List.of();
         }
+        int totalPhonemes = boundaries[boundaries.length - 1];
+        int boundedWords = Math.min(words.length, boundaries.length);
 
         LinkedHashSet<Integer> seen = new LinkedHashSet<>();
         List<WrongWord> hits = new ArrayList<>();
         for (AnalyzeError error : errors) {
             Integer idx = error.canonicalIndex();
-            if (idx == null || idx < 0 || idx >= canonicalSize) {
+            if (idx == null || idx < 0 || idx >= totalPhonemes) {
                 continue;
             }
-            int wordIdx = (int) Math.min((long) words.length - 1, (long) idx * words.length / canonicalSize);
+            int wordIdx = wordIndexForPhoneme(boundaries, idx);
+            if (wordIdx < 0 || wordIdx >= boundedWords) {
+                continue;
+            }
             String word = stripPunctuation(words[wordIdx]);
             if (word.isBlank()) {
                 continue;
@@ -81,6 +89,29 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
             }
         }
         return List.copyOf(hits);
+    }
+
+    private static int[] cumulativePhonemeBoundaries(List<G2pWord> g2pWords) {
+        if (g2pWords == null || g2pWords.isEmpty()) {
+            return new int[0];
+        }
+        int[] cumulative = new int[g2pWords.size()];
+        int running = 0;
+        for (int i = 0; i < g2pWords.size(); i++) {
+            List<String> phonemes = g2pWords.get(i).phonemes();
+            running += phonemes == null ? 0 : phonemes.size();
+            cumulative[i] = running;
+        }
+        return cumulative;
+    }
+
+    private static int wordIndexForPhoneme(int[] cumulative, int phonemeIdx) {
+        for (int i = 0; i < cumulative.length; i++) {
+            if (phonemeIdx < cumulative[i]) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static String[] splitWords(String targetText) {
