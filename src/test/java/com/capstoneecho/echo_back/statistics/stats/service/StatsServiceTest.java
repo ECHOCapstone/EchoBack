@@ -85,7 +85,10 @@ class StatsServiceTest {
 
         Instant boundary = Instant.parse("2026-05-11T23:59:00Z");
         completeFeedbackAt(user, script, "Boundary", boundary);
-        memberService.awardCompletionRewards(user.getId(), 10);
+        transactionTemplate.executeWithoutResult(s -> {
+            User u = userRepository.findById(user.getId()).orElseThrow();
+            u.recordCompletion(boundary, 10, kst());
+        });
 
         StatsResponse response = statsService.getMyStats(user.getId(), 2026, 5);
         User refreshed = userRepository.findById(user.getId()).orElseThrow();
