@@ -11,8 +11,12 @@ import com.capstoneecho.echo_back.learning.session.entity.SessionSentence;
 import com.capstoneecho.echo_back.learning.session.support.DefaultSentenceSplitter;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class RecordingFactoryTest {
 
@@ -121,6 +125,66 @@ class RecordingFactoryTest {
         assertThatThrownBy(() ->
                 Recording.forSessionSentence(intruder, session, sentence, AUDIO_PATH, SNAPSHOT))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("applyWrongWordsJson + RecordingUploadResponse.from: WrongWord[] round-trip")
+    void wrongWordsJsonRoundTripsThroughResponse() {
+        ObjectMapper mapper = JsonMapper.builder().build();
+        User user = user("rt@example.com");
+        Script script = chapterScript("RT");
+        LearningStep step = LearningStep.record(script, "say", "Hello world.");
+        Recording recording = Recording.forScriptStep(user, script, step, AUDIO_PATH, SNAPSHOT);
+
+        recording.applyWrongWordsJson("[{\"word\":\"water\",\"index\":0}]");
+
+        RecordingUploadResponse response = RecordingUploadResponse.from(recording, mapper);
+        assertThat(response.wrongWords())
+                .containsExactly(new WrongWord("water", 0));
+    }
+
+    @Test
+    @DisplayName("RecordingUploadResponse.from: wrongWordsJson NULL → [] 폴백")
+    void fromRecordingFallsBackToEmptyWhenJsonNull() {
+        ObjectMapper mapper = JsonMapper.builder().build();
+        User user = user("rtnull@example.com");
+        Script script = chapterScript("RTN");
+        LearningStep step = LearningStep.record(script, "say", "Hello.");
+        Recording recording = Recording.forScriptStep(user, script, step, AUDIO_PATH, SNAPSHOT);
+
+        RecordingUploadResponse response = RecordingUploadResponse.from(recording, mapper);
+
+        assertThat(response.wrongWords()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("RecordingUploadResponse.from: 손상된 JSON → [] 폴백 + WARN 로그")
+    void fromRecordingFallsBackToEmptyWhenJsonMalformed() {
+        ObjectMapper mapper = JsonMapper.builder().build();
+        User user = user("rtbad@example.com");
+        Script script = chapterScript("RTB");
+        LearningStep step = LearningStep.record(script, "say", "Hello.");
+        Recording recording = Recording.forScriptStep(user, script, step, AUDIO_PATH, SNAPSHOT);
+        recording.applyWrongWordsJson("not-json-at-all");
+
+        RecordingUploadResponse response = RecordingUploadResponse.from(recording, mapper);
+
+        assertThat(response.wrongWords()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("applyWrongWordsJson 빈 문자열 → NULL 로 정규화")
+    void applyWrongWordsJsonBlankNormalizesToNull() {
+        User user = user("blank@example.com");
+        Script script = chapterScript("B");
+        LearningStep step = LearningStep.record(script, "say", "Hi.");
+        Recording recording = Recording.forScriptStep(user, script, step, AUDIO_PATH, SNAPSHOT);
+
+        recording.applyWrongWordsJson("   ");
+        assertThat(recording.getWrongWordsJson()).isNull();
+
+        recording.applyWrongWordsJson(null);
+        assertThat(recording.getWrongWordsJson()).isNull();
     }
 
 }

@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +44,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
 
         RecordingGuidance result = generator.summarizeRecording(context);
 
-        assertThat(result.wrongWords()).containsExactly("world");
+        assertThat(result.wrongWords()).containsExactly(new WrongWord("world", 1));
         assertThat(result.guidanceKr()).isNotBlank();
     }
 
@@ -60,7 +61,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
 
         RecordingGuidance result = generator.summarizeRecording(context);
 
-        assertThat(result.wrongWords()).containsExactly("Hello");
+        assertThat(result.wrongWords()).containsExactly(new WrongWord("Hello", 0));
     }
 
     @Test

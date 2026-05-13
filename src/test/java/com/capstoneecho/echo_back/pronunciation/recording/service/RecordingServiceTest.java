@@ -35,6 +35,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
@@ -221,16 +222,23 @@ class RecordingServiceTest {
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(analyzeWithErrors());
         when(llmClient.summarizeRecording(any(LlmContext.class)))
-                .thenReturn(new RecordingGuidance("ɔ 모음을 더 둥글게.", List.of("water")));
+                .thenReturn(new RecordingGuidance(
+                        "ɔ 모음을 더 둥글게.", List.of(new WrongWord("water", 0))));
 
         RecordingUploadResponse withErrors = recordingService.upload(
                 f.userId(),
                 new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null),
                 VALID_WAV);
 
-        assertThat(withErrors.wrongWords()).containsExactly("water");
+        assertThat(withErrors.wrongWords()).containsExactly(new WrongWord("water", 0));
         assertThat(withErrors.errors()).hasSize(1);
         assertThat(withErrors.guidanceKr()).isNotBlank();
+
+        Recording persistedWithErrors = recordingRepository.findById(withErrors.id()).orElseThrow();
+        assertThat(persistedWithErrors.getWrongWordsJson())
+                .as("wrongWordsJson must serialize with FRONT_API_SPEC §12 shape")
+                .contains("\"word\":\"water\"")
+                .contains("\"index\":0");
 
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(perfectAnalyzeResult());
@@ -244,6 +252,9 @@ class RecordingServiceTest {
 
         assertThat(perfect.wrongWords()).isEmpty();
         assertThat(perfect.errors()).isEmpty();
+
+        Recording persistedPerfect = recordingRepository.findById(perfect.id()).orElseThrow();
+        assertThat(persistedPerfect.getWrongWordsJson()).isNull();
     }
 
     @Test

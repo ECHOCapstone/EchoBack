@@ -1,9 +1,11 @@
 package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -48,7 +50,7 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
         return DEFAULT_PRACTICE_WORD;
     }
 
-    private List<String> resolveWrongWords(LlmContext context) {
+    private List<WrongWord> resolveWrongWords(LlmContext context) {
         List<AnalyzeError> errors = context.errors();
         if (errors.isEmpty()) {
             return List.of();
@@ -62,7 +64,8 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
             return List.of();
         }
 
-        LinkedHashSet<String> hits = new LinkedHashSet<>();
+        LinkedHashSet<Integer> seen = new LinkedHashSet<>();
+        List<WrongWord> hits = new ArrayList<>();
         for (AnalyzeError error : errors) {
             Integer idx = error.canonicalIndex();
             if (idx == null || idx < 0 || idx >= canonicalSize) {
@@ -70,8 +73,11 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
             }
             int wordIdx = (int) Math.min((long) words.length - 1, (long) idx * words.length / canonicalSize);
             String word = stripPunctuation(words[wordIdx]);
-            if (!word.isBlank()) {
-                hits.add(word);
+            if (word.isBlank()) {
+                continue;
+            }
+            if (seen.add(wordIdx)) {
+                hits.add(new WrongWord(word, wordIdx));
             }
         }
         return List.copyOf(hits);

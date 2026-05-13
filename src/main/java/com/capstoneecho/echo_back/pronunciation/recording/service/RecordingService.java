@@ -21,6 +21,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
@@ -31,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class RecordingService {
@@ -46,6 +48,7 @@ public class RecordingService {
     private final RecordingStorage recordingStorage;
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
+    private final ObjectMapper objectMapper;
 
     public RecordingService(
             UserRepository userRepository,
@@ -56,7 +59,8 @@ public class RecordingService {
             RecordingRepository recordingRepository,
             RecordingStorage recordingStorage,
             ModelServerClient modelServerClient,
-            LlmClient llmClient) {
+            LlmClient llmClient,
+            ObjectMapper objectMapper) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
@@ -66,6 +70,7 @@ public class RecordingService {
         this.recordingStorage = recordingStorage;
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -96,9 +101,25 @@ public class RecordingService {
         registerStorageCleanupOnNonCommit(audioPath);
 
         Recording recording = buildRecording(mode, parents, audioPath, targetText);
+        recording.applyWrongWordsJson(serializeWrongWords(guidance.wrongWords()));
         Recording saved = recordingRepository.save(recording);
 
         return toResponse(saved, parents, analyze, guidance);
+    }
+
+    private String serializeWrongWords(List<WrongWord> wrongWords) {
+        if (wrongWords == null || wrongWords.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(wrongWords);
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "Failed to serialize wrongWords ({} items) for recording; persisting NULL",
+                    wrongWords.size(),
+                    ex);
+            return null;
+        }
     }
 
     private void registerStorageCleanupOnNonCommit(String audioPath) {
@@ -231,7 +252,7 @@ public class RecordingService {
                 stepScore,
                 guidance.guidanceKr(),
                 errorViews,
-                List.copyOf(guidance.wrongWords()),
+                List.<WrongWord>copyOf(guidance.wrongWords()),
                 saved.getCreatedAt());
     }
 

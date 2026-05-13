@@ -92,9 +92,32 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.sessionId").doesNotExist())
                 .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty())
                 .andExpect(jsonPath("$.data.stepScore").value(100.0))
+                .andExpect(jsonPath("$.data.wrongWords").isArray())
+                .andExpect(jsonPath("$.data.wrongWords").isEmpty())
                 .andDo(document("recordings/upload"));
 
         assertSnippetCreated("recordings/upload");
+    }
+
+    @Test
+    @DisplayName("POST /api/recordings (script-flow with-error) → wrongWords[0].word/index 채움")
+    void scriptFlowWithErrorReturnsTypedWrongWords() throws Exception {
+        ScriptFlowFixture f = seedScriptFlow("recuser1b", "water bottle");
+        when(modelServerClient.analyze(any(byte[].class), anyString()))
+                .thenReturn(AnalyzeMockResponses.withWaterError());
+        when(llmClient.summarizeRecording(any(LlmContext.class)))
+                .thenReturn(LlmMockResponses.withWrongWord("water", 0));
+        String token = issueToken(f.user());
+
+        mockMvc.perform(multipartUpload()
+                        .file(audioPart(WavFixtures.VALID_WAV))
+                        .param("scriptId", String.valueOf(f.scriptId()))
+                        .param("stepId", String.valueOf(f.stepId()))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.wrongWords").isArray())
+                .andExpect(jsonPath("$.data.wrongWords[0].word").value("water"))
+                .andExpect(jsonPath("$.data.wrongWords[0].index").value(0));
     }
 
     @Test
