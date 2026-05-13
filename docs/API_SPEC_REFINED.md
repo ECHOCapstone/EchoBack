@@ -67,13 +67,14 @@ HTTP 상태 코드는 `ErrorCode` 별 매핑(부록 §A) 에 따릅니다.
 | 경로 패턴 | 인증 |
 | --- | --- |
 | `/api/auth/**` | 공개 |
+| `/api/tts` | 공개 |
 | `/api/health` | 공개 |
 | `/error` | 공개 |
 | `/actuator/health` | 공개 |
 | 그 외 `/api/**` | **인증 필요(JWT)** |
 | 그 외 모든 경로 | 공개 |
 
-> 주의: 컨트롤러가 `@CurrentUser` 를 사용하지 않더라도(`/api/scripts/**`, `/api/tracks/**`, `/api/tts`, `/api/recordings`, `/api/sessions`, `/api/feedback*`, `/api/members/**`, `/api/ranking/**`, `/api/stats/**`) `SecurityConfig` 의 `requestMatchers("/api/**").authenticated()` 에 의해 모두 JWT 가 필요합니다.
+> 주의: 컨트롤러가 `@CurrentUser` 를 사용하지 않더라도(`/api/scripts/**`, `/api/tracks/**`, `/api/recordings`, `/api/sessions`, `/api/feedback*`, `/api/members/**`, `/api/ranking/**`, `/api/stats/**`) `SecurityConfig` 의 `requestMatchers("/api/**").authenticated()` 에 의해 모두 JWT 가 필요합니다. `/api/tts` 는 위 표대로 공개이며, 클라이언트가 토큰을 함께 보내더라도 백엔드는 무시한다 (FRONT_API_SPEC §11).
 
 ### 2.2 인증 실패 처리
 
@@ -123,7 +124,7 @@ HTTP 상태 코드는 `ErrorCode` 별 매핑(부록 §A) 에 따릅니다.
 | POST | `/api/feedback/{feedbackId}/complete` | JWT | 피드백 완료 보상 적립 | §4.4 |
 | GET | `/api/feedbacks` | JWT | 내 피드백 목록 | §4.5 |
 | GET | `/api/feedbacks/{feedbackId}` | JWT | 피드백 상세 | §4.5 |
-| POST | `/api/tts` | JWT | 영문 텍스트 → MP3 합성 | §4.12 |
+| POST | `/api/tts` | — | 영문 텍스트 → MP3 합성 | §4.12 |
 
 ### 3.4 Statistics (통계 · 랭킹)
 
@@ -376,27 +377,28 @@ HTTP 상태 코드는 `ErrorCode` 별 매핑(부록 §A) 에 따릅니다.
 - 인증: JWT 필수.
 - 응답 상태: `201 Created`.
 - 콘텐츠 타입: `multipart/form-data`
-- 폼 파트/파라미터:
+- 폼 파트/필드:
 
-| 파트/파라미터 | 위치 | 타입 | 필수 | 설명 |
+| 파트/필드 | 위치 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- | --- |
-| `audio` | form-data part | file | ✅ | 사용자 음성 |
-| `scriptId` | query | Long | 선택 | 프리셋 스크립트 컨텍스트 |
-| `sessionId` | query | Long | 선택 | 사용자 세션 컨텍스트 |
-| `stepId` | query | Long | 선택 | 스크립트 학습 단계 컨텍스트 |
-| `sessionSentenceId` | query | Long | 선택 | 세션 문장 컨텍스트 |
+| `audio` | form-data part | file | ✅ | 사용자 음성 (16-bit PCM WAV) |
+| `scriptId` | form-data field | Long | 선택 | 프리셋 스크립트 컨텍스트 |
+| `sessionId` | form-data field | Long | 선택 | 사용자 세션 컨텍스트 |
+| `stepId` | form-data field | Long | 선택 | 스크립트 학습 단계 컨텍스트 |
+| `sessionSentenceId` | form-data field | Long | 선택 | 세션 문장 컨텍스트 |
+
+> `null` / `undefined` 인 컨텍스트 필드는 multipart 본문에 part 로 붙이지 않는다 (FRONT_API_SPEC §7). 빈 문자열 `"null"` 을 그대로 보내면 `@RequestParam Long` 변환에서 거부된다.
 
 ##### 허용되는 조합 (canonical modes)
 
-컨텍스트 파라미터 4개는 위 표에서 모두 선택이지만, **실제로 의미를 가지는 조합은 다음 세 가지뿐** 입니다. 클라이언트는 학습 화면 종류에 따라 한 모드를 골라 호출합니다.
+`scriptId` / `sessionId` 중 **정확히 하나만** 전송하고, 그와 짝이 되는 `stepId` 또는 `sessionSentenceId` 도 반드시 함께 보낸다. **실제로 의미를 가지는 조합은 다음 두 가지뿐** 입니다 (FRONT_API_SPEC §7).
 
 | 모드 | 채워지는 컨텍스트 | 비워두는 컨텍스트 | 의미 |
 | --- | --- | --- | --- |
 | `script-flow` | `scriptId`, `stepId` | `sessionId`, `sessionSentenceId` | 추천 학습 트랙(프리셋 스크립트) 의 한 step 에 대한 녹음 |
 | `session-sentence` | `sessionId`, `sessionSentenceId` | `scriptId`, `stepId` | 사용자 맞춤 세션의 한 문장 녹음 |
-| `session-free-form` | `sessionId` | `scriptId`, `stepId`, `sessionSentenceId` | 사용자 맞춤 세션을 한 호흡으로 통째 녹음 (sentence 분리 없음) |
 
-위 세 조합 외의 케이스는 서버가 정상 응답을 보장하지 않습니다. cross-tenant 시도(타 사용자 소유 ID 사용) 는 user 스코프 조회의 자연 결과로 `*_NOT_FOUND` (404) 가 반환됩니다.
+위 두 조합 외의 케이스 (예: `sessionId` 만, `scriptId` + `sessionId` 동시, 컨텍스트 모두 누락) 는 `INVALID_REQUEST` (400) 로 거절된다. cross-tenant 시도(타 사용자 소유 ID 사용) 는 user 스코프 조회의 자연 결과로 `*_NOT_FOUND` (404) 가 반환됩니다.
 
 - 응답 데이터: `RecordingResponse`(§5.3).
 - 주요 에러: `AUDIO_DECODE_FAILED`, `INVALID_REQUEST`, `SCRIPT_NOT_FOUND`, `SESSION_NOT_FOUND`, `STEP_NOT_FOUND`, `SESSION_SENTENCE_NOT_FOUND`, `MODEL_SERVER_UNAVAILABLE`, `MODEL_SERVER_ERROR`.
@@ -443,26 +445,6 @@ HTTP 상태 코드는 `ErrorCode` 별 매핑(부록 §A) 에 따릅니다.
     "errors": [],
     "wrongWords": [],
     "createdAt": "2026-05-07T13:11:02.901Z"
-  }
-}
-```
-
-`session-free-form`:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 158,
-    "sessionId": 7,
-    "durationSec": 23.4,
-    "perceived": ["h", "aʊ", "ɑr", "j", "u"],
-    "canonical": ["h", "aʊ", "ɑr", "j", "u"],
-    "peakSoftmax": [0.92, 0.81, 0.79, 0.85, 0.88],
-    "stepScore": 84.7,
-    "guidanceKr": "긴 문장도 안정적이에요.",
-    "errors": [],
-    "wrongWords": [],
-    "createdAt": "2026-05-07T13:14:00.000Z"
   }
 }
 ```
@@ -649,10 +631,11 @@ JWT 필수.
 
 ### 4.12 TTS (`/api/tts`)
 
-JWT 필수. **응답이 `ApiResponse` envelope 이 아닌 raw 바이너리** 입니다.
+공개 (인증 선택). 클라이언트가 토큰을 함께 보내더라도 백엔드는 무시한다 (FRONT_API_SPEC §11). **응답은 `ApiResponse` envelope 이 아닌 raw 바이너리.**
 
 #### `POST /api/tts`
 - 목적: 영문 텍스트를 합성 음성(MP3) 으로 받기.
+- 인증: 불필요.
 - 요청 본문: `TtsRequest`
 
 | 필드 | 타입 | 제약 | 설명 |
@@ -902,3 +885,4 @@ JWT 필수. **응답이 `ApiResponse` envelope 이 아닌 raw 바이너리** 입
 | 일자 | 항목 |
 | --- | --- |
 | 2026-05-07 | 초판. 12개 컨트롤러 / 26개 엔드포인트 / 19개 ErrorCode / 15개 응답 스키마 수록. |
+| 2026-05-13 | FRONT_API_SPEC 정렬: TTS 인증 제거 (§2.1, §3.3, §4.12), Recording 파라미터 위치를 query → form-data field 로 정정 (§4.6), `session-free-form` 모드 삭제하여 2-mode 계약으로 단일화 (§4.6). 백엔드 코드는 아직 본 contract 와 어긋남(추적: `fix/auth-token-undefined`). |
