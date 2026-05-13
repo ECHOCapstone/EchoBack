@@ -119,8 +119,8 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/feedback/{id}/retry-word multipart → 200 + 갱신된 guidance + REST Docs 스니펫")
-    void retryWordReturnsDetail() throws Exception {
+    @DisplayName("POST /api/feedback/{id}/retry-word multipart correct=true → 200 + RetryWordResult 5 필드 + REST Docs 스니펫")
+    void retryWordReturnsRetryWordResultWhenCorrect() throws Exception {
         User user = newUser("fbretry");
         Script script = seedScript("RetryScript");
         PronunciationFeedback fb = transactionTemplate.execute(s ->
@@ -137,16 +137,46 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.id").value(fb.getId()))
+                .andExpect(jsonPath("$.data.correct").value(true))
+                .andExpect(jsonPath("$.data.perceived").isArray())
+                .andExpect(jsonPath("$.data.perceived[0]").value("HH"))
+                .andExpect(jsonPath("$.data.canonical").isArray())
+                .andExpect(jsonPath("$.data.canonical[0]").value("HH"))
+                .andExpect(jsonPath("$.data.score").value(100.0))
                 .andExpect(jsonPath("$.data.guidanceKr").value("새 가이드: 천천히 따라 읽어 보세요."))
+                .andExpect(jsonPath("$.data.id").doesNotExist())
+                .andExpect(jsonPath("$.data.accuracy").doesNotExist())
                 .andDo(document("feedback/retry-word"));
 
         assertSnippetCreated("feedback/retry-word");
     }
 
     @Test
-    @DisplayName("POST /api/feedback/{id}/complete → 200 멱등 (2회 호출도 200) + REST Docs 스니펫")
-    void completeTwiceReturns200Idempotent() throws Exception {
+    @DisplayName("POST /api/feedback/{id}/retry-word perceived≠canonical → correct=false, score<100")
+    void retryWordReturnsRetryWordResultWhenIncorrect() throws Exception {
+        User user = newUser("fbretrywrong");
+        Script script = seedScript("RetryScriptWrong");
+        PronunciationFeedback fb = transactionTemplate.execute(s ->
+                feedbackRepository.save(
+                        PronunciationFeedback.forScript(
+                                user, script, "RetryScriptWrong", 60.0, "AH", "water", "old")));
+        when(modelServerClient.analyze(any(byte[].class), anyString()))
+                .thenReturn(AnalyzeMockResponses.withWaterError());
+
+        String token = issueToken(user);
+
+        mockMvc.perform(multipart("/api/feedback/" + fb.getId() + "/retry-word")
+                        .file(audioPart(WavFixtures.VALID_WAV))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.correct").value(false))
+                .andExpect(jsonPath("$.data.score").value(75.0))
+                .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /api/feedback/{id}/complete → 200 갱신된 User 응답 + REST Docs 스니펫")
+    void completeReturnsUpdatedUserResponse() throws Exception {
         User user = newUser("fbcomplete");
         Script script = seedScript("CompleteScript");
         PronunciationFeedback fb = transactionTemplate.execute(s ->
@@ -158,14 +188,18 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
         mockMvc.perform(post("/api/feedback/" + fb.getId() + "/complete")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.completed").value(true))
-                .andExpect(jsonPath("$.data.completedAt").isNotEmpty())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.username").value(user.getUsername()))
+                .andExpect(jsonPath("$.data.streak").value(1))
+                .andExpect(jsonPath("$.data.exp").value(10))
+                .andExpect(jsonPath("$.data.completed").doesNotExist())
                 .andDo(document("feedback/complete"));
 
         mockMvc.perform(post("/api/feedback/" + fb.getId() + "/complete")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.completed").value(true));
+                .andExpect(jsonPath("$.data.username").value(user.getUsername()))
+                .andExpect(jsonPath("$.data.exp").value(10));
 
         assertSnippetCreated("feedback/complete");
     }

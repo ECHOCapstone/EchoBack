@@ -12,12 +12,14 @@ import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.member.service.MemberService;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeOp;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
@@ -133,8 +135,7 @@ public class FeedbackService {
         return FeedbackDetailResponse.from(saved);
     }
 
-    public FeedbackDetailResponse retryWord(
-            Long userId, Long feedbackId, byte[] audioBytes, Integer wordIndex) {
+    public RetryWordResult retryWord(Long userId, Long feedbackId, byte[] audioBytes) {
         validateAudio(audioBytes);
         PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
@@ -148,15 +149,20 @@ public class FeedbackService {
         String canonical = g2p == null || g2p.phonemes() == null ? "" : g2p.phonemes();
         AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
 
+        List<String> perceived = analyze.perceived() == null ? List.of() : analyze.perceived();
+        List<String> canonicalPhonemes = analyze.canonical().orElse(List.of());
+        boolean correct = perceived.equals(canonicalPhonemes);
+        double score = scoringPolicy.singleWordScore(analyze);
+
         LlmContext context = promptBuilder.buildRetryContext(
                 word,
-                analyze.perceived(),
-                analyze.canonical().orElse(List.of()),
+                perceived,
+                canonicalPhonemes,
                 analyze.errors(),
                 feedback.getWeakPhoneme());
         String guidance = safeRetryGuidance(context);
-        feedback.updateGuidance(guidance);
-        return FeedbackDetailResponse.from(feedback);
+
+        return new RetryWordResult(correct, perceived, canonicalPhonemes, score, guidance);
     }
 
     @Transactional(readOnly = true)
@@ -173,15 +179,11 @@ public class FeedbackService {
         return FeedbackDetailResponse.from(feedback);
     }
 
-    public FeedbackDetailResponse complete(Long userId, Long feedbackId) {
+    public UserResponse complete(Long userId, Long feedbackId) {
         Instant now = Instant.now();
         int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
         if (affected == 1) {
-            memberService.awardCompletionRewards(userId, DEFAULT_COMPLETION_EXP);
-            PronunciationFeedback feedback = feedbackRepository
-                    .findByIdAndUser_Id(feedbackId, userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-            return FeedbackDetailResponse.from(feedback);
+            return memberService.awardCompletionRewards(userId, DEFAULT_COMPLETION_EXP);
         }
         PronunciationFeedback existing = feedbackRepository
                 .findByIdAndUser_Id(feedbackId, userId)
@@ -189,7 +191,9 @@ public class FeedbackService {
         if (!existing.isCompleted()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
-        return FeedbackDetailResponse.from(existing);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return UserResponse.from(user);
     }
 
     private void requireFullMatch(List<Recording> found, List<Long> requested) {

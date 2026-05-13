@@ -26,8 +26,10 @@ import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
@@ -188,21 +190,26 @@ class FeedbackServiceTest {
                         PronunciationFeedback.forScript(
                                 user, script, "T", 85.0, "TH", "think", "guide")));
 
-        FeedbackDetailResponse first = feedbackService.complete(user.getId(), fb.getId());
-        FeedbackDetailResponse second = feedbackService.complete(user.getId(), fb.getId());
+        UserResponse first = feedbackService.complete(user.getId(), fb.getId());
+        UserResponse second = feedbackService.complete(user.getId(), fb.getId());
 
-        assertThat(first.completed()).isTrue();
-        assertThat(first.completedAt()).isNotNull();
-        assertThat(second.completed()).isTrue();
+        assertThat(first.exp()).isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
+        assertThat(first.streak()).isEqualTo(1);
+        assertThat(first.username()).isEqualTo(user.getUsername());
+        assertThat(second.exp()).isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
+        assertThat(second.streak()).isEqualTo(1);
 
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
         assertThat(reloaded.getExp()).isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
         assertThat(reloaded.getStreak()).isEqualTo(1);
+        PronunciationFeedback reloadedFb = feedbackRepository.findById(fb.getId()).orElseThrow();
+        assertThat(reloadedFb.isCompleted()).isTrue();
+        assertThat(reloadedFb.getCompletedAt()).isNotNull();
     }
 
     @Test
-    @DisplayName("retryWord 는 audio + 피드백 가이드를 갱신해 FeedbackDetailResponse 를 반환한다")
-    void retryWordAppendsRecordingAndUpdatesGuidance() {
+    @DisplayName("retryWord 는 audio + perceived/canonical 일치 시 RetryWordResult(correct=true, score=100) 반환, feedback 은 변경되지 않는다")
+    void retryWordReturnsRetryWordResultAndDoesNotPersist() {
         User user = newUser("u-retry");
         Script script = seedScript("RetryScript");
         PronunciationFeedback fb = transactionTemplate.execute(status ->
@@ -213,12 +220,19 @@ class FeedbackServiceTest {
         when(llmClient.retryGuidance(any(LlmContext.class)))
                 .thenReturn("새 가이드: 천천히 따라 읽어 보세요.");
 
-        FeedbackDetailResponse response =
-                feedbackService.retryWord(user.getId(), fb.getId(), VALID_WAV, null);
+        RetryWordResult response =
+                feedbackService.retryWord(user.getId(), fb.getId(), VALID_WAV);
 
+        assertThat(response.correct()).isTrue();
+        assertThat(response.perceived()).containsExactly("HH", "AH", "L", "OW");
+        assertThat(response.canonical()).containsExactly("HH", "AH", "L", "OW");
+        assertThat(response.score()).isEqualTo(100.0);
         assertThat(response.guidanceKr()).isEqualTo("새 가이드: 천천히 따라 읽어 보세요.");
+
         PronunciationFeedback reloaded = feedbackRepository.findById(fb.getId()).orElseThrow();
-        assertThat(reloaded.getGuidanceKr()).isEqualTo("새 가이드: 천천히 따라 읽어 보세요.");
+        assertThat(reloaded.getGuidanceKr())
+                .as("retry-word is read-only and must not persist guidance to feedback")
+                .isEqualTo("old guide");
     }
 
     @Test
@@ -233,7 +247,7 @@ class FeedbackServiceTest {
                                 owner, script, "T", 70.0, null, "the", "old")));
 
         assertThatThrownBy(() ->
-                feedbackService.retryWord(other.getId(), fb.getId(), VALID_WAV, null))
+                feedbackService.retryWord(other.getId(), fb.getId(), VALID_WAV))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.FEEDBACK_NOT_FOUND);

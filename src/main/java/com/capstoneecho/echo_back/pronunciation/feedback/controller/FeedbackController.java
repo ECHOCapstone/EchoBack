@@ -5,8 +5,10 @@ import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.pronunciation.feedback.service.FeedbackService;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -37,18 +39,17 @@ public class FeedbackController {
     }
 
     @PostMapping(value = "/{feedbackId}/retry-word", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<FeedbackDetailResponse> retryWord(
+    public ApiResponse<RetryWordResult> retryWord(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId,
-            @RequestParam("audio") MultipartFile audio,
-            @RequestParam(value = "wordIndex", required = false) Integer wordIndex) {
+            @RequestParam("audio") MultipartFile audio) {
         byte[] audioBytes = readAudioBytes(audio);
         return ApiResponse.success(
-                feedbackService.retryWord(principal.userId(), feedbackId, audioBytes, wordIndex));
+                feedbackService.retryWord(principal.userId(), feedbackId, audioBytes));
     }
 
     @PostMapping("/{feedbackId}/complete")
-    public ApiResponse<FeedbackDetailResponse> complete(
+    public ApiResponse<UserResponse> complete(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId) {
         return ApiResponse.success(feedbackService.complete(principal.userId(), feedbackId));
