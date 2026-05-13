@@ -19,7 +19,7 @@ public class DefaultTtsClient implements TtsClient {
     private static final int PAYLOAD_LENGTH = 100;
 
     @Override
-    public byte[] synthesize(String text, Locale locale) {
+    public byte[] synthesize(String text, Locale lang) {
         ByteBuffer buffer = ByteBuffer.allocate(PAYLOAD_LENGTH);
         buffer.put(ID3_MAGIC);
         buffer.put((byte) 0x03);
@@ -31,7 +31,7 @@ public class DefaultTtsClient implements TtsClient {
         buffer.put((byte) 0x0A);
 
         String tag = "ECHO-TTS-STUB:"
-                + (locale == null ? Locale.US.toLanguageTag() : locale.toLanguageTag());
+                + (lang == null ? Locale.US.toLanguageTag() : lang.toLanguageTag());
         byte[] tagBytes = tag.getBytes(StandardCharsets.UTF_8);
         int tagWritten = Math.min(tagBytes.length, buffer.remaining());
         buffer.put(tagBytes, 0, tagWritten);

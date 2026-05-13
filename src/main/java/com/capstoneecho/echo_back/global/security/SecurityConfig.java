@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/health",
+                                "/api/tts",
                                 "/error",
                                 "/actuator/health",
                                 "/actuator/health/**"

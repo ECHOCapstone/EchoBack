@@ -4,5 +4,5 @@ import java.util.Locale;
 
 public interface TtsClient {
 
-    byte[] synthesize(String text, Locale locale);
+    byte[] synthesize(String text, Locale lang);
 }

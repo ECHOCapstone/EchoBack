@@ -1,7 +1,5 @@
 package com.capstoneecho.echo_back.pronunciation.tts.controller;
 
-import com.capstoneecho.echo_back.global.jwt.CurrentUser;
-import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.pronunciation.tts.dto.TtsRequest;
 import com.capstoneecho.echo_back.pronunciation.tts.service.TtsService;
 import org.springframework.http.MediaType;
@@ -24,9 +22,7 @@ public class TtsController {
     }
 
     @PostMapping
-    public ResponseEntity<byte[]> synthesize(
-            @CurrentUser JwtPrincipal principal,
-            @RequestBody TtsRequest request) {
+    public ResponseEntity<byte[]> synthesize(@RequestBody TtsRequest request) {
         byte[] mp3 = ttsService.synthesize(request);
         return ResponseEntity.ok()
                 .contentType(AUDIO_MPEG)

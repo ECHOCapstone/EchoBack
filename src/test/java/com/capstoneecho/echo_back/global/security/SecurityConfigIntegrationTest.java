@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,6 +53,16 @@ class SecurityConfigIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().string(containsString("\"success\":false")))
                 .andExpect(content().string(containsString("\"error\":{\"code\":\"UNAUTHORIZED\"")));
+    }
+
+    @Test
+    @DisplayName("POST /api/tts 는 Authorization 헤더 없이도 permitAll 이라 401 아님")
+    void postTtsIsPermitAll() throws Exception {
+        mockMvc.perform(post("/api/tts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"Hello.\",\"lang\":\"en\"}"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .as("POST /api/tts must be permitAll").isNotEqualTo(401));
     }
 
     @Test

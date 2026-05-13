@@ -20,11 +20,11 @@ public class TtsService {
         if (request == null || request.text() == null || request.text().isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "text 는 비어 있을 수 없습니다.");
         }
-        Locale locale = parseLocale(request.locale());
-        return ttsClient.synthesize(request.text(), locale);
+        Locale lang = parseLang(request.lang());
+        return ttsClient.synthesize(request.text(), lang);
     }
 
-    private static Locale parseLocale(String tag) {
+    private static Locale parseLang(String tag) {
         if (tag == null || tag.isBlank()) {
             return Locale.US;
         }
