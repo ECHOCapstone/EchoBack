@@ -7,14 +7,16 @@ public record TrackDetailResponse(
         Long id,
         String title,
         String description,
-        List<ChapterResponse> chapters
+        int displayOrder,
+        List<ChapterSummaryResponse> chapters
 ) {
 
-    public static TrackDetailResponse of(Track track, List<ChapterResponse> chapters) {
+    public static TrackDetailResponse of(Track track, List<ChapterSummaryResponse> chapters) {
         return new TrackDetailResponse(
                 track.getId(),
                 track.getTitle(),
                 track.getDescription(),
+                track.getDisplayOrder(),
                 List.copyOf(chapters)
         );
     }

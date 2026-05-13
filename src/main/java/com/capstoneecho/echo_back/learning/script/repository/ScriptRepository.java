@@ -9,4 +9,6 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
     List<Script> findByTrack_IdOrderByChapterOrderAsc(Long trackId);
 
     List<Script> findByPresetTrueOrderByIdAsc();
+
+    long countByTrack_IdAndChapterOrderIsNotNull(Long trackId);
 }

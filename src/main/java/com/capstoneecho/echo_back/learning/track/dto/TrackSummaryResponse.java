@@ -6,15 +6,17 @@ public record TrackSummaryResponse(
         Long id,
         String title,
         String description,
-        int displayOrder
+        int displayOrder,
+        int chapterCount
 ) {
 
-    public static TrackSummaryResponse from(Track track) {
+    public static TrackSummaryResponse of(Track track, int chapterCount) {
         return new TrackSummaryResponse(
                 track.getId(),
                 track.getTitle(),
                 track.getDescription(),
-                track.getDisplayOrder()
+                track.getDisplayOrder(),
+                chapterCount
         );
     }
 }

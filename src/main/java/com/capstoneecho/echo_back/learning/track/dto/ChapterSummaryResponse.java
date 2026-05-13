@@ -3,21 +3,19 @@ package com.capstoneecho.echo_back.learning.track.dto;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 
-public record ChapterResponse(
+public record ChapterSummaryResponse(
         Long scriptId,
+        int chapterOrder,
         String title,
-        Integer chapterOrder,
-        Difficulty difficulty,
-        boolean preset
+        Difficulty difficulty
 ) {
 
-    public static ChapterResponse from(Script script) {
-        return new ChapterResponse(
+    public static ChapterSummaryResponse from(Script script) {
+        return new ChapterSummaryResponse(
                 script.getId(),
-                script.getTitle(),
                 script.getChapterOrder(),
-                script.getDifficulty(),
-                script.isPreset()
+                script.getTitle(),
+                script.getDifficulty()
         );
     }
 }

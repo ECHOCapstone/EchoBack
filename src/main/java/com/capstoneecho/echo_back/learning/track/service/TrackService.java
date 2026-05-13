@@ -4,7 +4,7 @@ import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
-import com.capstoneecho.echo_back.learning.track.dto.ChapterResponse;
+import com.capstoneecho.echo_back.learning.track.dto.ChapterSummaryResponse;
 import com.capstoneecho.echo_back.learning.track.dto.TrackDetailResponse;
 import com.capstoneecho.echo_back.learning.track.dto.TrackSummaryResponse;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
@@ -27,7 +27,10 @@ public class TrackService {
 
     public List<TrackSummaryResponse> listTracks() {
         return trackRepository.findAllByOrderByDisplayOrderAsc().stream()
-                .map(TrackSummaryResponse::from)
+                .map(track -> TrackSummaryResponse.of(
+                        track,
+                        Math.toIntExact(scriptRepository
+                                .countByTrack_IdAndChapterOrderIsNotNull(track.getId()))))
                 .toList();
     }
 
@@ -35,10 +38,10 @@ public class TrackService {
         Track track = trackRepository.findById(trackId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRACK_NOT_FOUND));
 
-        List<ChapterResponse> chapters = scriptRepository
+        List<ChapterSummaryResponse> chapters = scriptRepository
                 .findByTrack_IdOrderByChapterOrderAsc(trackId).stream()
                 .filter(this::hasChapterOrder)
-                .map(ChapterResponse::from)
+                .map(ChapterSummaryResponse::from)
                 .toList();
 
         return TrackDetailResponse.of(track, chapters);

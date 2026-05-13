@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.learning.script.dto;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 public record ScriptDetailResponse(
@@ -10,6 +11,7 @@ public record ScriptDetailResponse(
         String title,
         String content,
         Difficulty difficulty,
+        @JsonProperty("isPreset") boolean isPreset,
         String practiceWord,
         String masteryBadgeName,
         List<StepResponse> steps
@@ -24,6 +26,7 @@ public record ScriptDetailResponse(
                 script.getTitle(),
                 script.getContent(),
                 script.getDifficulty(),
+                script.isPreset(),
                 script.getPracticeWord(),
                 script.getMasteryBadgeName(),
                 stepResponses);

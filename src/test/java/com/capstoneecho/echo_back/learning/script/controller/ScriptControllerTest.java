@@ -69,6 +69,7 @@ class ScriptControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.difficulty").value("MEDIUM"))
                 .andExpect(jsonPath("$.data.practiceWord").value("beach"))
                 .andExpect(jsonPath("$.data.masteryBadgeName").value("VowelMaster"))
+                .andExpect(jsonPath("$.data.isPreset").value(true))
                 .andExpect(jsonPath("$.data.steps.length()").value(2))
                 .andExpect(jsonPath("$.data.steps[0].kind").value("INTRO"))
                 .andExpect(jsonPath("$.data.steps[0].prompt").value("Listen carefully"))
@@ -128,7 +129,7 @@ class ScriptControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data[0].preset").value(true))
+                .andExpect(jsonPath("$.data[0].isPreset").value(true))
                 .andDo(document("scripts/recommended-today"));
 
         assertSnippetCreated("scripts/recommended-today");
