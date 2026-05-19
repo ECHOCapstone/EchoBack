@@ -64,8 +64,7 @@ class SessionServiceImpl implements SessionService {
         // scriptText 가 들어왔을 때만 분할 정책을 호출해 SessionSentence 컬렉션을 재구성한다.
         // 빈 문자열도 의도된 "대본 비우기" 로 보고 그대로 반영한다.
         if (request.scriptText() != null) {
-            var sentences = sentenceSplitter.split(request.scriptText());
-            session.updateScript(request.scriptText(), sentences);
+            session.updateScript(request.scriptText(), sentenceSplitter);
             // 새로 추가된 SessionSentence 들의 자동 생성 id 가 응답 DTO 변환 전에 채워지도록
             // 명시 flush. saveAndFlush 가 dirty checking 결과를 즉시 DB 에 반영한다.
             repository.saveAndFlush(session);

@@ -76,16 +76,21 @@ public class Session {
         this.favorite = favorite;
     }
 
-    // 새 대본과 분할된 문장 리스트를 한 번에 반영한다. scriptText 가 null 이면 그대로 둔다.
-    public void updateScript(String scriptText, List<String> sentenceTexts) {
-        if (scriptText == null) return;
-        this.scriptText = scriptText;
+    // 새 대본을 받고 주입된 SentenceSplitter 로 문장을 다시 분할해 보관한다.
+    // scriptText 가 null 이면 그대로 둔다 (PATCH 부분 갱신 의미).
+    // 분할 정책을 엔티티 안에 직접 두지 않아 SOLID 의 의존성 역전 원칙을 만족한다.
+    public void updateScript(String newScriptText, SentenceSplitter sentenceSplitter) {
+        if (newScriptText == null) {
+            return;
+        }
+        if (sentenceSplitter == null) {
+            throw new IllegalArgumentException("sentenceSplitter is required");
+        }
+        this.scriptText = newScriptText;
         this.sentences.clear();
-        if (sentenceTexts != null) {
-            int idx = 0;
-            for (var text : sentenceTexts) {
-                this.sentences.add(SessionSentence.of(this, idx++, text));
-            }
+        int idx = 0;
+        for (var text : sentenceSplitter.split(newScriptText)) {
+            this.sentences.add(SessionSentence.of(this, idx++, text));
         }
     }
 }

@@ -1,18 +1,27 @@
 package com.capstoneecho.echo_back.learning.session.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import com.capstoneecho.echo_back.learning.session.support.SentenceSplitter;
-import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 // Session 안의 한 학습 문장. SentenceSplitter 로 분할된 결과 한 조각이며,
-// sentenceIndex 가 같은 세션 내 순서를 결정한다.
-//
-// Recording.sessionSentenceId 가 이 엔티티의 id 를 참조해 어떤 문장에 대한 녹음인지 식별한다.
+// sentenceIndex 가 같은 세션 안에서 순서를 결정한다.
+// 외부 코드는 Session.updateScript 를 통해서만 생성되도록 정적 팩토리를 패키지 가시성으로 한정한다.
 @Entity
-@Table(name = "session_sentences", indexes = @Index(name = "ix_session_sentences_session", columnList = "session_id, sentence_index"))
+@Table(
+        name = "session_sentences",
+        indexes = @Index(name = "ix_session_sentences_session", columnList = "session_id, sentence_index")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SessionSentence {
@@ -28,14 +37,22 @@ public class SessionSentence {
     @Column(name = "sentence_index", nullable = false)
     private int sentenceIndex;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(name = "text", nullable = false, columnDefinition = "TEXT")
     private String text;
 
-    public static SessionSentence of(Session session, int sentenceIndex, String text) {
-        var s = new SessionSentence();
-        s.session = session;
-        s.sentenceIndex = sentenceIndex;
-        s.text = text;
-        return s;
+    private SessionSentence(Session session, int sentenceIndex, String text) {
+        this.session = session;
+        this.sentenceIndex = sentenceIndex;
+        this.text = text;
+    }
+
+    static SessionSentence of(Session session, int sentenceIndex, String text) {
+        if (session == null) {
+            throw new IllegalArgumentException("session is required");
+        }
+        if (text == null) {
+            throw new IllegalArgumentException("text is required");
+        }
+        return new SessionSentence(session, sentenceIndex, text);
     }
 }
