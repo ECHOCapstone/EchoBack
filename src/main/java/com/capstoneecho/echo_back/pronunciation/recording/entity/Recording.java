@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.ModelAnalyzeResponse;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.session.entity.SessionSentence;
 import com.capstoneecho.echo_back.pronunciation.feedback.service.FeedbackService;
@@ -69,7 +69,7 @@ public class Recording {
     @Column(name = "guidance_kr", columnDefinition = "TEXT")
     private String guidanceKr;
 
-    // ModelAnalyzeResponse.errors 의 JSON 직렬화. FeedbackService 가 unit 종합 시 음소 빈도를 집계한다.
+    // AnalyzeResult.errors 의 JSON 직렬화. FeedbackService 가 unit 종합 시 음소 빈도를 집계한다.
     @Column(name = "errors_json", columnDefinition = "TEXT")
     private String errorsJson;
 

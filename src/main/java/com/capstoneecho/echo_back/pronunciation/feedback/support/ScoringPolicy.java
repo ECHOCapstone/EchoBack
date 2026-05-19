@@ -1,7 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
 import com.capstoneecho.echo_back.global.config.AppProperties;
-import com.capstoneecho.echo_back.external.modelserver.dto.ModelAnalyzeResponse;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,7 +17,7 @@ public class ScoringPolicy {
         this.alpha = properties.scoring().alpha();
     }
 
-    public double scoreOf(ModelAnalyzeResponse response) {
+    public double scoreOf(AnalyzeResult response) {
         double accuracy = accuracyFromPer(response.per());
         double meanPeak = meanPeak(response.peakSoftmax());
         return clamp01(alpha * accuracy + (1.0 - alpha) * meanPeak) * 100.0;

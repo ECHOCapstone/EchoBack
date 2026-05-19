@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.ModelAnalyzeResponse;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.PhonemeErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,7 @@ import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 public class PhonemeErrorMapper {
 
     private static final Logger log = LoggerFactory.getLogger(PhonemeErrorMapper.class);
-    private static final TypeReference<List<ModelAnalyzeResponse.AlignmentItem>> ALIGNMENT_LIST =
+    private static final TypeReference<List<AnalyzeError>> ALIGNMENT_LIST =
             new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
@@ -31,14 +32,14 @@ public class PhonemeErrorMapper {
         this.objectMapper = objectMapper;
     }
 
-    public List<PhonemeErrorResponse> toResponses(List<ModelAnalyzeResponse.AlignmentItem> items) {
+    public List<PhonemeErrorResponse> toResponses(List<AnalyzeError> items) {
         if (items == null || items.isEmpty()) return List.of();
         return items.stream()
                 .map(e -> new PhonemeErrorResponse(e.op(), e.canonical(), e.recognized(), e.canonicalIndex()))
                 .toList();
     }
 
-    public String serialize(List<ModelAnalyzeResponse.AlignmentItem> items) {
+    public String serialize(List<AnalyzeError> items) {
         if (items == null || items.isEmpty()) return null;
         try {
             return objectMapper.writeValueAsString(items);
@@ -51,7 +52,7 @@ public class PhonemeErrorMapper {
     public List<PhonemeErrorResponse> deserialize(String errorsJson) {
         if (errorsJson == null || errorsJson.isBlank()) return List.of();
         try {
-            var items = objectMapper.<List<ModelAnalyzeResponse.AlignmentItem>>readValue(errorsJson, ALIGNMENT_LIST);
+            var items = objectMapper.<List<AnalyzeError>>readValue(errorsJson, ALIGNMENT_LIST);
             return toResponses(items);
         } catch (Exception e) {
             log.warn("PhonemeError 역직렬화 실패 (skip): {}", e.getMessage());

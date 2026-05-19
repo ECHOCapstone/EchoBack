@@ -2,8 +2,8 @@ package com.capstoneecho.echo_back.external.modelserver;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.external.modelserver.dto.ModelAnalyzeResponse;
-import com.capstoneecho.echo_back.external.modelserver.dto.ModelG2pResponse;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -32,7 +32,7 @@ class RestClientModelServerClient implements ModelServerClient {
     }
 
     @Override
-    public ModelAnalyzeResponse analyze(byte[] audio, String filename, String contentType, String canonical) {
+    public AnalyzeResult analyze(byte[] audio, String filename, String contentType, String canonical) {
         var safeFilename = filename != null && !filename.isBlank() ? filename : DEFAULT_FILENAME;
         var safeContentType = contentType != null && !contentType.isBlank() ? contentType : DEFAULT_AUDIO_TYPE;
 
@@ -47,7 +47,7 @@ class RestClientModelServerClient implements ModelServerClient {
             builder.part("canonical", canonical);
         }
 
-        return postMultipart(ANALYZE_ENDPOINT, builder, ModelAnalyzeResponse.class);
+        return postMultipart(ANALYZE_ENDPOINT, builder, AnalyzeResult.class);
     }
 
     @Override
@@ -57,7 +57,7 @@ class RestClientModelServerClient implements ModelServerClient {
         }
         var builder = new MultipartBodyBuilder();
         builder.part("text", text);
-        var response = postMultipart(G2P_ENDPOINT, builder, ModelG2pResponse.class);
+        var response = postMultipart(G2P_ENDPOINT, builder, G2pResult.class);
         return response != null && response.phonemes() != null ? response.phonemes() : "";
     }
 
