@@ -38,3 +38,17 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('runPromptTemplates', JavaExec) {
+    group = 'application'
+    description = 'prompts.yaml 을 읽어 PromptTemplates 결과를 콘솔에 출력'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.capstoneecho.echo_back.app.feedback.PromptTemplatesRunner'
+}
+
+tasks.register('runLlmFeedback', JavaExec) {
+    group = 'application'
+    description = 'CLI 인자로 받은 입력을 GeminiLlmFeedbackGenerator 에 흘려 LLM 응답 출력'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.capstoneecho.echo_back.app.feedback.LlmFeedbackRunner'
+}
