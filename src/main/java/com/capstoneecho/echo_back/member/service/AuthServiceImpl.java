@@ -47,7 +47,7 @@ class AuthServiceImpl implements AuthService {
         // exists 체크와 save 사이에 동시 가입이 들어오면 UNIQUE 제약 위반이 발생하는데,
         // 그것도 도메인이 의미하는 "중복" 으로 일관 응답하기 위해 명시적으로 변환한다.
         try {
-            var saved = userRepository.save(User.create(
+            var saved = userRepository.save(User.signup(
                     request.username(),
                     request.email(),
                     passwordEncoder.encode(request.password()),
@@ -72,7 +72,7 @@ class AuthServiceImpl implements AuthService {
     @Override
     public AuthTokenResponse demoGoogleLogin() {
         var user = userRepository.findByUsername(demoGoogle.username())
-                .orElseGet(() -> userRepository.save(User.create(
+                .orElseGet(() -> userRepository.save(User.signup(
                         demoGoogle.username(),
                         demoGoogle.email(),
                         passwordEncoder.encode(demoGoogle.password()),

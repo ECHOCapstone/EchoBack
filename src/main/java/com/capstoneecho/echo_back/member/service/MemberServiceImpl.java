@@ -5,6 +5,7 @@ import com.capstoneecho.echo_back.global.common.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.ZoneId;
 
 import com.capstoneecho.echo_back.member.entity.User;
@@ -32,7 +33,7 @@ class MemberServiceImpl implements MemberService {
     public User awardCompletionRewards(Long userId, int expReward) {
         var user = repository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        user.recordCompletion(expReward, learningZone);
+        user.recordCompletion(Instant.now(), expReward, learningZone);
         return user;
     }
 
@@ -41,7 +42,7 @@ class MemberServiceImpl implements MemberService {
     public User updateNickname(Long userId, String nickname) {
         var user = repository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        user.changeNickname(nickname);
+        user.updateNickname(nickname);
         return user;
     }
 }
