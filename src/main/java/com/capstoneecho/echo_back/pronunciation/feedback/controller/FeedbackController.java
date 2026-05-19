@@ -30,7 +30,7 @@ public class FeedbackController {
             @CurrentUser JwtPrincipal principal,
             @Valid @RequestBody GenerateFeedbackRequest request
     ) {
-        return ApiResponse.ok(feedbackService.generate(principal.userId(), request));
+        return ApiResponse.success(feedbackService.generate(principal.userId(), request));
     }
 
     @PostMapping(value = "/{feedbackId}/retry-word", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -39,7 +39,7 @@ public class FeedbackController {
             @PathVariable Long feedbackId,
             @RequestPart("audio") MultipartFile audio
     ) {
-        return ApiResponse.ok(feedbackService.retryWord(principal.userId(), feedbackId, audio));
+        return ApiResponse.success(feedbackService.retryWord(principal.userId(), feedbackId, audio));
     }
 
     @PostMapping("/{feedbackId}/complete")
@@ -47,6 +47,6 @@ public class FeedbackController {
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId
     ) {
-        return ApiResponse.ok(feedbackService.complete(principal.userId(), feedbackId));
+        return ApiResponse.success(feedbackService.complete(principal.userId(), feedbackId));
     }
 }

@@ -26,6 +26,6 @@ public class StatsController {
             @RequestParam(value = "year", required = false) Integer year,
             @RequestParam(value = "month", required = false) Integer month
     ) {
-        return ApiResponse.ok(statsService.getMe(principal.userId(), year, month));
+        return ApiResponse.success(statsService.getMe(principal.userId(), year, month));
     }
 }

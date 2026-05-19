@@ -11,20 +11,19 @@ public record ApiResponse<T>(
         ApiError error
 ) {
 
-    public static <T> ApiResponse<T> ok(T data) {
+    public static <T> ApiResponse<T> success(T data) {
         return new ApiResponse<>(true, data, null);
     }
 
-    public static <T> ApiResponse<T> ok() {
-        return new ApiResponse<>(true, null, null);
+    public static <T> ApiResponse<T> failure(ErrorCode code, String message) {
+        String resolved = (message == null || message.isBlank())
+                ? code.getDefaultMessage()
+                : message;
+        return new ApiResponse<>(false, null, new ApiError(code.name(), resolved));
     }
 
-    public static <T> ApiResponse<T> fail(ErrorCode code, String message) {
-        return new ApiResponse<>(false, null, new ApiError(code.name(), message));
-    }
-
-    public static <T> ApiResponse<T> fail(ErrorCode code) {
-        return fail(code, code.defaultMessage());
+    public static <T> ApiResponse<T> failure(ErrorCode code) {
+        return failure(code, null);
     }
 
     public record ApiError(String code, String message) {}

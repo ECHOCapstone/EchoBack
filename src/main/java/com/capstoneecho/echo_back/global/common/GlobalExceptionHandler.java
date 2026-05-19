@@ -22,8 +22,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
         return ResponseEntity
-                .status(e.code().status())
-                .body(ApiResponse.fail(e.code(), e.getMessage()));
+                .status(e.code().getStatusCode())
+                .body(ApiResponse.failure(e.code(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -31,38 +31,38 @@ public class GlobalExceptionHandler {
         var msg = e.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
-                .orElse(ErrorCode.VALIDATION_FAILED.defaultMessage());
+                .orElse(ErrorCode.VALIDATION_FAILED.getDefaultMessage());
         return ResponseEntity
-                .status(ErrorCode.VALIDATION_FAILED.status())
-                .body(ApiResponse.fail(ErrorCode.VALIDATION_FAILED, msg));
+                .status(ErrorCode.VALIDATION_FAILED.getStatusCode())
+                .body(ApiResponse.failure(ErrorCode.VALIDATION_FAILED, msg));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleUploadSize(MaxUploadSizeExceededException e) {
         return ResponseEntity
-                .status(ErrorCode.INVALID_REQUEST.status())
-                .body(ApiResponse.fail(ErrorCode.INVALID_REQUEST, "업로드 파일 크기가 제한을 초과했습니다."));
+                .status(ErrorCode.INVALID_REQUEST.getStatusCode())
+                .body(ApiResponse.failure(ErrorCode.INVALID_REQUEST, "업로드 파일 크기가 제한을 초과했습니다."));
     }
 
     @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ApiResponse<Void>> handleMissingPart(Exception e) {
         return ResponseEntity
-                .status(ErrorCode.INVALID_REQUEST.status())
-                .body(ApiResponse.fail(ErrorCode.INVALID_REQUEST, e.getMessage()));
+                .status(ErrorCode.INVALID_REQUEST.getStatusCode())
+                .body(ApiResponse.failure(ErrorCode.INVALID_REQUEST, e.getMessage()));
     }
 
     @ExceptionHandler({AuthenticationException.class, AccessDeniedException.class})
     public ResponseEntity<ApiResponse<Void>> handleAuth(Exception e) {
         return ResponseEntity
-                .status(ErrorCode.UNAUTHORIZED.status())
-                .body(ApiResponse.fail(ErrorCode.UNAUTHORIZED, e.getMessage()));
+                .status(ErrorCode.UNAUTHORIZED.getStatusCode())
+                .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED, e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnknown(Exception e) {
         log.error("Unhandled exception", e);
         return ResponseEntity
-                .status(ErrorCode.INTERNAL_ERROR.status())
-                .body(ApiResponse.fail(ErrorCode.INTERNAL_ERROR, e.getMessage()));
+                .status(ErrorCode.INTERNAL_ERROR.getStatusCode())
+                .body(ApiResponse.failure(ErrorCode.INTERNAL_ERROR, e.getMessage()));
     }
 }

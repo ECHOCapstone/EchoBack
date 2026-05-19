@@ -23,11 +23,11 @@ public class TrackController {
 
     @GetMapping
     public ApiResponse<List<TrackSummaryResponse>> list() {
-        return ApiResponse.ok(trackService.listAll());
+        return ApiResponse.success(trackService.listAll());
     }
 
     @GetMapping("/{trackId}")
     public ApiResponse<TrackDetailResponse> detail(@PathVariable Long trackId) {
-        return ApiResponse.ok(trackService.getDetail(trackId));
+        return ApiResponse.success(trackService.getDetail(trackId));
     }
 }

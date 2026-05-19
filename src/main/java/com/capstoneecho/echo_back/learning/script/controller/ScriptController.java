@@ -23,11 +23,11 @@ public class ScriptController {
 
     @GetMapping("/recommended/today")
     public ApiResponse<List<ScriptSummaryResponse>> recommendedToday() {
-        return ApiResponse.ok(scriptService.getRecommendedToday());
+        return ApiResponse.success(scriptService.getRecommendedToday());
     }
 
     @GetMapping("/{scriptId}")
     public ApiResponse<ScriptDetailResponse> detail(@PathVariable Long scriptId) {
-        return ApiResponse.ok(scriptService.getDetail(scriptId));
+        return ApiResponse.success(scriptService.getDetail(scriptId));
     }
 }

@@ -39,11 +39,17 @@ public enum ErrorCode {
         this.defaultMessage = defaultMessage;
     }
 
-    public HttpStatus status() {
+    // Spring 의 ResponseEntity.status(int) 와 MockMvc 의 status().is(int) 가 같이 받을 수 있게
+    // status code 를 정수로 노출한다. HttpStatus 객체가 필요한 호출 경로는 httpStatus() 로 별도 제공.
+    public int getStatusCode() {
+        return status.value();
+    }
+
+    public HttpStatus httpStatus() {
         return status;
     }
 
-    public String defaultMessage() {
+    public String getDefaultMessage() {
         return defaultMessage;
     }
 }

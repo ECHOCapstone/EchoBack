@@ -29,26 +29,26 @@ public class AuthController {
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<TokenResponse> signup(@Valid @RequestBody SignupRequest request) {
-        return ApiResponse.ok(authService.signup(request));
+        return ApiResponse.success(authService.signup(request));
     }
 
     @PostMapping("/login")
     public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok(authService.login(request));
+        return ApiResponse.success(authService.login(request));
     }
 
     @PostMapping("/check-username")
     public ApiResponse<CheckResponse> checkUsername(@Valid @RequestBody CheckRequest request) {
-        return ApiResponse.ok(new CheckResponse(authService.isUsernameAvailable(request.value())));
+        return ApiResponse.success(new CheckResponse(authService.isUsernameAvailable(request.value())));
     }
 
     @PostMapping("/check-email")
     public ApiResponse<CheckResponse> checkEmail(@Valid @RequestBody CheckRequest request) {
-        return ApiResponse.ok(new CheckResponse(authService.isEmailAvailable(request.value())));
+        return ApiResponse.success(new CheckResponse(authService.isEmailAvailable(request.value())));
     }
 
     @GetMapping("/oauth2/google/demo")
     public ApiResponse<TokenResponse> demoGoogleLogin() {
-        return ApiResponse.ok(authService.demoGoogleLogin());
+        return ApiResponse.success(authService.demoGoogleLogin());
     }
 }

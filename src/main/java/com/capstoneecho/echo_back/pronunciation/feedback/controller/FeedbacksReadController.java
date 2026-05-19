@@ -27,7 +27,7 @@ public class FeedbacksReadController {
 
     @GetMapping
     public ApiResponse<List<FeedbackSummaryResponse>> list(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.ok(feedbackService.listMine(principal.userId()));
+        return ApiResponse.success(feedbackService.listMine(principal.userId()));
     }
 
     @GetMapping("/{feedbackId}")
@@ -35,6 +35,6 @@ public class FeedbacksReadController {
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId
     ) {
-        return ApiResponse.ok(feedbackService.get(principal.userId(), feedbackId));
+        return ApiResponse.success(feedbackService.get(principal.userId(), feedbackId));
     }
 }

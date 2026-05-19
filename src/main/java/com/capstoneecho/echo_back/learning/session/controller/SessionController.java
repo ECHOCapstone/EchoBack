@@ -25,7 +25,7 @@ public class SessionController {
 
     @GetMapping
     public ApiResponse<List<SessionResponse>> list(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.ok(sessionService.listMine(principal.userId()));
+        return ApiResponse.success(sessionService.listMine(principal.userId()));
     }
 
     @PostMapping
@@ -34,7 +34,7 @@ public class SessionController {
             @CurrentUser JwtPrincipal principal,
             @Valid @RequestBody SessionCreateRequest request
     ) {
-        return ApiResponse.ok(sessionService.create(principal.userId(), request));
+        return ApiResponse.success(sessionService.create(principal.userId(), request));
     }
 
     @GetMapping("/{sessionId}")
@@ -42,7 +42,7 @@ public class SessionController {
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long sessionId
     ) {
-        return ApiResponse.ok(sessionService.get(principal.userId(), sessionId));
+        return ApiResponse.success(sessionService.get(principal.userId(), sessionId));
     }
 
     @PatchMapping("/{sessionId}")
@@ -51,7 +51,7 @@ public class SessionController {
             @PathVariable Long sessionId,
             @Valid @RequestBody SessionUpdateRequest request
     ) {
-        return ApiResponse.ok(sessionService.update(principal.userId(), sessionId, request));
+        return ApiResponse.success(sessionService.update(principal.userId(), sessionId, request));
     }
 
     @DeleteMapping("/{sessionId}")
@@ -60,6 +60,6 @@ public class SessionController {
             @PathVariable Long sessionId
     ) {
         sessionService.delete(principal.userId(), sessionId);
-        return ApiResponse.ok();
+        return ApiResponse.success(null);
     }
 }

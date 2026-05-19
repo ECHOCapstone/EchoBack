@@ -21,6 +21,6 @@ public class RankingController {
 
     @GetMapping("/today")
     public ApiResponse<RankingResponse> today(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.ok(rankingService.today(principal.userId()));
+        return ApiResponse.success(rankingService.today(principal.userId()));
     }
 }

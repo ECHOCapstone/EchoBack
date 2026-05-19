@@ -26,7 +26,7 @@ public class MemberController {
     @GetMapping("/me")
     public ApiResponse<UserResponse> me(@CurrentUser JwtPrincipal principal) {
         var user = memberService.getById(principal.userId());
-        return ApiResponse.ok(UserResponse.from(user));
+        return ApiResponse.success(UserResponse.from(user));
     }
 
     @PatchMapping("/me/nickname")
@@ -35,6 +35,6 @@ public class MemberController {
             @Valid @RequestBody UpdateNicknameRequest request
     ) {
         var user = memberService.updateNickname(principal.userId(), request.nickname());
-        return ApiResponse.ok(UserResponse.from(user));
+        return ApiResponse.success(UserResponse.from(user));
     }
 }

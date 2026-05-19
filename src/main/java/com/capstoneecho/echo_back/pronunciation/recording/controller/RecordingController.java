@@ -30,7 +30,7 @@ public class RecordingController {
             @RequestParam(value = "stepId", required = false) Long stepId,
             @RequestParam(value = "sessionSentenceId", required = false) Long sessionSentenceId
     ) {
-        return ApiResponse.ok(recordingService.upload(
+        return ApiResponse.success(recordingService.upload(
                 principal.userId(), scriptId, sessionId, stepId, sessionSentenceId, audio
         ));
     }
