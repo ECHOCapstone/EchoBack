@@ -80,7 +80,6 @@ jacoco {
 // 부트스트랩 클래스는 실제 로직 비중이 적어 커버리지에 잡혀도 의미가 적다.
 def jacocoExcludePatterns = [
         '**/EchoBackApplication.*',
-        '**/EchoAppApplication.*',
         '**/dto/**',
         '**/entity/**',
         '**/global/config/**',
