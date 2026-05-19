@@ -3,7 +3,7 @@ package com.capstoneecho.echo_back.member.service;
 import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.member.dto.LoginRequest;
 import com.capstoneecho.echo_back.member.dto.SignupRequest;
-import com.capstoneecho.echo_back.member.dto.TokenResponse;
+import com.capstoneecho.echo_back.member.dto.AuthTokenResponse;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
@@ -37,7 +37,7 @@ class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public TokenResponse signup(SignupRequest request) {
+    public AuthTokenResponse signup(SignupRequest request) {
         if (userRepository.existsByUsername(request.username())) {
             throw new BusinessException(ErrorCode.USERNAME_DUPLICATED);
         }
@@ -60,7 +60,7 @@ class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public TokenResponse login(LoginRequest request) {
+    public AuthTokenResponse login(LoginRequest request) {
         var user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -70,7 +70,7 @@ class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public TokenResponse demoGoogleLogin() {
+    public AuthTokenResponse demoGoogleLogin() {
         var user = userRepository.findByUsername(demoGoogle.username())
                 .orElseGet(() -> userRepository.save(User.create(
                         demoGoogle.username(),
@@ -93,8 +93,8 @@ class AuthServiceImpl implements AuthService {
         return !userRepository.existsByEmail(email);
     }
 
-    private TokenResponse issue(User user) {
+    private AuthTokenResponse issue(User user) {
         var token = jwtProvider.issue(user.getId(), user.getUsername());
-        return TokenResponse.of(token, jwtProvider.expiresInSec(), UserResponse.from(user));
+        return AuthTokenResponse.of(token, jwtProvider.expiresInSec(), UserResponse.from(user));
     }
 }

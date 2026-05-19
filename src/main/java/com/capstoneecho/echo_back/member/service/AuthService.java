@@ -2,16 +2,16 @@ package com.capstoneecho.echo_back.member.service;
 
 import com.capstoneecho.echo_back.member.dto.LoginRequest;
 import com.capstoneecho.echo_back.member.dto.SignupRequest;
-import com.capstoneecho.echo_back.member.dto.TokenResponse;
+import com.capstoneecho.echo_back.member.dto.AuthTokenResponse;
 
 // 인증 도메인의 외부 노출 인터페이스. 모든 구현체는 동일한 토큰 응답 계약을 따른다.
 public interface AuthService {
 
-    TokenResponse signup(SignupRequest request);
+    AuthTokenResponse signup(SignupRequest request);
 
-    TokenResponse login(LoginRequest request);
+    AuthTokenResponse login(LoginRequest request);
 
-    TokenResponse demoGoogleLogin();
+    AuthTokenResponse demoGoogleLogin();
 
     boolean isUsernameAvailable(String username);
 

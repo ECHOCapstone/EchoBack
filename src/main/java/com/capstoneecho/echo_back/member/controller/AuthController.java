@@ -1,10 +1,11 @@
 package com.capstoneecho.echo_back.member.controller;
 
-import com.capstoneecho.echo_back.member.dto.CheckRequest;
-import com.capstoneecho.echo_back.member.dto.CheckResponse;
+import com.capstoneecho.echo_back.member.dto.AvailabilityResponse;
+import com.capstoneecho.echo_back.member.dto.EmailCheckRequest;
 import com.capstoneecho.echo_back.member.dto.LoginRequest;
 import com.capstoneecho.echo_back.member.dto.SignupRequest;
-import com.capstoneecho.echo_back.member.dto.TokenResponse;
+import com.capstoneecho.echo_back.member.dto.AuthTokenResponse;
+import com.capstoneecho.echo_back.member.dto.UsernameCheckRequest;
 import com.capstoneecho.echo_back.global.common.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -28,27 +29,27 @@ public class AuthController {
 
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<TokenResponse> signup(@Valid @RequestBody SignupRequest request) {
+    public ApiResponse<AuthTokenResponse> signup(@Valid @RequestBody SignupRequest request) {
         return ApiResponse.success(authService.signup(request));
     }
 
     @PostMapping("/login")
-    public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<AuthTokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));
     }
 
     @PostMapping("/check-username")
-    public ApiResponse<CheckResponse> checkUsername(@Valid @RequestBody CheckRequest request) {
-        return ApiResponse.success(new CheckResponse(authService.isUsernameAvailable(request.value())));
+    public ApiResponse<AvailabilityResponse> checkUsername(@Valid @RequestBody UsernameCheckRequest request) {
+        return ApiResponse.success(new AvailabilityResponse(authService.isUsernameAvailable(request.value())));
     }
 
     @PostMapping("/check-email")
-    public ApiResponse<CheckResponse> checkEmail(@Valid @RequestBody CheckRequest request) {
-        return ApiResponse.success(new CheckResponse(authService.isEmailAvailable(request.value())));
+    public ApiResponse<AvailabilityResponse> checkEmail(@Valid @RequestBody EmailCheckRequest request) {
+        return ApiResponse.success(new AvailabilityResponse(authService.isEmailAvailable(request.value())));
     }
 
     @GetMapping("/oauth2/google/demo")
-    public ApiResponse<TokenResponse> demoGoogleLogin() {
+    public ApiResponse<AuthTokenResponse> demoGoogleLogin() {
         return ApiResponse.success(authService.demoGoogleLogin());
     }
 }

@@ -3,7 +3,7 @@ package com.capstoneecho.echo_back.member.controller;
 import com.capstoneecho.echo_back.global.common.ApiResponse;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
-import com.capstoneecho.echo_back.member.dto.UpdateNicknameRequest;
+import com.capstoneecho.echo_back.member.dto.NicknameUpdateRequest;
 import com.capstoneecho.echo_back.member.dto.UserResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +32,7 @@ public class MemberController {
     @PatchMapping("/me/nickname")
     public ApiResponse<UserResponse> changeNickname(
             @CurrentUser JwtPrincipal principal,
-            @Valid @RequestBody UpdateNicknameRequest request
+            @Valid @RequestBody NicknameUpdateRequest request
     ) {
         var user = memberService.updateNickname(principal.userId(), request.nickname());
         return ApiResponse.success(UserResponse.from(user));
