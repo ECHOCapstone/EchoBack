@@ -23,7 +23,7 @@ import com.capstoneecho.echo_back.external.llm.LlmFeedbackGenerator;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.learning.script.service.ScriptService;
 import com.capstoneecho.echo_back.learning.session.service.SessionService;
-import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeError;
+import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeOp;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PracticeWordResolver;
@@ -105,7 +105,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 guidance
         );
         for (var err : weakness.errors()) {
-            feedback.addError(PhonemeError.of(err.op(), err.canonical(), err.perceived(), err.canonicalIndex()));
+            feedback.recordPhonemeError(PhonemeOp.valueOf(err.op()), err.canonical(), err.perceived(), err.canonicalIndex());
         }
         return FeedbackDetailResponse.from(feedbackRepository.save(feedback));
     }

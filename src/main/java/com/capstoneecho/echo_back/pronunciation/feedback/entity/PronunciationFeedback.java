@@ -79,9 +79,24 @@ public class PronunciationFeedback {
         return f;
     }
 
-    public void addError(PhonemeError error) {
+    // 외부 코드가 만들어 둔 PhonemeError 를 이 피드백에 첨부한다. 양방향 연결을 보장한다.
+    public void attach(PhonemeError error) {
         error.attachTo(this);
         this.errors.add(error);
+    }
+
+    // 외부 코드가 op / 음소만 알고 PhonemeError 객체를 직접 만들 수 없을 때의 진입점.
+    // 도메인 책임 (생성 + 양방향 연결) 을 엔티티 안에 둔다.
+    public void recordPhonemeError(PhonemeOp op, String canonical, String perceived, Integer canonicalIndex) {
+        attach(PhonemeError.create(op, canonical, perceived, canonicalIndex));
+    }
+
+    // 외부에서 가이드 문장을 갱신할 때 사용. blank 입력은 무시한다.
+    public void updateGuidance(String newGuidance) {
+        if (newGuidance == null || newGuidance.isBlank()) {
+            return;
+        }
+        this.guidanceKr = newGuidance;
     }
 
     // 처음 완료 처리할 때만 true 를 반환한다. 호출자는 이 값으로 보상 가산 여부를 결정한다.

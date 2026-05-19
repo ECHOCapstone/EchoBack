@@ -10,6 +10,6 @@ public record PhonemeErrorResponse(
 ) {
 
     public static PhonemeErrorResponse from(PhonemeError e) {
-        return new PhonemeErrorResponse(e.getOp(), e.getCanonical(), e.getPerceived(), e.getCanonicalIndex());
+        return new PhonemeErrorResponse(e.getOp().name(), e.getCanonical(), e.getPerceived(), e.getCanonicalIndex());
     }
 }
