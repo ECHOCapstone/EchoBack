@@ -26,7 +26,7 @@ class TrackServiceImpl implements TrackService {
     @Override
     public List<TrackSummaryResponse> listAll() {
         // 카운트 전용 쿼리로 트랙별 챕터 수만 가져온다 (목록 화면은 챕터 본문이 필요 없음).
-        return trackRepository.findAllByOrderByDisplayOrderAscIdAsc().stream()
+        return trackRepository.findAllByOrderByDisplayOrderAsc().stream()
                 .map(track -> TrackSummaryResponse.of(
                         track,
                         (int) scriptRepository.countByTrack_Id(track.getId())
@@ -38,7 +38,7 @@ class TrackServiceImpl implements TrackService {
     public TrackDetailResponse getDetail(Long trackId) {
         var track = trackRepository.findById(trackId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRACK_NOT_FOUND));
-        var chapters = scriptRepository.findByTrack_IdOrderByChapterOrderAscIdAsc(trackId);
+        var chapters = scriptRepository.findByTrack_IdOrderByChapterOrderAsc(trackId);
         return TrackDetailResponse.of(track, chapters);
     }
 }

@@ -12,7 +12,8 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
     // primitive boolean preset 의 JPA 프로퍼티 이름은 'preset' 이라 메서드 이름도 By-Preset 으로 표기한다.
     List<Script> findByPresetTrueOrderByIdAsc();
 
-    List<Script> findByTrack_IdOrderByChapterOrderAscIdAsc(Long trackId);
+    // 한 트랙 안에서 chapterOrder 는 시드에서 유일하므로 추가 정렬키 없이 결정적.
+    List<Script> findByTrack_IdOrderByChapterOrderAsc(Long trackId);
 
     // 트랙별 챕터 수만 필요한 트랙 목록 화면을 위한 카운트 전용 쿼리. N+1 회피.
     long countByTrack_Id(Long trackId);

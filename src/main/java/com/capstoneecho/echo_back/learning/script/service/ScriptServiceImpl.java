@@ -35,7 +35,7 @@ class ScriptServiceImpl implements ScriptService {
     @Override
     public ScriptDetailResponse getDetail(Long scriptId) {
         var script = getEntity(scriptId);
-        var steps = stepRepository.findByScript_IdOrderByOrderIndexAsc(scriptId);
+        var steps = stepRepository.findByScript_IdOrderByIdAsc(scriptId);
         return ScriptDetailResponse.of(script, steps);
     }
 
