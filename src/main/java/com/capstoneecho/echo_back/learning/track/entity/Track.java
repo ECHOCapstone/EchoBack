@@ -1,15 +1,17 @@
 package com.capstoneecho.echo_back.learning.track.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
-import com.capstoneecho.echo_back.learning.script.entity.Script;
-// 학습 코스의 최상위 단위. 한 트랙은 순서 있는 챕터(Script) 들의 묶음이고,
-// 사용자가 트랙을 선택하면 첫 챕터부터 순차로 학습한다.
+// 학습 코스의 최상위 단위. 한 트랙은 순서 있는 챕터(Script) 들의 묶음이며 사용자가
+// 트랙을 선택하면 첫 챕터부터 순차로 학습한다. displayOrder 가 작은 값이 먼저 노출된다.
 @Entity
 @Table(name = "tracks")
 @Getter
@@ -20,29 +22,25 @@ public class Track {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(length = 100, nullable = false)
+    @Column(name = "title", nullable = false, length = 100)
     private String title;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    // 트랙 목록 노출 시 사용하는 정렬 키. 작은 값이 먼저 표시된다.
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    public static Track create(String title, String description, int displayOrder) {
-        var t = new Track();
-        t.title = title;
-        t.description = description;
-        t.displayOrder = displayOrder;
-        return t;
+    private Track(String title, String description, int displayOrder) {
+        this.title = title;
+        this.description = description;
+        this.displayOrder = displayOrder;
     }
 
-    @PrePersist
-    void onCreate() {
-        this.createdAt = Instant.now();
+    public static Track create(String title, String description, int displayOrder) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        return new Track(title, description, displayOrder);
     }
 }

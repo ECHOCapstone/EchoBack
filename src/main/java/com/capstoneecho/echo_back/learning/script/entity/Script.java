@@ -1,18 +1,29 @@
 package com.capstoneecho.echo_back.learning.script.entity;
 
 import com.capstoneecho.echo_back.learning.track.entity.Track;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
-import com.capstoneecho.echo_back.pronunciation.feedback.support.PracticeWordResolver;
-import com.capstoneecho.echo_back.statistics.stats.support.BadgePolicy;
-// 트랙 안의 한 챕터. preset=true 면 시드 챕터, false 면 사용자가 만든 자유 스크립트.
+// 트랙 안의 한 챕터. preset=true 면 시드 챕터, false 면 사용자가 만든 자유 스크립트다.
+// 자유 스크립트는 트랙에 소속되지 않아 track 과 chapterOrder 가 null 일 수 있다.
 @Entity
-@Table(name = "scripts", indexes = @Index(name = "ix_scripts_track", columnList = "track_id, chapter_order"))
+@Table(
+        name = "scripts",
+        indexes = @Index(name = "ix_scripts_track", columnList = "track_id, chapter_order")
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Script {
@@ -25,68 +36,77 @@ public class Script {
     @JoinColumn(name = "track_id")
     private Track track;
 
-    @Column(name = "chapter_order")
-    private Integer chapterOrder;
-
-    @Column(length = 255, nullable = false)
+    @Column(name = "title", nullable = false, length = 255)
     private String title;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 16)
+    @Column(name = "difficulty", length = 16)
     private Difficulty difficulty;
 
-    @Column(name = "is_preset", nullable = false)
+    @Column(name = "preset", nullable = false)
     private boolean preset;
 
     // 종합 피드백에서 권장할 재연습 단어. 비어 있으면 PracticeWordResolver 가 약점 음소로 추정한다.
     @Column(name = "practice_word", length = 100)
     private String practiceWord;
 
-    // 이 챕터를 마스터했을 때 부여할 배지명. 채워져 있으면 BadgePolicy 가 자동으로 마스터 배지를 만든다.
-    // 잰말놀이처럼 횟수로 평가하는 챕터는 비워 둔다.
+    // 챕터 마스터 배지명. 잰말놀이처럼 횟수로 평가하는 챕터는 비워 둔다.
     @Column(name = "mastery_badge_name", length = 50)
     private String masteryBadgeName;
 
-    @Column(name = "created_at", insertable = true, updatable = false)
-    private Instant createdAt;
+    // 트랙 안에서의 노출 순서. 자유 스크립트는 트랙 자체가 없어 null.
+    @Column(name = "chapter_order")
+    private Integer chapterOrder;
+
+    private Script(
+            Track track,
+            Integer chapterOrder,
+            String title,
+            String content,
+            Difficulty difficulty,
+            boolean preset,
+            String practiceWord,
+            String masteryBadgeName
+    ) {
+        this.track = track;
+        this.chapterOrder = chapterOrder;
+        this.title = title;
+        this.content = content;
+        this.difficulty = difficulty;
+        this.preset = preset;
+        this.practiceWord = practiceWord;
+        this.masteryBadgeName = masteryBadgeName;
+    }
 
     public static Script createChapter(
             Track track,
-            int chapterOrder,
+            Integer chapterOrder,
             String title,
             String content,
             Difficulty difficulty,
             String practiceWord,
             String masteryBadgeName
     ) {
-        var s = new Script();
-        s.track = track;
-        s.chapterOrder = chapterOrder;
-        s.title = title;
-        s.content = content;
-        s.difficulty = difficulty;
-        s.preset = true;
-        s.practiceWord = practiceWord;
-        s.masteryBadgeName = masteryBadgeName;
-        return s;
+        if (track == null) {
+            throw new IllegalArgumentException("track is required for a chapter");
+        }
+        requireNonBlank(title, "title");
+        requireNonBlank(content, "content");
+        return new Script(track, chapterOrder, title, content, difficulty, true, practiceWord, masteryBadgeName);
     }
 
     public static Script createStandalone(String title, String content, Difficulty difficulty) {
-        var s = new Script();
-        s.title = title;
-        s.content = content;
-        s.difficulty = difficulty;
-        s.preset = false;
-        return s;
+        requireNonBlank(title, "title");
+        requireNonBlank(content, "content");
+        return new Script(null, null, title, content, difficulty, false, null, null);
     }
 
-    @PrePersist
-    void onCreate() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
+    private static void requireNonBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
         }
     }
 }

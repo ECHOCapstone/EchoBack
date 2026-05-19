@@ -83,16 +83,13 @@ public class InitialDataLoader implements ApplicationRunner {
         }
     }
 
+    // JSON 배열 안 등장 순서가 그대로 PK 순서로 저장된다.
+    // SeedData.Step 의 orderIndex 필드는 도메인 모델에서 제거되어 더 이상 사용되지 않는다.
     private LearningStep toEntity(Script chapter, SeedData.Step stepData) {
         var kind = StepKind.valueOf(stepData.kind());
         return switch (kind) {
-            case INTRO -> LearningStep.intro(chapter, stepData.orderIndex(), stepData.prompt());
-            case RECORD -> LearningStep.record(
-                    chapter,
-                    stepData.orderIndex(),
-                    stepData.prompt(),
-                    stepData.targetText()
-            );
+            case INTRO -> LearningStep.intro(chapter, stepData.prompt());
+            case RECORD -> LearningStep.record(chapter, stepData.prompt(), stepData.targetText());
         };
     }
 
