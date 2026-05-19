@@ -6,9 +6,14 @@ import com.capstoneecho.echo_back.statistics.ranking.entity.DemoRankingEntry;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
+import com.capstoneecho.echo_back.learning.script.repository.LearningStepRepository;
+import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
+import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
+import com.capstoneecho.echo_back.statistics.ranking.repository.DemoRankingEntryRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +22,12 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import com.capstoneecho.echo_back.learning.script.repository.LearningStepRepository;
-import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
-import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
-import com.capstoneecho.echo_back.statistics.ranking.repository.DemoRankingEntryRepository;
 // 부팅 시 H2 가 비어 있으면 src/main/resources/seed/*.json 의 트랙/챕터/스텝과 데모 랭킹을
-// 한 번 채워 넣는다. 이미 행이 있으면 그대로 둔다.
+// 한 번 채워 넣는다. 이미 행이 있으면 그대로 둔다 (멱등). 테스트 프로파일에서는
+// 픽스처와의 간섭을 막기 위해 시드 적재를 비활성화한다.
 @Component
-class InitialDataLoader implements ApplicationRunner {
+@Profile("!test")
+public class InitialDataLoader implements ApplicationRunner {
 
     private final TrackRepository trackRepository;
     private final ScriptRepository scriptRepository;

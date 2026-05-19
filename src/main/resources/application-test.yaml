@@ -1,0 +1,24 @@
+# 테스트 프로파일.
+# 공통 application.yaml 위에 덮어쓰는 형태로 적용된다. 픽스처 간 간섭을 막기 위해
+# 별도 H2 인스턴스를 쓰고, JWT 만료를 짧게, 저장 루트를 build/ 하위로 둔다.
+spring:
+  datasource:
+    url: "jdbc:h2:mem:echo-test;MODE=MySQL;DB_CLOSE_DELAY=-1"
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+    open-in-view: false
+
+app:
+  jwt:
+    secret: "test-jwt-secret-do-not-use-in-prod-1234567890abcdef1234567890abcdef"
+    expire-ms: 3600000
+  storage:
+    recording-dir: build/test-storage
