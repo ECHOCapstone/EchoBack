@@ -1,3 +1,70 @@
 spring:
   application:
-    name: ECHO_back
+    name: echo-back-app
+  # 프로젝트 root 의 .env 파일을 properties 형식으로 읽어들인다.
+  # 파일이 없어도 부팅이 막히지 않도록 optional 로 둔다.
+  config:
+    import: optional:file:./.env[.properties]
+  datasource:
+    url: jdbc:h2:mem:echo;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    expire-ms: ${JWT_EXPIRE_MS:86400000}
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+  model-server:
+    base-url: ${MODEL_SERVER_BASE_URL:http://localhost:8001}
+    timeout-ms: ${MODEL_SERVER_TIMEOUT_MS:30000}
+  scoring:
+    alpha: ${SCORING_ALPHA:0.7}
+  storage:
+    recording-dir: ${RECORDING_DIR:./backend-storage/recordings}
+  llm:
+    provider: ${LLM_PROVIDER:rule-based}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:gemini-1.5-flash}
+    base-url: ${LLM_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+  reward:
+    completion-exp: ${COMPLETION_EXP:1000}
+  badge:
+    master-threshold: ${BADGE_MASTER_THRESHOLD:80}
+    perfect-threshold: ${BADGE_PERFECT_THRESHOLD:95}
+    tongue-twister-goal: ${BADGE_TONGUE_TWISTER_GOAL:5}
+    session-master-goal: ${BADGE_SESSION_MASTER_GOAL:5}
+  time:
+    zone-id: ${APP_TIME_ZONE_ID:Asia/Seoul}
+  auth:
+    demo-google:
+      username: ${DEMO_GOOGLE_USERNAME:google_demo}
+      email: ${DEMO_GOOGLE_EMAIL:demo@google.example}
+      nickname: ${DEMO_GOOGLE_NICKNAME:구글 데모}
+      password: ${DEMO_GOOGLE_PASSWORD:demo-oauth}
+  feedback:
+    step-threshold:
+      pass: ${STEP_PASS_THRESHOLD:80}
+      ok: ${STEP_OK_THRESHOLD:60}
+    default-practice-word: ${DEFAULT_PRACTICE_WORD:rabbit}
+  session:
+    sentence-min-length: ${SENTENCE_MIN_LENGTH:6}
+  stats:
+    weekly-top-n: ${WEEKLY_TOP_N:5}

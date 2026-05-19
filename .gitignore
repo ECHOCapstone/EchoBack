@@ -38,3 +38,8 @@ out/
 
 ### Claude Code ###
 CLAUDE.local.md
+
+### Environment / secrets ###
+.env
+.env.local
+*.env.local

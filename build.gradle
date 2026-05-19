@@ -2,12 +2,11 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
-    id 'org.asciidoctor.jvm.convert' version '4.0.5'
 }
 
 group = 'com.capstoneecho'
 version = '0.0.1-SNAPSHOT'
-description = 'ECHO_back'
+description = 'echo-back-app'
 
 java {
     toolchain {
@@ -19,41 +18,37 @@ repositories {
     mavenCentral()
 }
 
-ext {
-    set('snippetsDir', file("build/generated-snippets"))
-}
-
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // RestClient + MultipartBodyBuilder 가 내부적으로 reactive-streams Publisher 인터페이스를
+    // 참조한다. spring-boot-starter-webmvc 가 transitive 로 가져오지 않아 명시 추가가 필요.
+    implementation 'org.reactivestreams:reactive-streams:1.0.4'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     implementation 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testCompileOnly 'org.projectlombok:lombok'
-    testAnnotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly 'com.h2database:h2'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'com.mysql:mysql-connector-j'
-    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-restdocs'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
-    testAndDevelopmentOnly 'com.h2database:h2' // MySQL DB 연결 전까지는 H2 사용
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
-    outputs.dir snippetsDir
     useJUnitPlatform()
 }
 
-tasks.named('asciidoctor') {
-    inputs.dir snippetsDir
-    dependsOn test
+tasks.register('runPromptTemplates', JavaExec) {
+    group = 'application'
+    description = 'prompts.yaml 을 읽어 PromptTemplates 결과를 콘솔에 출력'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.capstoneecho.echo_back.app.feedback.PromptTemplatesRunner'
+}
+
+tasks.register('runLlmFeedback', JavaExec) {
+    group = 'application'
+    description = 'CLI 인자로 받은 입력을 GeminiLlmFeedbackGenerator 에 흘려 LLM 응답 출력'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.capstoneecho.echo_back.app.feedback.LlmFeedbackRunner'
 }
