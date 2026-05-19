@@ -1,10 +1,7 @@
 package com.capstoneecho.echo_back.global.common;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
-// 모든 REST 응답이 공유하는 envelope. success 플래그로 성공/실패를 구분하고,
-// 성공 시 data, 실패 시 error 만 직렬화된다.
-@JsonInclude(JsonInclude.Include.NON_NULL)
+// 모든 REST 응답이 공유하는 envelope. 성공 시 data 가 채워지고 error 는 null,
+// 실패 시 그 반대다. 두 필드 모두 항상 직렬화되어 클라이언트는 일관된 키를 본다.
 public record ApiResponse<T>(
         boolean success,
         T data,
