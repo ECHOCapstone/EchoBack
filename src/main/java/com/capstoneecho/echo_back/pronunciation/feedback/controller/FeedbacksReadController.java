@@ -1,7 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.controller;
 
 import com.capstoneecho.echo_back.global.common.ApiResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResponse;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
@@ -31,7 +31,7 @@ public class FeedbacksReadController {
     }
 
     @GetMapping("/{feedbackId}")
-    public ApiResponse<FeedbackResponse> get(
+    public ApiResponse<FeedbackDetailResponse> get(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId
     ) {

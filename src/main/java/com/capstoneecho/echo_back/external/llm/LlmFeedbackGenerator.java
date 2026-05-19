@@ -1,7 +1,7 @@
 package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.PhonemeErrorResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.WrongWord;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
 
 import java.util.List;
 

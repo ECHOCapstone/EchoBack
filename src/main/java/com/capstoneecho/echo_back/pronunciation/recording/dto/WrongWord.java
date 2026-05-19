@@ -1,4 +1,4 @@
-package com.capstoneecho.echo_back.pronunciation.feedback.dto;
+package com.capstoneecho.echo_back.pronunciation.recording.dto;
 
 // LLM 이 step 응답에서 짚어 준 잘못 발음된 단어 한 항목.
 //   word  - 원문 영어 단어 (소문자, 따옴표/구두점 제거)

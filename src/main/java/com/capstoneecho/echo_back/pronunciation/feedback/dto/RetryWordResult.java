@@ -2,7 +2,7 @@ package com.capstoneecho.echo_back.pronunciation.feedback.dto;
 
 import java.util.List;
 
-public record RetryWordResponse(
+public record RetryWordResult(
         boolean correct,
         List<String> perceived,
         List<String> canonical,

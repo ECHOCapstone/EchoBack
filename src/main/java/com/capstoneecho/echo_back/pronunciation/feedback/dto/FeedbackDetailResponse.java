@@ -5,7 +5,7 @@ import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFee
 import java.time.Instant;
 import java.util.List;
 
-public record FeedbackResponse(
+public record FeedbackDetailResponse(
         Long id,
         Long scriptId,
         Long sessionId,
@@ -18,8 +18,8 @@ public record FeedbackResponse(
         Instant createdAt
 ) {
 
-    public static FeedbackResponse from(PronunciationFeedback f) {
-        return new FeedbackResponse(
+    public static FeedbackDetailResponse from(PronunciationFeedback f) {
+        return new FeedbackDetailResponse(
                 f.getId(),
                 f.getScriptId(),
                 f.getSessionId(),

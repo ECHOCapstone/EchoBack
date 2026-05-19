@@ -3,10 +3,10 @@ package com.capstoneecho.echo_back.pronunciation.feedback.service;
 import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.GenerateFeedbackRequest;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.member.service.MemberService;
 import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.pronunciation.recording.support.MultipartAudioReader;
@@ -79,7 +79,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     @Override
-    public FeedbackResponse generate(Long userId, GenerateFeedbackRequest request) {
+    public FeedbackDetailResponse generate(Long userId, FeedbackGenerateRequest request) {
         validateTarget(request);
 
         var script = request.scriptId() != null ? scriptService.getEntity(request.scriptId()) : null;
@@ -107,11 +107,11 @@ public class FeedbackServiceImpl implements FeedbackService {
         for (var err : weakness.errors()) {
             feedback.addError(PhonemeError.of(err.op(), err.canonical(), err.perceived(), err.canonicalIndex()));
         }
-        return FeedbackResponse.from(feedbackRepository.save(feedback));
+        return FeedbackDetailResponse.from(feedbackRepository.save(feedback));
     }
 
     @Override
-    public RetryWordResponse retryWord(Long userId, Long feedbackId, MultipartFile audio) {
+    public RetryWordResult retryWord(Long userId, Long feedbackId, MultipartFile audio) {
         var feedback = feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
         var bytes = audioReader.read(audio);
@@ -128,7 +128,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         var evaluation = llmGenerator.evaluateRetry(practiceWord, analysis.perceived(), analysis.canonical());
         var score = scoringPolicy.scoreOf(analysis);
 
-        return new RetryWordResponse(
+        return new RetryWordResult(
                 evaluation.correct(),
                 analysis.perceived(),
                 analysis.canonical(),
@@ -147,10 +147,10 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     @Transactional(readOnly = true)
-    public FeedbackResponse get(Long userId, Long feedbackId) {
+    public FeedbackDetailResponse get(Long userId, Long feedbackId) {
         var feedback = feedbackRepository.findByIdAndUserId(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-        return FeedbackResponse.from(feedback);
+        return FeedbackDetailResponse.from(feedback);
     }
 
     @Override
@@ -164,7 +164,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         return UserResponse.from(user);
     }
 
-    private void validateTarget(GenerateFeedbackRequest request) {
+    private void validateTarget(FeedbackGenerateRequest request) {
         var hasScript = request.scriptId() != null;
         var hasSession = request.sessionId() != null;
         if (hasScript == hasSession) {
@@ -173,7 +173,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         }
     }
 
-    private String resolveTitle(Long userId, GenerateFeedbackRequest request, Script script) {
+    private String resolveTitle(Long userId, FeedbackGenerateRequest request, Script script) {
         if (script != null) {
             return script.getTitle();
         }

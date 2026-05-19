@@ -1,9 +1,9 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.controller;
 
 import com.capstoneecho.echo_back.global.common.ApiResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.GenerateFeedbackRequest;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.member.dto.UserResponse;
@@ -26,15 +26,15 @@ public class FeedbackController {
     }
 
     @PostMapping("/generate")
-    public ApiResponse<FeedbackResponse> generate(
+    public ApiResponse<FeedbackDetailResponse> generate(
             @CurrentUser JwtPrincipal principal,
-            @Valid @RequestBody GenerateFeedbackRequest request
+            @Valid @RequestBody FeedbackGenerateRequest request
     ) {
         return ApiResponse.success(feedbackService.generate(principal.userId(), request));
     }
 
     @PostMapping(value = "/{feedbackId}/retry-word", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<RetryWordResponse> retryWord(
+    public ApiResponse<RetryWordResult> retryWord(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId,
             @RequestPart("audio") MultipartFile audio
