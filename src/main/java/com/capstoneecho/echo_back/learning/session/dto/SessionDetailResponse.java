@@ -5,7 +5,7 @@ import com.capstoneecho.echo_back.learning.session.entity.Session;
 import java.time.Instant;
 import java.util.List;
 
-public record SessionResponse(
+public record SessionDetailResponse(
         Long id,
         String title,
         String scriptText,
@@ -15,8 +15,8 @@ public record SessionResponse(
         Instant updatedAt
 ) {
 
-    public static SessionResponse from(Session session) {
-        return new SessionResponse(
+    public static SessionDetailResponse from(Session session) {
+        return new SessionDetailResponse(
                 session.getId(),
                 session.getTitle(),
                 session.getScriptText(),

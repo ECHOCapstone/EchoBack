@@ -4,8 +4,8 @@ import com.capstoneecho.echo_back.global.common.ApiResponse;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
-import com.capstoneecho.echo_back.learning.session.dto.SessionResponse;
-import com.capstoneecho.echo_back.learning.session.dto.SessionUpdateRequest;
+import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
+import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -24,13 +24,13 @@ public class SessionController {
     }
 
     @GetMapping
-    public ApiResponse<List<SessionResponse>> list(@CurrentUser JwtPrincipal principal) {
+    public ApiResponse<List<SessionDetailResponse>> list(@CurrentUser JwtPrincipal principal) {
         return ApiResponse.success(sessionService.listMine(principal.userId()));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<SessionResponse> create(
+    public ApiResponse<SessionDetailResponse> create(
             @CurrentUser JwtPrincipal principal,
             @Valid @RequestBody SessionCreateRequest request
     ) {
@@ -38,7 +38,7 @@ public class SessionController {
     }
 
     @GetMapping("/{sessionId}")
-    public ApiResponse<SessionResponse> get(
+    public ApiResponse<SessionDetailResponse> get(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long sessionId
     ) {
@@ -46,10 +46,10 @@ public class SessionController {
     }
 
     @PatchMapping("/{sessionId}")
-    public ApiResponse<SessionResponse> update(
+    public ApiResponse<SessionDetailResponse> update(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long sessionId,
-            @Valid @RequestBody SessionUpdateRequest request
+            @Valid @RequestBody SessionPatchRequest request
     ) {
         return ApiResponse.success(sessionService.update(principal.userId(), sessionId, request));
     }

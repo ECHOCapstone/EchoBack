@@ -3,8 +3,8 @@ package com.capstoneecho.echo_back.learning.session.service;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
-import com.capstoneecho.echo_back.learning.session.dto.SessionResponse;
-import com.capstoneecho.echo_back.learning.session.dto.SessionUpdateRequest;
+import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
+import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,26 +35,26 @@ class SessionServiceImpl implements SessionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SessionResponse> listMine(Long userId) {
+    public List<SessionDetailResponse> listMine(Long userId) {
         return repository.findByUserIdOrderByFavoriteDescUpdatedAtDesc(userId).stream()
-                .map(SessionResponse::from)
+                .map(SessionDetailResponse::from)
                 .toList();
     }
 
     @Override
-    public SessionResponse create(Long userId, SessionCreateRequest request) {
+    public SessionDetailResponse create(Long userId, SessionCreateRequest request) {
         var session = repository.save(Session.create(userId, request.title()));
-        return SessionResponse.from(session);
+        return SessionDetailResponse.from(session);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public SessionResponse get(Long userId, Long sessionId) {
-        return SessionResponse.from(getEntity(userId, sessionId));
+    public SessionDetailResponse get(Long userId, Long sessionId) {
+        return SessionDetailResponse.from(getEntity(userId, sessionId));
     }
 
     @Override
-    public SessionResponse update(Long userId, Long sessionId, SessionUpdateRequest request) {
+    public SessionDetailResponse update(Long userId, Long sessionId, SessionPatchRequest request) {
         var session = getEntity(userId, sessionId);
         session.rename(request.title());
         // favorite 는 명시된 경우에만 반영. null 이면 기존 값 유지 (PATCH 부분 갱신 의미).
@@ -70,7 +70,7 @@ class SessionServiceImpl implements SessionService {
             // 명시 flush. saveAndFlush 가 dirty checking 결과를 즉시 DB 에 반영한다.
             repository.saveAndFlush(session);
         }
-        return SessionResponse.from(session);
+        return SessionDetailResponse.from(session);
     }
 
     @Override

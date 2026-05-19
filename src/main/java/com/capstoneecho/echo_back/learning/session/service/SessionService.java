@@ -1,8 +1,8 @@
 package com.capstoneecho.echo_back.learning.session.service;
 
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
-import com.capstoneecho.echo_back.learning.session.dto.SessionResponse;
-import com.capstoneecho.echo_back.learning.session.dto.SessionUpdateRequest;
+import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
+import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
 
 import java.util.List;
 
@@ -11,13 +11,13 @@ import com.capstoneecho.echo_back.learning.session.entity.SessionSentence;
 import com.capstoneecho.echo_back.pronunciation.recording.service.RecordingService;
 public interface SessionService {
 
-    List<SessionResponse> listMine(Long userId);
+    List<SessionDetailResponse> listMine(Long userId);
 
-    SessionResponse create(Long userId, SessionCreateRequest request);
+    SessionDetailResponse create(Long userId, SessionCreateRequest request);
 
-    SessionResponse get(Long userId, Long sessionId);
+    SessionDetailResponse get(Long userId, Long sessionId);
 
-    SessionResponse update(Long userId, Long sessionId, SessionUpdateRequest request);
+    SessionDetailResponse update(Long userId, Long sessionId, SessionPatchRequest request);
 
     void delete(Long userId, Long sessionId);
 
