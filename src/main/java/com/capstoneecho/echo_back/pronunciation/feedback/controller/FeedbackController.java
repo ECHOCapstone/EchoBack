@@ -36,14 +36,17 @@ public class FeedbackController {
         return ApiResponse.success(feedbackService.generate(principal.userId(), request));
     }
 
+    // word 파라미터를 명시하면 종합 피드백의 nextPracticeItems 중 그 항목에 대해 재시도 평가한다.
+    // 미지정 시 feedback 의 practiceWord (또는 외부화된 폴백 단어) 가 사용된다.
     @PostMapping(value = "/{feedbackId}/retry-word", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<RetryWordResult> retryWord(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId,
-            @RequestParam("audio") MultipartFile audio) {
+            @RequestParam("audio") MultipartFile audio,
+            @RequestParam(value = "word", required = false) String word) {
         byte[] audioBytes = AudioBytesReader.read(audio);
         return ApiResponse.success(
-                feedbackService.retryWord(principal.userId(), feedbackId, audioBytes));
+                feedbackService.retryWord(principal.userId(), feedbackId, audioBytes, word));
     }
 
     @PostMapping("/{feedbackId}/complete")

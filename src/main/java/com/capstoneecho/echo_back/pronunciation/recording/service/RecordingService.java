@@ -56,6 +56,7 @@ public class RecordingService {
     private final ScoringPolicy scoringPolicy;
     private final PriorAttemptAssembler priorAttemptAssembler;
     private final double passThreshold;
+    private final int priorAttemptsCap;
 
     public RecordingService(
             UserRepository userRepository,
@@ -87,6 +88,7 @@ public class RecordingService {
         this.priorAttemptAssembler = priorAttemptAssembler;
         AppProperties.Gamification g = appProperties.gamification();
         this.passThreshold = g == null ? 80.0 : g.passThreshold();
+        this.priorAttemptsCap = g == null ? 10 : Math.max(1, g.priorAttemptsCap());
     }
 
     // 녹음 1건 업로드 흐름:
@@ -143,8 +145,17 @@ public class RecordingService {
                 passed);
     }
 
-    // 같은 부모 (script+step 또는 session+sentence) 에서 작성 시각 오름차순 이전 시도 목록.
+    // 같은 부모 (script+step 또는 session+sentence) 의 이전 시도들을 오름차순으로 가져온 뒤,
+    // 가장 최근 priorAttemptsCap 개만 잘라 LLM 입력을 적정 토큰량으로 유지한다.
     private List<Recording> findPriorAttempts(Long userId, ResolvedParents parents) {
+        List<Recording> all = loadAllPriorAttempts(userId, parents);
+        if (all.size() <= priorAttemptsCap) {
+            return all;
+        }
+        return all.subList(all.size() - priorAttemptsCap, all.size());
+    }
+
+    private List<Recording> loadAllPriorAttempts(Long userId, ResolvedParents parents) {
         if (parents.step() != null && parents.script() != null) {
             return recordingRepository.findAllByUser_IdAndScript_IdAndStep_IdOrderByCreatedAtAsc(
                     userId, parents.script().getId(), parents.step().getId());
@@ -175,7 +186,7 @@ public class RecordingService {
                 g2p.words(),
                 pickWeakPhoneme(analyze.errors()),
                 stepScore,
-                priorAttemptAssembler.from(priorRecordings));
+                priorAttemptAssembler.fromRecordings(priorRecordings));
     }
 
     private static String pickWeakPhoneme(List<AnalyzeError> errors) {

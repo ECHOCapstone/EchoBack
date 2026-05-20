@@ -27,7 +27,9 @@ import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResp
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeOp;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
+import com.capstoneecho.echo_back.pronunciation.feedback.entity.RetryAttempt;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
+import com.capstoneecho.echo_back.pronunciation.feedback.repository.RetryAttemptRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.WeakPhonemeAnalyzer;
@@ -42,6 +44,8 @@ import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -57,6 +61,7 @@ public class FeedbackService {
     private final SessionRepository sessionRepository;
     private final RecordingRepository recordingRepository;
     private final FeedbackRepository feedbackRepository;
+    private final RetryAttemptRepository retryAttemptRepository;
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
     private final ScoringPolicy scoringPolicy;
@@ -67,6 +72,7 @@ public class FeedbackService {
     private final ObjectMapper objectMapper;
     private final int completionExp;
     private final double passThreshold;
+    private final int priorAttemptsCap;
     private final String defaultPracticeWord;
 
     public FeedbackService(
@@ -75,6 +81,7 @@ public class FeedbackService {
             SessionRepository sessionRepository,
             RecordingRepository recordingRepository,
             FeedbackRepository feedbackRepository,
+            RetryAttemptRepository retryAttemptRepository,
             ModelServerClient modelServerClient,
             LlmClient llmClient,
             ScoringPolicy scoringPolicy,
@@ -89,6 +96,7 @@ public class FeedbackService {
         this.sessionRepository = sessionRepository;
         this.recordingRepository = recordingRepository;
         this.feedbackRepository = feedbackRepository;
+        this.retryAttemptRepository = retryAttemptRepository;
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
         this.scoringPolicy = scoringPolicy;
@@ -100,6 +108,7 @@ public class FeedbackService {
         AppProperties.Gamification g = appProperties.gamification();
         this.completionExp = g == null ? 10 : g.completionExp();
         this.passThreshold = g == null ? 80.0 : g.passThreshold();
+        this.priorAttemptsCap = g == null ? 10 : Math.max(1, g.priorAttemptsCap());
         this.defaultPracticeWord = g == null ? "the" : g.defaultPracticeWord();
     }
 
@@ -172,20 +181,22 @@ public class FeedbackService {
     }
 
     // 단어 / 구 재시도 흐름:
-    // (1) WAV 검증 → feedback 조회 → 연습 단어 결정
+    // (1) WAV 검증 → feedback 조회 → 연습 단어 (또는 클라이언트가 명시한 word) 결정
     // (2) 모델 서버 g2p / analyze
-    // (3) 같은 feedback 의 이전 retry-word 기록은 현재 모델에 별도 컬럼이 없으므로 빈 priorAttempts 로 호출.
-    //     (PronunciationFeedback 자체의 errors 가 LLM 컨텍스트에서 누적 신호 역할을 한다.)
+    // (3) 같은 feedback 의 이전 retry-word 시도들을 RetryAttempt 에서 불러와 priorAttempts 로 채운다
     // (4) LLM 구조화 결과로 응답 구성
+    // (5) 이번 시도를 RetryAttempt 로 저장해 다음 호출의 누적 컨텍스트가 된다
     public RetryWordResult retryWord(Long userId, Long feedbackId, byte[] audioBytes) {
+        return retryWord(userId, feedbackId, audioBytes, null);
+    }
+
+    public RetryWordResult retryWord(
+            Long userId, Long feedbackId, byte[] audioBytes, String overrideWord) {
         wavHeaderValidator.require(audioBytes);
         PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
 
-        String word = feedback.getPracticeWord();
-        if (word == null || word.isBlank()) {
-            word = defaultPracticeWord;
-        }
+        String word = resolveRetryWord(feedback, overrideWord);
 
         G2pResult g2p = modelServerClient.g2p(word);
         String canonical = g2p == null || g2p.phonemes() == null ? "" : g2p.phonemes();
@@ -195,6 +206,10 @@ public class FeedbackService {
         List<String> canonicalPhonemes = analyze.canonicalOrEmpty();
         double score = scoringPolicy.singleWordScore(analyze);
 
+        Pageable cap = PageRequest.of(0, priorAttemptsCap);
+        List<RetryAttempt> recent = retryAttemptRepository
+                .findByFeedback_IdOrderByCreatedAtDesc(feedback.getId(), cap);
+
         LlmRetryContext context = new LlmRetryContext(
                 word,
                 perceived,
@@ -202,9 +217,11 @@ public class FeedbackService {
                 analyze.errors(),
                 feedback.getWeakPhoneme(),
                 score,
-                List.of());
+                priorAttemptAssembler.fromRetries(recent));
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
         boolean passed = score >= passThreshold && !llm.retryRecommended();
+
+        persistRetryAttempt(feedback, word, perceived, canonicalPhonemes, analyze, score, llm);
 
         return new RetryWordResult(
                 llm.correct(),
@@ -215,6 +232,57 @@ public class FeedbackService {
                 score,
                 llm.guidanceKr(),
                 llm.phonemeTips());
+    }
+
+    // overrideWord 가 들어오면 우선 — 종합 피드백의 nextPracticeItems 중 어떤 항목을 재시도할지 클라이언트가 명시한다.
+    // 없으면 feedback 의 practiceWord, 둘 다 없으면 외부화된 폴백 단어로 떨어진다.
+    private String resolveRetryWord(PronunciationFeedback feedback, String overrideWord) {
+        if (overrideWord != null && !overrideWord.isBlank()) {
+            return overrideWord;
+        }
+        String word = feedback.getPracticeWord();
+        if (word == null || word.isBlank()) {
+            return defaultPracticeWord;
+        }
+        return word;
+    }
+
+    private void persistRetryAttempt(
+            PronunciationFeedback feedback,
+            String word,
+            List<String> perceived,
+            List<String> canonical,
+            AnalyzeResult analyze,
+            double score,
+            LlmRetryFeedback llm) {
+        String errorsJson = serializeErrors(analyze.errors());
+        RetryAttempt attempt = RetryAttempt.create(
+                feedback,
+                word,
+                joinTokens(perceived),
+                joinTokens(canonical),
+                errorsJson,
+                score,
+                llm.guidanceKr(),
+                llm.correct());
+        retryAttemptRepository.save(attempt);
+    }
+
+    private String serializeErrors(List<AnalyzeError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(errors);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to serialize retry errors; storing NULL", ex);
+            return null;
+        }
+    }
+
+    private static String joinTokens(List<String> tokens) {
+        if (tokens == null || tokens.isEmpty()) return null;
+        return String.join(" ", tokens);
     }
 
     @Transactional(readOnly = true)
