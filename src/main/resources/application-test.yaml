@@ -18,6 +18,9 @@ app:
     expiration-ms: 3600000
   model-server:
     timeout-ms: 5000
+  # 테스트는 외부 모델 서버 없이 결정적으로 도는 더미 mp3 클라이언트를 강제한다.
+  tts:
+    provider: local-stub
   storage:
     local-root: build/test-storage
   auth:

@@ -39,7 +39,8 @@ app:
   storage:
     local-root: build/local-storage
   tts:
-    provider: local-stub
+    # local-stub (외부 호출 없음, 더미 mp3) | model-server (gTTS 진짜 음성을 모델 서버에서 합성)
+    provider: ${APP_TTS_PROVIDER:model-server}
   stats:
     zone: Asia/Seoul
     badges:
