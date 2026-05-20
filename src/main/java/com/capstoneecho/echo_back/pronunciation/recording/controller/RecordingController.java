@@ -1,15 +1,23 @@
 package com.capstoneecho.echo_back.pronunciation.recording.controller;
 
 import com.capstoneecho.echo_back.global.common.ApiResponse;
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingResponse;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
+import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
+import com.capstoneecho.echo_back.pronunciation.recording.service.RecordingService;
+import java.io.IOException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.capstoneecho.echo_back.pronunciation.recording.service.RecordingService;
 @RestController
 @RequestMapping("/api/recordings")
 public class RecordingController {
@@ -21,17 +29,26 @@ public class RecordingController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<RecordingResponse> upload(
+    public ResponseEntity<ApiResponse<RecordingUploadResponse>> upload(
             @CurrentUser JwtPrincipal principal,
-            @RequestPart("audio") MultipartFile audio,
+            @RequestParam("audio") MultipartFile audio,
             @RequestParam(value = "scriptId", required = false) Long scriptId,
-            @RequestParam(value = "sessionId", required = false) Long sessionId,
             @RequestParam(value = "stepId", required = false) Long stepId,
-            @RequestParam(value = "sessionSentenceId", required = false) Long sessionSentenceId
-    ) {
-        return ApiResponse.success(recordingService.upload(
-                principal.userId(), scriptId, sessionId, stepId, sessionSentenceId, audio
-        ));
+            @RequestParam(value = "sessionId", required = false) Long sessionId,
+            @RequestParam(value = "sessionSentenceId", required = false) Long sessionSentenceId) {
+        byte[] audioBytes = readAudioBytes(audio);
+        RecordingUploadRequest request = new RecordingUploadRequest(
+                scriptId, stepId, sessionId, sessionSentenceId);
+        RecordingUploadResponse response =
+                recordingService.upload(principal.userId(), request, audioBytes);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    private static byte[] readAudioBytes(MultipartFile audio) {
+        try {
+            return audio.getBytes();
+        } catch (IOException ex) {
+            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED, ex.getMessage());
+        }
     }
 }

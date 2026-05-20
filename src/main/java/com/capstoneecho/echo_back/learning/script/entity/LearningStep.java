@@ -15,8 +15,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 한 챕터 안의 학습 단계. INTRO 는 안내문, RECORD 는 사용자가 따라 읽을 목표 텍스트를 보유한다.
-// PK 순서 = 시드 적재 순서 = 의도된 학습 순서이므로 별도 정렬 컬럼 없이 id 정렬로 안정적 출력을 보장한다.
 @Entity
 @Table(name = "learning_steps")
 @Getter
@@ -38,7 +36,6 @@ public class LearningStep {
     @Column(name = "prompt", nullable = false, columnDefinition = "TEXT")
     private String prompt;
 
-    // RECORD 단계에서 사용자가 따라 읽어야 할 목표 텍스트. INTRO 는 null.
     @Column(name = "target_text", columnDefinition = "TEXT")
     private String targetText;
 

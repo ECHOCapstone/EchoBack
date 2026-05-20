@@ -15,8 +15,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 한 PronunciationFeedback 안의 단일 오류 항목.
-// 외부 코드는 직접 생성하지 않고 PronunciationFeedback.recordPhonemeError 를 통해 만든다.
 @Entity
 @Table(name = "phoneme_errors")
 @Getter
@@ -51,7 +49,6 @@ public class PhonemeError {
         this.canonicalIndex = canonicalIndex;
     }
 
-    // 같은 패키지 안 PronunciationFeedback.recordPhonemeError 에서만 호출한다.
     static PhonemeError create(PhonemeOp op, String canonical, String perceived, Integer canonicalIndex) {
         if (op == null) {
             throw new IllegalArgumentException("op is required");
@@ -59,7 +56,6 @@ public class PhonemeError {
         return new PhonemeError(op, canonical, perceived, canonicalIndex);
     }
 
-    // PronunciationFeedback.attach / recordPhonemeError 가 호출하는 양방향 연결 훅.
     void attachTo(PronunciationFeedback parent) {
         this.feedback = parent;
     }

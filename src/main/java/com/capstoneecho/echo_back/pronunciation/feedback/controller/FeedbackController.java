@@ -1,20 +1,26 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.controller;
 
 import com.capstoneecho.echo_back.global.common.ApiResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
-import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.member.dto.UserResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
+import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
+import com.capstoneecho.echo_back.pronunciation.feedback.service.FeedbackService;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.capstoneecho.echo_back.pronunciation.feedback.service.FeedbackService;
-// 피드백을 새로 만들거나 보상으로 마무리하는 쓰기 계열 엔드포인트.
-// 동일 도메인의 조회는 FeedbacksReadController 가 /api/feedbacks 경로로 분리해서 담당한다.
 @RestController
 @RequestMapping("/api/feedback")
 public class FeedbackController {
@@ -28,8 +34,7 @@ public class FeedbackController {
     @PostMapping("/generate")
     public ApiResponse<FeedbackDetailResponse> generate(
             @CurrentUser JwtPrincipal principal,
-            @Valid @RequestBody FeedbackGenerateRequest request
-    ) {
+            @Valid @RequestBody FeedbackGenerateRequest request) {
         return ApiResponse.success(feedbackService.generate(principal.userId(), request));
     }
 
@@ -37,16 +42,24 @@ public class FeedbackController {
     public ApiResponse<RetryWordResult> retryWord(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId,
-            @RequestPart("audio") MultipartFile audio
-    ) {
-        return ApiResponse.success(feedbackService.retryWord(principal.userId(), feedbackId, audio));
+            @RequestParam("audio") MultipartFile audio) {
+        byte[] audioBytes = readAudioBytes(audio);
+        return ApiResponse.success(
+                feedbackService.retryWord(principal.userId(), feedbackId, audioBytes));
     }
 
     @PostMapping("/{feedbackId}/complete")
     public ApiResponse<UserResponse> complete(
             @CurrentUser JwtPrincipal principal,
-            @PathVariable Long feedbackId
-    ) {
+            @PathVariable Long feedbackId) {
         return ApiResponse.success(feedbackService.complete(principal.userId(), feedbackId));
+    }
+
+    private static byte[] readAudioBytes(MultipartFile audio) {
+        try {
+            return audio.getBytes();
+        } catch (IOException ex) {
+            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED, ex.getMessage());
+        }
     }
 }

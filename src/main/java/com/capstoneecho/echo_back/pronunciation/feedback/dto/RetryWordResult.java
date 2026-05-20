@@ -7,5 +7,10 @@ public record RetryWordResult(
         List<String> perceived,
         List<String> canonical,
         double score,
-        String guidanceKr
-) {}
+        String guidanceKr) {
+
+    public RetryWordResult {
+        perceived = perceived == null ? List.of() : List.copyOf(perceived);
+        canonical = canonical == null ? List.of() : List.copyOf(canonical);
+    }
+}

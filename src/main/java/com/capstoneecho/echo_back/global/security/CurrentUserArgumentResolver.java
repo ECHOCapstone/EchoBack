@@ -2,7 +2,10 @@ package com.capstoneecho.echo_back.global.security;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.jwt.CurrentUser;
+import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import org.springframework.core.MethodParameter;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -10,16 +13,15 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-import com.capstoneecho.echo_back.global.jwt.CurrentUser;
-import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
-// @CurrentUser 가 붙은 컨트롤러 파라미터에 SecurityContext 의 JwtPrincipal 을 주입한다.
 @Component
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
+
+    private static final String ANONYMOUS_PRINCIPAL = "anonymousUser";
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
         return parameter.hasParameterAnnotation(CurrentUser.class)
-                && JwtPrincipal.class.isAssignableFrom(parameter.getParameterType());
+                && JwtPrincipal.class.equals(parameter.getParameterType());
     }
 
     @Override
@@ -29,10 +31,17 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
             NativeWebRequest webRequest,
             WebDataBinderFactory binderFactory
     ) {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof JwtPrincipal principal)) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getPrincipal() == null
+                || ANONYMOUS_PRINCIPAL.equals(authentication.getPrincipal())) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        return principal;
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof JwtPrincipal jwtPrincipal)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        return jwtPrincipal;
     }
 }

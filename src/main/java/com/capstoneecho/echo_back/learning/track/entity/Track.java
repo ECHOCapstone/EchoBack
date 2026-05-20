@@ -10,8 +10,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 학습 코스의 최상위 단위. 한 트랙은 순서 있는 챕터(Script) 들의 묶음이며 사용자가
-// 트랙을 선택하면 첫 챕터부터 순차로 학습한다. displayOrder 가 작은 값이 먼저 노출된다.
 @Entity
 @Table(name = "tracks")
 @Getter

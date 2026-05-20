@@ -1,59 +1,77 @@
 package com.capstoneecho.echo_back.pronunciation.recording.support;
 
 import com.capstoneecho.echo_back.global.config.AppProperties;
-import com.capstoneecho.echo_back.global.common.BusinessException;
-import com.capstoneecho.echo_back.global.common.ErrorCode;
-import org.springframework.stereotype.Component;
-
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
+import org.springframework.stereotype.Component;
 
-// 로컬 디스크 저장소. 사용자별 하위 디렉토리에 timestamped 파일명을 부여해 충돌을 피한다.
 @Component
-class LocalRecordingStorage implements RecordingStorage {
+public class LocalRecordingStorage implements RecordingStorage {
 
-    private final Path rootDir;
+    private static final DateTimeFormatter YEAR_MONTH =
+            DateTimeFormatter.ofPattern("yyyyMM").withZone(ZoneOffset.UTC);
 
-    LocalRecordingStorage(AppProperties properties) {
-        this.rootDir = Paths.get(properties.storage().recordingDir()).toAbsolutePath().normalize();
+    private final Path root;
+
+    public LocalRecordingStorage(AppProperties properties) {
+        String configuredRoot = properties.storage().localRoot();
+        if (configuredRoot == null || configuredRoot.isBlank()) {
+            throw new IllegalStateException("app.storage.localRoot must be configured");
+        }
+        this.root = Path.of(configuredRoot).toAbsolutePath().normalize();
     }
 
     @Override
-    public Stored save(Long userId, String originalFilename, byte[] data) {
-        var ext = pickExtension(originalFilename);
-        var filename = Instant.now().toEpochMilli() + "-" + UUID.randomUUID() + ext;
-        var dir = rootDir.resolve(String.valueOf(userId));
+    public String save(long userId, byte[] wavBytes) {
+        if (wavBytes == null) {
+            throw new IllegalArgumentException("wavBytes is required");
+        }
+        String yearMonth = YEAR_MONTH.format(Instant.now());
+        String audioPath = userId + "/" + yearMonth + "/" + UUID.randomUUID() + ".wav";
+        Path absolute = root.resolve(audioPath);
         try {
-            Files.createDirectories(dir);
-            var target = dir.resolve(filename);
-            Files.write(target, data);
-            return new Stored(target.toString(), originalFilename);
+            Files.createDirectories(absolute.getParent());
+            Files.write(absolute, wavBytes);
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "파일 저장 실패: " + e.getMessage());
+            throw new UncheckedIOException("failed to save recording: " + audioPath, e);
+        }
+        return audioPath;
+    }
+
+    @Override
+    public void delete(String audioPath) {
+        Path absolute = resolve(audioPath);
+        try {
+            Files.deleteIfExists(absolute);
+        } catch (IOException e) {
+            throw new UncheckedIOException("failed to delete recording: " + audioPath, e);
         }
     }
 
     @Override
-    public byte[] read(String path) {
+    public byte[] read(String audioPath) {
+        Path absolute = resolve(audioPath);
         try {
-            return Files.readAllBytes(Paths.get(path));
+            return Files.readAllBytes(absolute);
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "파일 읽기 실패: " + e.getMessage());
+            throw new UncheckedIOException("failed to read recording: " + audioPath, e);
         }
     }
 
-    private String pickExtension(String filename) {
-        if (filename == null) {
-            return ".wav";
+    private Path resolve(String audioPath) {
+        if (audioPath == null || audioPath.isBlank()) {
+            throw new IllegalArgumentException("audioPath is required");
         }
-        var idx = filename.lastIndexOf('.');
-        if (idx <= 0 || idx == filename.length() - 1) {
-            return ".wav";
+        Path resolved = root.resolve(audioPath).normalize();
+        if (!resolved.startsWith(root)) {
+            throw new IllegalArgumentException("audioPath escapes storage root: " + audioPath);
         }
-        return filename.substring(idx).toLowerCase();
+        return resolved;
     }
 }

@@ -1,18 +1,30 @@
 package com.capstoneecho.echo_back.learning.session.entity;
 
-import jakarta.persistence.*;
+import com.capstoneecho.echo_back.learning.session.support.SentenceSplitter;
+import com.capstoneecho.echo_back.member.entity.User;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-
-import com.capstoneecho.echo_back.learning.session.support.SentenceSplitter;
-// 사용자가 직접 대본을 입력해 만드는 맞춤 학습 세션. scriptText 가 채워지면 녹음/피드백으로 넘어간다.
 @Entity
-@Table(name = "sessions", indexes = @Index(name = "ix_sessions_user", columnList = "user_id"))
+@Table(name = "sessions")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Session {
@@ -21,20 +33,19 @@ public class Session {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(length = 100, nullable = false)
+    @Column(name = "title", nullable = false, length = 100)
     private String title;
 
-    @Column(name = "script_text", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "script_text", nullable = false, columnDefinition = "TEXT")
     private String scriptText;
 
-    // 목록을 즐겨찾기 우선으로 정렬할 때 쓰는 플래그.
-    @Column(nullable = false)
+    @Column(name = "favorite", nullable = false)
     private boolean favorite;
 
-    // 분할된 문장들. SentenceSplitter 결과를 그대로 받아 보관하고, 갱신 시 이전 항목은 orphanRemoval 로 정리된다.
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sentenceIndex ASC")
     private List<SessionSentence> sentences = new ArrayList<>();
@@ -45,40 +56,34 @@ public class Session {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public static Session create(Long userId, String title) {
-        var s = new Session();
-        s.userId = userId;
-        s.title = title;
-        s.scriptText = "";
-        s.favorite = false;
-        return s;
+    private Session(User user, String title) {
+        this.user = user;
+        this.title = title;
+        this.scriptText = "";
+        this.favorite = false;
     }
 
-    @PrePersist
-    void onCreate() {
-        var now = Instant.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updatedAt = Instant.now();
-    }
-
-    public void rename(String title) {
-        if (title != null && !title.isBlank()) {
-            this.title = title;
+    public static Session create(User user, String title) {
+        if (user == null) {
+            throw new IllegalArgumentException("user is required");
         }
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        return new Session(user, title);
+    }
+
+    public void rename(String newTitle) {
+        if (newTitle == null || newTitle.isBlank()) {
+            return;
+        }
+        this.title = newTitle;
     }
 
     public void setFavorite(boolean favorite) {
         this.favorite = favorite;
     }
 
-    // 새 대본을 받고 주입된 SentenceSplitter 로 문장을 다시 분할해 보관한다.
-    // scriptText 가 null 이면 그대로 둔다 (PATCH 부분 갱신 의미).
-    // 분할 정책을 엔티티 안에 직접 두지 않아 SOLID 의 의존성 역전 원칙을 만족한다.
     public void updateScript(String newScriptText, SentenceSplitter sentenceSplitter) {
         if (newScriptText == null) {
             return;
@@ -88,9 +93,28 @@ public class Session {
         }
         this.scriptText = newScriptText;
         this.sentences.clear();
+        List<String> texts = sentenceSplitter.split(newScriptText);
+        if (texts == null) {
+            return;
+        }
         int idx = 0;
-        for (var text : sentenceSplitter.split(newScriptText)) {
+        for (String text : texts) {
+            if (text == null) {
+                continue;
+            }
             this.sentences.add(SessionSentence.of(this, idx++, text));
         }
+    }
+
+    @PrePersist
+    void onCreate() {
+        Instant now = Instant.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = Instant.now();
     }
 }

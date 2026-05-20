@@ -1,8 +1,26 @@
 package com.capstoneecho.echo_back.pronunciation.recording.dto;
 
-// LLM 이 step 응답에서 짚어 준 잘못 발음된 단어 한 항목.
-//   word  - 원문 영어 단어 (소문자, 따옴표/구두점 제거)
-//   index - targetText 를 공백·구두점으로 쪼개 추출한 영어 단어들 중 0-based 위치
-//
-// 같은 단어가 여러 번 등장해도 정확한 위치 한 곳만 색칠하기 위해 word 와 index 를 함께 받는다.
-public record WrongWord(String word, int index) {}
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * FRONT_API_SPEC §12 정렬: LLM 또는 rule-based 폴백이 짚어 준 단어와 그 0-based 단어 인덱스.
+ *
+ * <p>{@code index} 는 {@code targetText} 를 공백 split 한 단어 배열에서의 위치다.
+ */
+public record WrongWord(String word, int index) {
+
+    @JsonCreator
+    public WrongWord(
+            @JsonProperty("word") String word,
+            @JsonProperty("index") int index) {
+        if (word == null) {
+            throw new IllegalArgumentException("word is required");
+        }
+        if (index < 0) {
+            throw new IllegalArgumentException("index must be >= 0");
+        }
+        this.word = word;
+        this.index = index;
+    }
+}

@@ -1,14 +1,117 @@
 package com.capstoneecho.echo_back.external.modelserver;
 
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
-// 모델 서버에 위임하는 호출 포트. 구현은 HTTP, gRPC, 인프로세스 등 자유롭게 갈 수 있다.
-public interface ModelServerClient {
+@Component
+public class ModelServerClient {
 
-    // 오디오 + (선택)정답 음소 시퀀스를 보내 perceived/alignment/errors/per 을 받는다.
-    AnalyzeResult analyze(byte[] audio, String filename, String contentType, String canonical);
+    private final RestClient restClient;
+    private final AppProperties appProperties;
 
-    // 영문 텍스트를 모델 인벤토리에 맞춘 ARPAbet 음소 시퀀스(공백 구분 문자열) 로 변환한다.
-    // 변환 결과가 비어 있을 수 있으므로 호출자는 빈 문자열 케이스를 안전히 다뤄야 한다.
-    String g2p(String text);
+    public ModelServerClient(RestClient restClient, AppProperties appProperties) {
+        this.restClient = restClient;
+        this.appProperties = appProperties;
+    }
+
+    public G2pResult g2p(String text) {
+        MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
+        body.add("text", textPart("text", text == null ? "" : text));
+        return execute("/g2p", body, G2pResult.class);
+    }
+
+    public AnalyzeResult analyze(byte[] audioBytes, String canonicalArpabetSpaceSep) {
+        MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
+        body.add("audio", audioPart(audioBytes));
+        if (canonicalArpabetSpaceSep != null && !canonicalArpabetSpaceSep.isBlank()) {
+            body.add("canonical", textPart("canonical", canonicalArpabetSpaceSep));
+        }
+        AnalyzeWire wire = execute("/analyze", body, AnalyzeWire.class);
+        return toResult(wire);
+    }
+
+    private static HttpEntity<String> textPart(String name, String value) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentDisposition(ContentDisposition.formData().name(name).build());
+        headers.setContentType(MediaType.TEXT_PLAIN);
+        return new HttpEntity<>(value, headers);
+    }
+
+    private static HttpEntity<ByteArrayResource> audioPart(byte[] audioBytes) {
+        ByteArrayResource resource = new ByteArrayResource(audioBytes) {
+            @Override
+            public String getFilename() {
+                return "audio.wav";
+            }
+        };
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentDisposition(
+                ContentDisposition.formData()
+                        .name("audio")
+                        .filename("audio.wav")
+                        .build());
+        headers.setContentType(MediaType.parseMediaType("audio/wav"));
+        return new HttpEntity<>(resource, headers);
+    }
+
+    private <T> T execute(
+            String path,
+            MultiValueMap<String, HttpEntity<?>> body,
+            Class<T> responseType
+    ) {
+        String url = appProperties.modelServer().baseUrl() + path;
+        try {
+            return restClient.post()
+                    .uri(url)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(responseType);
+        } catch (ResourceAccessException ex) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+        } catch (RestClientResponseException ex) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+        }
+    }
+
+    private static AnalyzeResult toResult(AnalyzeWire wire) {
+        return new AnalyzeResult(
+                wire.perceived(),
+                Optional.ofNullable(wire.canonical()),
+                wire.peakSoftmax(),
+                wire.alignment(),
+                wire.errors(),
+                Optional.ofNullable(wire.per()),
+                wire.durationSec()
+        );
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record AnalyzeWire(
+            List<String> perceived,
+            List<String> canonical,
+            List<Double> peakSoftmax,
+            List<Object> alignment,
+            List<AnalyzeError> errors,
+            Double per,
+            double durationSec
+    ) {}
 }

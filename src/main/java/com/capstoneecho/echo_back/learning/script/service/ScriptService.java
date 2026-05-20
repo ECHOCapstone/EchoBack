@@ -1,26 +1,57 @@
 package com.capstoneecho.echo_back.learning.script.service;
 
-import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptDetailResponse;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptSummaryResponse;
+import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
-
+import com.capstoneecho.echo_back.learning.script.repository.LearningStepRepository;
+import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
+import com.capstoneecho.echo_back.learning.script.support.RecommendedScriptSelector;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
-import com.capstoneecho.echo_back.statistics.stats.support.BadgePolicy;
-// 스크립트 도메인의 외부 노출 인터페이스. Recording/Feedback 도메인이 이 추상화에만 의존한다.
-public interface ScriptService {
+@Service
+@Transactional(readOnly = true)
+public class ScriptService {
 
-    List<ScriptSummaryResponse> getRecommendedToday();
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final int DAILY_RECOMMENDED_COUNT = 3;
 
-    ScriptDetailResponse getDetail(Long scriptId);
+    private final ScriptRepository scriptRepository;
+    private final LearningStepRepository learningStepRepository;
+    private final RecommendedScriptSelector recommendedScriptSelector;
 
-    Script getEntity(Long scriptId);
+    public ScriptService(
+            ScriptRepository scriptRepository,
+            LearningStepRepository learningStepRepository,
+            RecommendedScriptSelector recommendedScriptSelector) {
+        this.scriptRepository = scriptRepository;
+        this.learningStepRepository = learningStepRepository;
+        this.recommendedScriptSelector = recommendedScriptSelector;
+    }
 
-    LearningStep getStep(Long scriptId, Long stepId);
+    public ScriptDetailResponse getScript(Long scriptId) {
+        Script script = scriptRepository.findById(scriptId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
+        List<LearningStep> steps = learningStepRepository.findByScript_IdOrderByIdAsc(scriptId);
+        if (steps.isEmpty()) {
+            throw new BusinessException(ErrorCode.STEP_NOT_FOUND);
+        }
+        return ScriptDetailResponse.of(script, steps);
+    }
 
-    // BadgePolicy 가 챕터 단위 마스터 배지 (master_<scriptId>) 를 동적 생성할 때 사용한다.
-    // 어드민/시드가 masteryBadgeName 을 채운 시드 챕터만 반환된다.
-    List<Script> listMasteryChapters();
+    public List<ScriptSummaryResponse> recommendToday(Long userId) {
+        List<Script> presets = scriptRepository.findByPresetTrueOrderByIdAsc();
+        LocalDate today = LocalDate.now(KST);
+        List<Script> picked = recommendedScriptSelector.select(
+                userId, today, presets, DAILY_RECOMMENDED_COUNT);
+        return picked.stream()
+                .map(ScriptSummaryResponse::from)
+                .toList();
+    }
 }

@@ -1,20 +1,45 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.entity;
 
-import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-
+import com.capstoneecho.echo_back.learning.script.entity.Script;
+import com.capstoneecho.echo_back.learning.session.entity.Session;
+import com.capstoneecho.echo_back.member.entity.User;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Check;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
-// 한 챕터 또는 세션을 끝냈을 때 만들어지는 종합 피드백 한 건.
-// accuracy 는 step 점수 평균(0~100), weakPhoneme 는 가장 자주 틀린 음소.
 @Entity
-@Table(name = "pronunciation_feedbacks", indexes = {
-        @Index(name = "ix_feedbacks_user", columnList = "user_id")
-})
+@Table(
+        name = "pronunciation_feedbacks",
+        indexes = @Index(
+                name = "idx_feedback_user_completed_at",
+                columnList = "user_id, completed_at"
+        )
+)
+@Check(
+        name = "ck_pronunciation_feedbacks_script_session_xor",
+        constraints =
+                "(script_id IS NULL AND session_id IS NULL)"
+                        + " OR ((script_id IS NULL) <> (session_id IS NULL))"
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PronunciationFeedback {
@@ -23,19 +48,24 @@ public class PronunciationFeedback {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name = "script_id")
-    private Long scriptId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "script_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Script script;
 
-    @Column(name = "session_id")
-    private Long sessionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Session session;
 
-    @Column(length = 200, nullable = false)
+    @Column(name = "title", nullable = false, length = 200)
     private String title;
 
-    @Column(nullable = false)
+    @Column(name = "accuracy", nullable = false)
     private double accuracy;
 
     @Column(name = "weak_phoneme", length = 32)
@@ -47,51 +77,103 @@ public class PronunciationFeedback {
     @Column(name = "guidance_kr", columnDefinition = "TEXT")
     private String guidanceKr;
 
-    // 보상이 한 번 적용된 피드백인지. complete 가 두 번 호출돼도 EXP 가 중복 가산되지 않도록 막는다.
-    @Column(nullable = false)
+    @Column(name = "completed", nullable = false)
     private boolean completed;
 
-    @OneToMany(mappedBy = "feedback", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<PhonemeError> errors = new ArrayList<>();
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
+    @Column(name = "task_title", length = 200)
+    private String taskTitle;
+
+    @Column(name = "script_text", columnDefinition = "TEXT")
+    private String scriptText;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static PronunciationFeedback create(
-            Long userId,
-            Long scriptId,
-            Long sessionId,
+    @OneToMany(mappedBy = "feedback", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PhonemeError> errors = new ArrayList<>();
+
+    private PronunciationFeedback(
+            User user,
+            Script script,
+            Session session,
+            String title,
+            double accuracy,
+            String weakPhoneme,
+            String practiceWord,
+            String guidanceKr,
+            String taskTitle,
+            String scriptText
+    ) {
+        this.user = user;
+        this.script = script;
+        this.session = session;
+        this.title = title;
+        this.accuracy = accuracy;
+        this.weakPhoneme = weakPhoneme;
+        this.practiceWord = practiceWord;
+        this.guidanceKr = guidanceKr;
+        this.taskTitle = taskTitle;
+        this.scriptText = scriptText;
+        this.completed = false;
+    }
+
+    public static PronunciationFeedback forScript(
+            User user,
+            Script script,
             String title,
             double accuracy,
             String weakPhoneme,
             String practiceWord,
             String guidanceKr
     ) {
-        var f = new PronunciationFeedback();
-        f.userId = userId;
-        f.scriptId = scriptId;
-        f.sessionId = sessionId;
-        f.title = title;
-        f.accuracy = accuracy;
-        f.weakPhoneme = weakPhoneme;
-        f.practiceWord = practiceWord;
-        f.guidanceKr = guidanceKr;
-        return f;
+        requireNonNull(user, "user");
+        requireNonNull(script, "script");
+        requireNonBlank(title, "title");
+        requireAccuracyRange(accuracy);
+        return new PronunciationFeedback(
+                user, script, null, title, accuracy, weakPhoneme, practiceWord, guidanceKr,
+                null, null);
     }
 
-    // 외부 코드가 만들어 둔 PhonemeError 를 이 피드백에 첨부한다. 양방향 연결을 보장한다.
-    public void attach(PhonemeError error) {
-        error.attachTo(this);
-        this.errors.add(error);
+    public static PronunciationFeedback forSession(
+            User user,
+            Session session,
+            String title,
+            double accuracy,
+            String weakPhoneme,
+            String practiceWord,
+            String guidanceKr
+    ) {
+        requireNonNull(user, "user");
+        requireNonNull(session, "session");
+        requireNonBlank(title, "title");
+        requireAccuracyRange(accuracy);
+        if (session.getUser() != user) {
+            throw new IllegalArgumentException("session.user must equal the supplied user");
+        }
+        return new PronunciationFeedback(
+                user, null, session, title, accuracy, weakPhoneme, practiceWord, guidanceKr,
+                session.getTitle(), session.getScriptText());
     }
 
-    // 외부 코드가 op / 음소만 알고 PhonemeError 객체를 직접 만들 수 없을 때의 진입점.
-    // 도메인 책임 (생성 + 양방향 연결) 을 엔티티 안에 둔다.
-    public void recordPhonemeError(PhonemeOp op, String canonical, String perceived, Integer canonicalIndex) {
-        attach(PhonemeError.create(op, canonical, perceived, canonicalIndex));
+    public void attach(PhonemeError phonemeError) {
+        if (phonemeError == null) {
+            throw new IllegalArgumentException("phonemeError is required");
+        }
+        phonemeError.attachTo(this);
+        this.errors.add(phonemeError);
     }
 
-    // 외부에서 가이드 문장을 갱신할 때 사용. blank 입력은 무시한다.
+    public PhonemeError recordPhonemeError(
+            PhonemeOp op, String canonical, String perceived, Integer canonicalIndex) {
+        PhonemeError error = PhonemeError.create(op, canonical, perceived, canonicalIndex);
+        attach(error);
+        return error;
+    }
+
     public void updateGuidance(String newGuidance) {
         if (newGuidance == null || newGuidance.isBlank()) {
             return;
@@ -99,15 +181,26 @@ public class PronunciationFeedback {
         this.guidanceKr = newGuidance;
     }
 
-    // 처음 완료 처리할 때만 true 를 반환한다. 호출자는 이 값으로 보상 가산 여부를 결정한다.
-    public boolean markCompleted() {
-        if (completed) return false;
-        this.completed = true;
-        return true;
-    }
-
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
+    }
+
+    private static void requireNonNull(Object value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+    }
+
+    private static void requireNonBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+    }
+
+    private static void requireAccuracyRange(double accuracy) {
+        if (accuracy < 0.0 || accuracy > 100.0) {
+            throw new IllegalArgumentException("accuracy must be in [0, 100]");
+        }
     }
 }

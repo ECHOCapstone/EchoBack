@@ -1,0 +1,54 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: "jdbc:mysql://localhost:3306/echo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false"
+    username: echo
+    password: echo
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+  jackson:
+    time-zone: Asia/Seoul
+
+app:
+  jwt:
+    secret: "local-jwt-secret-please-replace-with-something-long-and-random-1234567890"
+    expiration-ms: 86400000
+  cors:
+    allowed-origins:
+      - "http://localhost:3000"
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    exposed-headers:
+      - Authorization
+    allow-credentials: true
+    max-age-sec: 3600
+  model-server:
+    base-url: "http://localhost:8000"
+    timeout-ms: 10000
+  llm:
+    provider: rule-based
+  storage:
+    local-root: build/local-storage
+  tts:
+    provider: local-stub
+  stats:
+    zone: Asia/Seoul
+  auth:
+    demo-google:
+      email: "demo.google@echo.local"
+      nickname: "DemoGoogleUser"

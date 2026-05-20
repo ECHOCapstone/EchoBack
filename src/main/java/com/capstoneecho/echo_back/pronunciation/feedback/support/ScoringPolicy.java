@@ -1,60 +1,50 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
-import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
+import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
-// 점수 계산의 단일 지점. score = alpha * accuracyFromPer + (1 - alpha) * meanPeak.
-// per 또는 peak 가 비어 있는 입력도 안전하게 0~100 범위의 값을 반환한다.
 @Component
 public class ScoringPolicy {
 
-    private final double alpha;
-
-    public ScoringPolicy(AppProperties properties) {
-        this.alpha = properties.scoring().alpha();
-    }
-
-    public double scoreOf(AnalyzeResult response) {
-        double accuracy = accuracyFromPer(response.per());
-        double meanPeak = meanPeak(response.peakSoftmax());
-        return clamp01(alpha * accuracy + (1.0 - alpha) * meanPeak) * 100.0;
-    }
-
-    public double averageScore(List<Double> scores) {
-        if (scores == null || scores.isEmpty()) {
-            return 0.0;
+    public double aggregate(Collection<Recording> recordings) {
+        if (recordings == null || recordings.isEmpty()) {
+            return 100.0;
         }
         double sum = 0.0;
-        for (var s : scores) {
-            sum += s;
+        int count = 0;
+        for (Recording r : recordings) {
+            Double score = r.getStepScore();
+            if (score != null) {
+                sum += clamp(score);
+                count++;
+            }
         }
-        return sum / scores.size();
+        if (count == 0) {
+            return 100.0;
+        }
+        return sum / count;
     }
 
-    private double accuracyFromPer(Double per) {
+    public double singleWordScore(AnalyzeResult analyze) {
+        if (analyze == null) {
+            return 100.0;
+        }
+        Double per = analyze.per().orElse(null);
         if (per == null) {
-            return 1.0;
+            List<AnalyzeError> errors = analyze.errors();
+            return (errors == null || errors.isEmpty()) ? 100.0 : 70.0;
         }
-        return clamp01(1.0 - per);
+        double score = (1.0 - per) * 100.0;
+        return clamp(score);
     }
 
-    private double meanPeak(List<Double> peaks) {
-        if (peaks == null || peaks.isEmpty()) {
-            return 0.0;
-        }
-        double sum = 0.0;
-        for (var p : peaks) {
-            sum += p;
-        }
-        return clamp01(sum / peaks.size());
-    }
-
-    private double clamp01(double v) {
+    private static double clamp(double v) {
         if (v < 0.0) return 0.0;
-        if (v > 1.0) return 1.0;
+        if (v > 100.0) return 100.0;
         return v;
     }
 }

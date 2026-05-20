@@ -1,32 +1,105 @@
 package com.capstoneecho.echo_back.learning.session.service;
 
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
 import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
 import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
-
-import java.util.List;
-
 import com.capstoneecho.echo_back.learning.session.entity.Session;
-import com.capstoneecho.echo_back.learning.session.entity.SessionSentence;
-import com.capstoneecho.echo_back.pronunciation.recording.service.RecordingService;
-public interface SessionService {
+import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
+import com.capstoneecho.echo_back.learning.session.support.SentenceSplitter;
+import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.member.repository.UserRepository;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-    List<SessionDetailResponse> listMine(Long userId);
+@Service
+@Transactional(readOnly = true)
+public class SessionService {
 
-    SessionDetailResponse create(Long userId, SessionCreateRequest request);
+    private final SessionRepository sessionRepository;
+    private final UserRepository userRepository;
+    private final SentenceSplitter sentenceSplitter;
+    private final Validator validator;
 
-    SessionDetailResponse get(Long userId, Long sessionId);
+    public SessionService(
+            SessionRepository sessionRepository,
+            UserRepository userRepository,
+            SentenceSplitter sentenceSplitter,
+            Validator validator) {
+        this.sessionRepository = sessionRepository;
+        this.userRepository = userRepository;
+        this.sentenceSplitter = sentenceSplitter;
+        this.validator = validator;
+    }
 
-    SessionDetailResponse update(Long userId, Long sessionId, SessionPatchRequest request);
+    public List<SessionDetailResponse> list(Long userId) {
+        return sessionRepository.findByUser_IdOrderByFavoriteDescUpdatedAtDesc(userId).stream()
+                .map(SessionDetailResponse::from)
+                .toList();
+    }
 
-    void delete(Long userId, Long sessionId);
+    @Transactional
+    public SessionDetailResponse create(Long userId, SessionCreateRequest request) {
+        validate(request);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        Session session = Session.create(user, request.title());
+        Session saved = sessionRepository.save(session);
+        return SessionDetailResponse.from(saved);
+    }
 
-    // 사용자 맞춤 학습 도전 횟수 — Stats 에서 "맞춤 학습 도전자/마스터" 배지 평가 입력으로 사용된다.
-    long countMine(Long userId);
+    public SessionDetailResponse get(Long userId, Long sessionId) {
+        return SessionDetailResponse.from(loadOwnedSession(userId, sessionId));
+    }
 
-    Session getEntity(Long userId, Long sessionId);
+    @Transactional
+    public SessionDetailResponse patch(Long userId, Long sessionId, SessionPatchRequest request) {
+        if (request == null) {
+            return SessionDetailResponse.from(loadOwnedSession(userId, sessionId));
+        }
+        validate(request);
+        Session session = loadOwnedSession(userId, sessionId);
+        if (request.title() != null && !request.title().isBlank()) {
+            session.rename(request.title());
+        }
+        if (request.scriptText() != null) {
+            session.updateScript(request.scriptText(), sentenceSplitter);
+        }
+        if (request.favorite() != null) {
+            session.setFavorite(request.favorite());
+        }
+        return SessionDetailResponse.from(session);
+    }
 
-    // 한 문장 학습 흐름에서 사용자 소유 검증과 함께 SessionSentence 를 돌려준다.
-    // RecordingService 가 sentenceId 로 녹음을 받을 때 targetText 를 결정하기 위한 진입점이다.
-    SessionSentence getSentence(Long userId, Long sentenceId);
+    @Transactional
+    public void delete(Long userId, Long sessionId) {
+        int affected = sessionRepository.deleteByIdAndUser_Id(sessionId, userId);
+        if (affected == 0) {
+            throw new BusinessException(ErrorCode.SESSION_NOT_FOUND);
+        }
+    }
+
+    private Session loadOwnedSession(Long userId, Long sessionId) {
+        return sessionRepository.findByIdAndUser_Id(sessionId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+    }
+
+    private <T> void validate(T request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+        Set<ConstraintViolation<T>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            String message = violations.stream()
+                    .map(v -> v.getPropertyPath() + " " + v.getMessage())
+                    .collect(Collectors.joining(", "));
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, message);
+        }
+    }
 }

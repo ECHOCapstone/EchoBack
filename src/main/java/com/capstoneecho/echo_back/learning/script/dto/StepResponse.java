@@ -3,21 +3,9 @@ package com.capstoneecho.echo_back.learning.script.dto;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.StepKind;
 
-// 채팅형 학습 UI 의 한 메시지에 대응되는 DTO. id 순서가 학습 단계 순서다.
-// 정답 음소는 도메인이 보관하지 않으므로 응답에도 노출되지 않는다.
-public record StepResponse(
-        Long id,
-        StepKind kind,
-        String prompt,
-        String targetText
-) {
+public record StepResponse(Long id, StepKind kind, String prompt, String targetText) {
 
     public static StepResponse from(LearningStep step) {
-        return new StepResponse(
-                step.getId(),
-                step.getKind(),
-                step.getPrompt(),
-                step.getTargetText()
-        );
+        return new StepResponse(step.getId(), step.getKind(), step.getPrompt(), step.getTargetText());
     }
 }

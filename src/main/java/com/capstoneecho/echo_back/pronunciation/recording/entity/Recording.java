@@ -1,28 +1,44 @@
 package com.capstoneecho.echo_back.pronunciation.recording.entity;
 
-import jakarta.persistence.*;
+import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
+import com.capstoneecho.echo_back.learning.script.entity.Script;
+import com.capstoneecho.echo_back.learning.session.entity.Session;
+import com.capstoneecho.echo_back.learning.session.entity.SessionSentence;
+import com.capstoneecho.echo_back.member.entity.User;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Check;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
-import java.time.Instant;
-
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
-import com.capstoneecho.echo_back.learning.session.entity.SessionSentence;
-import com.capstoneecho.echo_back.pronunciation.feedback.service.FeedbackService;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
-// 한 건의 사용자 녹음 메타.
-//
-// 참조는 scriptId/sessionId 중 하나만 사용한다. stepId 는 정해진 학습 단계(추천 학습)일 때만.
-// audioPath 는 디스크 저장 경로, perceived/canonical/peakSoftmax 는 모델 응답 캐시,
-// stepScore 는 ScoringPolicy 로 계산한 단계 점수(0~100).
 @Entity
-@Table(name = "recordings", indexes = {
-        @Index(name = "ix_recordings_user", columnList = "user_id"),
-        @Index(name = "ix_recordings_script", columnList = "script_id"),
-        @Index(name = "ix_recordings_session", columnList = "session_id")
-})
+@Table(name = "recordings")
+@Check(
+        name = "ck_recordings_script_session_xor",
+        constraints =
+                "(script_id IS NULL AND session_id IS NULL)"
+                        + " OR ((script_id IS NULL) <> (session_id IS NULL))"
+)
+@Check(
+        name = "ck_recordings_step_requires_script",
+        constraints = "step_id IS NULL OR script_id IS NOT NULL"
+)
+@Check(
+        name = "ck_recordings_sentence_requires_session",
+        constraints = "session_sentence_id IS NULL OR session_id IS NOT NULL"
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Recording {
@@ -31,24 +47,35 @@ public class Recording {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name = "script_id")
-    private Long scriptId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "script_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Script script;
 
-    @Column(name = "session_id")
-    private Long sessionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "step_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private LearningStep step;
 
-    @Column(name = "step_id")
-    private Long stepId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Session session;
 
-    // 추천 학습의 step_id 와 동등 위치의 식별자. 사용자 맞춤 세션의 한 문장에 대한 녹음일 때 채워진다.
-    @Column(name = "session_sentence_id")
-    private Long sessionSentenceId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_sentence_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private SessionSentence sessionSentence;
 
-    @Column(name = "audio_path", length = 500, nullable = false)
+    @Column(name = "audio_path", nullable = false, length = 500)
     private String audioPath;
+
+    @Column(name = "target_text_snapshot", columnDefinition = "TEXT")
+    private String targetTextSnapshot;
 
     @Column(name = "duration_sec")
     private Double durationSec;
@@ -62,76 +89,99 @@ public class Recording {
     @Column(name = "peak_softmax", columnDefinition = "TEXT")
     private String peakSoftmax;
 
+    @Column(name = "errors_json", columnDefinition = "TEXT")
+    private String errorsJson;
+
     @Column(name = "step_score")
     private Double stepScore;
 
-    // 한 녹음 직후 채팅 흐름에 노출되는 한국어 한 줄 가이드.
     @Column(name = "guidance_kr", columnDefinition = "TEXT")
     private String guidanceKr;
 
-    // AnalyzeResult.errors 의 JSON 직렬화. FeedbackService 가 unit 종합 시 음소 빈도를 집계한다.
-    @Column(name = "errors_json", columnDefinition = "TEXT")
-    private String errorsJson;
+    @Column(name = "wrong_words_json", columnDefinition = "TEXT")
+    private String wrongWordsJson;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // 추천 학습 트랙의 한 step (LearningStep) 에 대한 녹음.
-    public static Recording forScriptStep(Long userId, Long scriptId, Long stepId, String audioPath) {
-        return build(userId, scriptId, null, stepId, null, audioPath);
-    }
-
-    // 사용자 맞춤 세션의 한 문장 (SessionSentence) 에 대한 녹음.
-    public static Recording forSessionSentence(Long userId, Long sessionId, Long sessionSentenceId, String audioPath) {
-        return build(userId, null, sessionId, null, sessionSentenceId, audioPath);
-    }
-
-    // 사용자 맞춤 세션을 한 호흡으로 통째로 녹음하는 자유 폼 (sentence 분리 없음).
-    public static Recording forSessionFreeForm(Long userId, Long sessionId, String audioPath) {
-        return build(userId, null, sessionId, null, null, audioPath);
-    }
-
-    private static Recording build(
-            Long userId,
-            Long scriptId,
-            Long sessionId,
-            Long stepId,
-            Long sessionSentenceId,
-            String audioPath
+    private Recording(
+            User user,
+            Script script,
+            LearningStep step,
+            Session session,
+            SessionSentence sessionSentence,
+            String audioPath,
+            String targetTextSnapshot
     ) {
-        var r = new Recording();
-        r.userId = userId;
-        r.scriptId = scriptId;
-        r.sessionId = sessionId;
-        r.stepId = stepId;
-        r.sessionSentenceId = sessionSentenceId;
-        r.audioPath = audioPath;
-        return r;
+        this.user = user;
+        this.script = script;
+        this.step = step;
+        this.session = session;
+        this.sessionSentence = sessionSentence;
+        this.audioPath = audioPath;
+        this.targetTextSnapshot = targetTextSnapshot;
     }
 
-    public void applyAnalysis(AnalysisOutcome outcome) {
-        this.perceived = outcome.perceivedJoined();
-        this.canonical = outcome.canonicalJoined();
-        this.peakSoftmax = outcome.peakSoftmaxJoined();
-        this.errorsJson = outcome.errorsJson();
-        this.guidanceKr = outcome.guidanceKr();
-        this.durationSec = outcome.durationSec();
-        this.stepScore = outcome.stepScore();
+    public static Recording forScriptStep(
+            User user,
+            Script script,
+            LearningStep step,
+            String audioPath,
+            String targetTextSnapshot
+    ) {
+        requireNonNull(user, "user");
+        requireNonNull(script, "script");
+        requireNonNull(step, "step");
+        requireNonBlank(audioPath, "audioPath");
+        if (step.getScript() != script) {
+            throw new IllegalArgumentException("step.script must equal the supplied script");
+        }
+        return new Recording(user, script, step, null, null, audioPath, targetTextSnapshot);
     }
 
-    // 모델 분석 + 점수 + LLM 가이드까지 한 녹음에 반영할 결과를 한 번에 들고 다닌다.
-    public record AnalysisOutcome(
-            String perceivedJoined,
-            String canonicalJoined,
-            String peakSoftmaxJoined,
-            String errorsJson,
-            String guidanceKr,
-            Double durationSec,
-            Double stepScore
-    ) {}
+    public static Recording forSessionSentence(
+            User user,
+            Session session,
+            SessionSentence sentence,
+            String audioPath,
+            String targetTextSnapshot
+    ) {
+        requireNonNull(user, "user");
+        requireNonNull(session, "session");
+        requireNonNull(sentence, "sentence");
+        requireNonBlank(audioPath, "audioPath");
+        if (sentence.getSession() != session) {
+            throw new IllegalArgumentException("sentence.session must equal the supplied session");
+        }
+        if (session.getUser() != user) {
+            throw new IllegalArgumentException("session.user must equal the supplied user");
+        }
+        return new Recording(user, null, null, session, sentence, audioPath, targetTextSnapshot);
+    }
 
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
+    }
+
+    /**
+     * 분석 단계의 {@code wrongWords} JSON 캐시를 채운다. NULL/빈 문자열 입력은 컬럼을 NULL 로 둔다.
+     *
+     * <p>JSON 형태는 FRONT_API_SPEC §12 {@code WrongWord} 와 일치: {@code [{"word":"...","index":0},...]}.
+     */
+    public void applyWrongWordsJson(String json) {
+        this.wrongWordsJson = (json == null || json.isBlank()) ? null : json;
+    }
+
+    private static void requireNonNull(Object value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+    }
+
+    private static void requireNonBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
     }
 }

@@ -15,9 +15,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 인증 + 학습 통계 캐시를 보유하는 사용자.
-// 일반 가입은 BCrypt 해시 형태의 password 를 강제하고, OAuth2 가입 사용자는 password 가 비어 있다.
-// streak 와 exp 는 학습 완료를 기록할 때 갱신되며, 학습 메인 화면 헤더에서 즉시 노출된다.
 @Entity
 @Table(
         name = "users",
@@ -30,11 +27,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
-    // 연속 학습일의 상한. 운영 정책상 한 사용자가 무한 streak 으로 누적되는 것을 막는다.
     private static final int STREAK_CAP = 7;
-    // 닉네임 최대 길이. column length 와 일치한다.
     private static final int NICKNAME_MAX = 30;
-    // BCrypt 해시 형식 검증. signup 진입 직전에 PasswordEncoder.encode 결과를 받아 적용한다는 전제.
     private static final Pattern BCRYPT_PATTERN =
             Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
 
@@ -48,7 +42,6 @@ public class User {
     @Column(name = "email", nullable = false, length = 100)
     private String email;
 
-    // OAuth2 가입의 경우 비어 있을 수 있어 nullable.
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
 
@@ -61,7 +54,6 @@ public class User {
     @Column(name = "exp", nullable = false)
     private int exp;
 
-    // 마지막으로 학습 완료가 기록된 시각. streak 정책 계산의 기준점이 된다. 한 번도 학습한 적 없는 사용자는 null.
     @Column(name = "last_study_at")
     private Instant lastStudyAt;
 
@@ -80,7 +72,6 @@ public class User {
         this.createdAt = Instant.now();
     }
 
-    // 일반 회원 가입. 호출자가 PasswordEncoder.encode 로 만든 BCrypt 해시를 그대로 넘긴다.
     public static User signup(String username, String email, String passwordHashBCrypt, String nickname) {
         requireNonBlank(username, "username");
         requireNonBlank(email, "email");
@@ -91,14 +82,12 @@ public class User {
         return new User(username, email, passwordHashBCrypt, truncateNickname(nickname));
     }
 
-    // OAuth2 가입. password 가 없고 username 은 email 과 동일하게 둔다.
     public static User fromOAuth2(String email, String nickname) {
         requireNonBlank(email, "email");
         requireNonBlank(nickname, "nickname");
         return new User(email, email, null, truncateNickname(nickname));
     }
 
-    // 빈 입력은 무시한다. 길이를 넘으면 자른다.
     public void updateNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
             return;
@@ -106,16 +95,10 @@ public class User {
         this.nickname = truncateNickname(nickname);
     }
 
-    // 동일 email 의 표준 회원에 OAuth2 로그인을 연결하는 훅.
-    // provider 식별자를 별도 컬럼으로 트래킹하지 않는 현 모델에서는 no-op.
     public void mergeOAuth2Login() {
+        // 동일 email 의 표준 회원에 OAuth2 로그인을 연결하는 훅. 현재는 별도 provider 트랙킹이 없어 no-op.
     }
 
-    // 한 챕터 학습을 끝냈을 때의 streak 갱신 + EXP 가산.
-    //   - 같은 날 다시 완료하면 streak 은 그대로 (중복 가산 방지)
-    //   - 어제 완료 + 오늘 완료면 streak +1 (단, STREAK_CAP 초과 금지)
-    //   - 이틀 이상 비었거나 첫 학습이면 streak 을 1 로 리셋
-    // 자정 경계는 호출자가 넘겨준 statsZone 기준이며, now 인자로 시간 의존성을 주입해 테스트 가능하다.
     public void recordCompletion(Instant now, int expReward, ZoneId statsZone) {
         if (now == null) {
             throw new IllegalArgumentException("now is required");
@@ -133,7 +116,7 @@ public class User {
         } else {
             LocalDate lastDay = this.lastStudyAt.atZone(statsZone).toLocalDate();
             if (lastDay.equals(today)) {
-                // 같은 날 — streak 유지.
+                // 같은 KST 일자 — streak 유지
             } else if (lastDay.plusDays(1).equals(today)) {
                 this.streak = Math.min(STREAK_CAP, this.streak + 1);
             } else {

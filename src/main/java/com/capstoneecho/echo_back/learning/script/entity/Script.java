@@ -17,8 +17,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-// 트랙 안의 한 챕터. preset=true 면 시드 챕터, false 면 사용자가 만든 자유 스크립트다.
-// 자유 스크립트는 트랙에 소속되지 않아 track 과 chapterOrder 가 null 일 수 있다.
 @Entity
 @Table(
         name = "scripts",
@@ -49,15 +47,12 @@ public class Script {
     @Column(name = "preset", nullable = false)
     private boolean preset;
 
-    // 종합 피드백에서 권장할 재연습 단어. 비어 있으면 PracticeWordResolver 가 약점 음소로 추정한다.
     @Column(name = "practice_word", length = 100)
     private String practiceWord;
 
-    // 챕터 마스터 배지명. 잰말놀이처럼 횟수로 평가하는 챕터는 비워 둔다.
     @Column(name = "mastery_badge_name", length = 50)
     private String masteryBadgeName;
 
-    // 트랙 안에서의 노출 순서. 자유 스크립트는 트랙 자체가 없어 null.
     @Column(name = "chapter_order")
     private Integer chapterOrder;
 

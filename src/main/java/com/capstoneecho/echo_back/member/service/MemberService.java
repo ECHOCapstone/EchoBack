@@ -1,15 +1,76 @@
 package com.capstoneecho.echo_back.member.service;
 
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
+import com.capstoneecho.echo_back.member.dto.NicknameUpdateRequest;
 import com.capstoneecho.echo_back.member.entity.User;
-// 외부에서 사용자 도메인을 다루기 위한 인터페이스. 컨트롤러는 이 추상화에만 의존한다.
-public interface MemberService {
+import com.capstoneecho.echo_back.member.repository.UserRepository;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-    User getById(Long userId);
+@Service
+@Transactional(readOnly = true)
+public class MemberService {
 
-    // 한 학습 단위 완료 시 EXP 보상과 streak 갱신을 한 번에 적용하고 갱신된 사용자를 돌려준다.
-    // 정책 자체는 User.recordCompletion 안에 캡슐화되어 있다.
-    User awardCompletionRewards(Long userId, int expReward);
+    private final UserRepository userRepository;
+    private final Validator validator;
+    private final AppProperties appProperties;
 
-    // 사용자가 직접 자신의 닉네임을 변경한다. 길이/공백 정규화는 User.changeNickname 가 책임진다.
-    User updateNickname(Long userId, String nickname);
+    public MemberService(
+            UserRepository userRepository, Validator validator, AppProperties appProperties) {
+        this.userRepository = userRepository;
+        this.validator = validator;
+        this.appProperties = appProperties;
+    }
+
+    public UserResponse findMe(Long userId) {
+        User user = loadUser(userId);
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse updateNickname(Long userId, NicknameUpdateRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+        Set<ConstraintViolation<NicknameUpdateRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            String message = violations.stream()
+                    .map(v -> v.getPropertyPath() + " " + v.getMessage())
+                    .collect(Collectors.joining(", "));
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, message);
+        }
+
+        User user = loadUser(userId);
+        user.updateNickname(request.nickname());
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse awardCompletionRewards(Long userId, int expReward) {
+        if (expReward < 0) {
+            throw new IllegalArgumentException("expReward must be >= 0");
+        }
+        User user = loadUser(userId);
+        user.recordCompletion(Instant.now(), expReward, statsZone());
+        return UserResponse.from(user);
+    }
+
+    private ZoneId statsZone() {
+        String zone = appProperties.stats() == null ? null : appProperties.stats().zone();
+        return (zone == null || zone.isBlank()) ? ZoneId.systemDefault() : ZoneId.of(zone);
+    }
+
+    private User loadUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    }
 }

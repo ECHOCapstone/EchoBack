@@ -4,11 +4,11 @@ import com.capstoneecho.echo_back.global.common.ApiResponse;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.statistics.ranking.dto.RankingResponse;
+import com.capstoneecho.echo_back.statistics.ranking.service.RankingService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.capstoneecho.echo_back.statistics.ranking.service.RankingService;
 @RestController
 @RequestMapping("/api/ranking")
 public class RankingController {
@@ -20,7 +20,7 @@ public class RankingController {
     }
 
     @GetMapping("/today")
-    public ApiResponse<RankingResponse> today(@CurrentUser JwtPrincipal principal) {
+    public ApiResponse<RankingResponse> getToday(@CurrentUser JwtPrincipal principal) {
         return ApiResponse.success(rankingService.today(principal.userId()));
     }
 }

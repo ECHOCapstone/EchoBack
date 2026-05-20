@@ -1,47 +1,63 @@
 package com.capstoneecho.echo_back.global.security;
 
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
+import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
 
-import com.capstoneecho.echo_back.global.jwt.JwtProvider;
-// Authorization: Bearer <token> 헤더가 있을 때 검증해 SecurityContext 에 인증을 채운다.
-// 토큰이 없거나 유효하지 않으면 익명 상태로 다음 필터에 위임하고, 보호 자원 접근은
-// SecurityFilterChain 의 인가 단계에서 401 로 처리된다.
-@Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+    public static final String ERROR_ATTRIBUTE = "jwtAuthError";
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final JwtProvider provider;
+    private final JwtProvider jwtProvider;
 
-    public JwtAuthFilter(JwtProvider provider) {
-        this.provider = provider;
+    public JwtAuthFilter(JwtProvider jwtProvider) {
+        this.jwtProvider = jwtProvider;
     }
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
     ) throws ServletException, IOException {
-        var header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header != null && header.startsWith(BEARER_PREFIX)) {
-            var token = header.substring(BEARER_PREFIX.length()).trim();
-            provider.verify(token).ifPresent(principal -> {
-                var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            });
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (header == null || header.isBlank()) {
+            chain.doFilter(request, response);
+            return;
         }
-        filterChain.doFilter(request, response);
+        if (!header.startsWith(BEARER_PREFIX)) {
+            SecurityContextHolder.clearContext();
+            request.setAttribute(ERROR_ATTRIBUTE, ErrorCode.INVALID_TOKEN);
+            chain.doFilter(request, response);
+            return;
+        }
+        String token = header.substring(BEARER_PREFIX.length()).trim();
+        try {
+            JwtPrincipal principal = jwtProvider.parse(token);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(principal, null, List.of());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        } catch (BusinessException ex) {
+            SecurityContextHolder.clearContext();
+            request.setAttribute(ERROR_ATTRIBUTE, ex.getCode());
+        } catch (RuntimeException ex) {
+            SecurityContextHolder.clearContext();
+            request.setAttribute(ERROR_ATTRIBUTE, ErrorCode.INVALID_TOKEN);
+        }
+        chain.doFilter(request, response);
     }
 }

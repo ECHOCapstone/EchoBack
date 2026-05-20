@@ -6,13 +6,20 @@ import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.learning.session.dto.SessionCreateRequest;
 import com.capstoneecho.echo_back.learning.session.dto.SessionDetailResponse;
 import com.capstoneecho.echo_back.learning.session.dto.SessionPatchRequest;
-import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
 import com.capstoneecho.echo_back.learning.session.service.SessionService;
+import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 @RestController
 @RequestMapping("/api/sessions")
 public class SessionController {
@@ -25,40 +32,36 @@ public class SessionController {
 
     @GetMapping
     public ApiResponse<List<SessionDetailResponse>> list(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.success(sessionService.listMine(principal.userId()));
+        return ApiResponse.success(sessionService.list(principal.userId()));
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<SessionDetailResponse> create(
+    public ResponseEntity<ApiResponse<SessionDetailResponse>> create(
             @CurrentUser JwtPrincipal principal,
-            @Valid @RequestBody SessionCreateRequest request
-    ) {
-        return ApiResponse.success(sessionService.create(principal.userId(), request));
+            @Valid @RequestBody SessionCreateRequest request) {
+        SessionDetailResponse created = sessionService.create(principal.userId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
     }
 
     @GetMapping("/{sessionId}")
     public ApiResponse<SessionDetailResponse> get(
             @CurrentUser JwtPrincipal principal,
-            @PathVariable Long sessionId
-    ) {
+            @PathVariable Long sessionId) {
         return ApiResponse.success(sessionService.get(principal.userId(), sessionId));
     }
 
     @PatchMapping("/{sessionId}")
-    public ApiResponse<SessionDetailResponse> update(
+    public ApiResponse<SessionDetailResponse> patch(
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long sessionId,
-            @Valid @RequestBody SessionPatchRequest request
-    ) {
-        return ApiResponse.success(sessionService.update(principal.userId(), sessionId, request));
+            @Valid @RequestBody SessionPatchRequest request) {
+        return ApiResponse.success(sessionService.patch(principal.userId(), sessionId, request));
     }
 
     @DeleteMapping("/{sessionId}")
     public ApiResponse<Void> delete(
             @CurrentUser JwtPrincipal principal,
-            @PathVariable Long sessionId
-    ) {
+            @PathVariable Long sessionId) {
         sessionService.delete(principal.userId(), sessionId);
         return ApiResponse.success(null);
     }
