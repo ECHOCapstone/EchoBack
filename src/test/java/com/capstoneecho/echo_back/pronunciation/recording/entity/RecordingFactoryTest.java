@@ -12,7 +12,7 @@ import com.capstoneecho.echo_back.learning.session.support.DefaultSentenceSplitt
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
+import com.capstoneecho.echo_back.external.llm.WrongWord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;

@@ -2,43 +2,50 @@ package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
-
+import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
 
-/**
- * LLM 호출 없이 룰 기반으로 가이던스를 생성하는 기본 {@link LlmClient} 구현.
- *
- * <p>활성 조건: {@code app.llm.provider=rule-based} 또는 미설정 (기본).
- */
+// LLM 호출 없이 규칙 기반으로 가이던스를 생성하는 기본 LlmClient 구현.
+// 모든 폴백 문구와 단어는 app.messages / app.gamification 에서 주입한다.
 @Component
 @ConditionalOnProperty(name = "app.llm.provider", havingValue = "rule-based", matchIfMissing = true)
 public class RuleBasedLlmFeedbackGenerator implements LlmClient {
 
-    private static final String DEFAULT_RECORDING_GUIDANCE = "발음을 더 또렷하게 따라 읽어 보세요.";
-    private static final String DEFAULT_FEEDBACK_GUIDANCE = "꾸준한 연습이 발음 개선에 도움이 됩니다.";
-    private static final String DEFAULT_RETRY_GUIDANCE = "해당 단어를 한 번 더 천천히 따라 읽어 보세요.";
-    private static final String DEFAULT_PRACTICE_WORD = "the";
+    private final String recordingGuidance;
+    private final String feedbackGuidance;
+    private final String retryGuidance;
+    private final String defaultPracticeWord;
+
+    public RuleBasedLlmFeedbackGenerator(AppProperties appProperties) {
+        AppProperties.Messages m = appProperties.messages();
+        this.recordingGuidance = m == null ? "" : m.recordingGuidanceFallback();
+        this.feedbackGuidance = m == null ? "" : m.feedbackGuidanceFallback();
+        this.retryGuidance = m == null ? "" : m.retryGuidanceFallback();
+        AppProperties.Gamification g = appProperties.gamification();
+        this.defaultPracticeWord = g == null ? "the" : g.defaultPracticeWord();
+    }
 
     @Override
     public RecordingGuidance summarizeRecording(LlmContext context) {
-        return new RecordingGuidance(DEFAULT_RECORDING_GUIDANCE, resolveWrongWords(context));
+        return new RecordingGuidance(recordingGuidance, resolveWrongWords(context));
     }
 
     @Override
     public String summarizeFeedback(LlmContext context) {
-        return DEFAULT_FEEDBACK_GUIDANCE;
+        return feedbackGuidance;
     }
 
     @Override
     public String retryGuidance(LlmContext context) {
-        return DEFAULT_RETRY_GUIDANCE;
+        return retryGuidance;
     }
 
+    // targetText 의 첫 단어를 추천한다. 비어 있으면 외부화된 폴백 단어로 떨어진다.
     @Override
     public String suggestPracticeWord(LlmContext context) {
         String[] words = splitWords(context.targetText());
@@ -48,9 +55,11 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
                 return first;
             }
         }
-        return DEFAULT_PRACTICE_WORD;
+        return defaultPracticeWord;
     }
 
+    // canonical phoneme 인덱스를 단어 경계로 환원해 wrong-word 목록을 만든다.
+    // 단어 경계 정보 (g2pWords) 가 없으면 추측 매핑을 하지 않고 빈 리스트를 돌려준다.
     private List<WrongWord> resolveWrongWords(LlmContext context) {
         List<AnalyzeError> errors = context.errors();
         if (errors.isEmpty()) {
@@ -62,8 +71,6 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
         }
         int[] boundaries = cumulativePhonemeBoundaries(context.g2pWords());
         if (boundaries.length == 0) {
-            // 단어 경계 정보 없이 추측하지 않는다 — FRONT_API_SPEC §12 의 0-based
-            // target-word index 정확성을 깨뜨리는 비례 매핑 폴백은 사용하지 않음.
             return List.of();
         }
         int totalPhonemes = boundaries[boundaries.length - 1];
@@ -91,6 +98,7 @@ public class RuleBasedLlmFeedbackGenerator implements LlmClient {
         return List.copyOf(hits);
     }
 
+    // 단어별 phoneme 개수의 누적합. 인덱스 i 는 단어 i 까지의 phoneme 총합을 가리킨다.
     private static int[] cumulativePhonemeBoundaries(List<G2pWord> g2pWords) {
         if (g2pWords == null || g2pWords.isEmpty()) {
             return new int[0];

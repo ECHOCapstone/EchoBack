@@ -35,7 +35,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
+import com.capstoneecho.echo_back.external.llm.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
@@ -298,11 +298,11 @@ class RecordingServiceTest {
     private static AnalyzeResult perfectAnalyzeResult() {
         return new AnalyzeResult(
                 List.of("HH", "AH", "L", "OW"),
-                Optional.of(List.of("HH", "AH", "L", "OW")),
+                List.of("HH", "AH", "L", "OW"),
                 List.of(0.9, 0.85, 0.8, 0.75),
                 List.of(),
                 List.of(),
-                Optional.of(0.0),
+                0.0,
                 1.23);
     }
 
@@ -310,11 +310,11 @@ class RecordingServiceTest {
         AnalyzeError err = new AnalyzeError("substitution", 1, "ʌ", "ɔ");
         return new AnalyzeResult(
                 List.of("w", "ʌ", "t", "ɚ"),
-                Optional.of(List.of("w", "ɔ", "t", "ɚ")),
+                List.of("w", "ɔ", "t", "ɚ"),
                 List.of(0.91, 0.62, 0.88, 0.79),
                 List.of(),
                 List.of(err),
-                Optional.of(0.25),
+                0.25,
                 2.0);
     }
 }

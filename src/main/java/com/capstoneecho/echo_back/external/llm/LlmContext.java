@@ -2,23 +2,10 @@ package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
-
-import java.util.ArrayList;
 import java.util.List;
 
-/**
- * LlmClient 호출 시 전달되는 컨텍스트 캐리어.
- *
- * <p>모든 필드는 null-safe 보장:
- * <ul>
- *   <li>{@code targetText} 는 null 이면 빈 문자열로 정규화.</li>
- *   <li>리스트 필드는 null 이면 빈 리스트, 그 외에는 방어 복사된 불변 리스트.</li>
- *   <li>{@code weakPhoneme} 만 nullable (특정 음소를 강조하지 않는 호출 케이스 허용).</li>
- * </ul>
- *
- * <p>{@code g2pWords} 는 G2P 가 반환한 단어별 음소 분할이다. rule-based 폴백이
- * {@code canonicalIndex → wordIndex} 매핑을 단어 경계 기준으로 산출할 때 사용한다.
- */
+// LlmClient 호출 컨텍스트. 리스트는 null 입력 시 빈 리스트로, targetText 는 빈 문자열로 정규화된다.
+// weakPhoneme 만 nullable. g2pWords 는 단어 경계 기준 wrong-word 매핑에 쓰인다.
 public record LlmContext(
         String targetText,
         List<String> perceived,
@@ -40,6 +27,7 @@ public record LlmContext(
         return new Builder();
     }
 
+    // 부분 채우기를 허용하는 짧은 빌더. record canonical 생성자가 null-safe 정규화를 맡는다.
     public static final class Builder {
         private String targetText;
         private List<String> perceived;
@@ -48,38 +36,14 @@ public record LlmContext(
         private List<G2pWord> g2pWords;
         private String weakPhoneme;
 
-        private Builder() {
-        }
+        private Builder() {}
 
-        public Builder targetText(String targetText) {
-            this.targetText = targetText;
-            return this;
-        }
-
-        public Builder perceived(List<String> perceived) {
-            this.perceived = perceived == null ? null : new ArrayList<>(perceived);
-            return this;
-        }
-
-        public Builder canonical(List<String> canonical) {
-            this.canonical = canonical == null ? null : new ArrayList<>(canonical);
-            return this;
-        }
-
-        public Builder errors(List<AnalyzeError> errors) {
-            this.errors = errors == null ? null : new ArrayList<>(errors);
-            return this;
-        }
-
-        public Builder g2pWords(List<G2pWord> g2pWords) {
-            this.g2pWords = g2pWords == null ? null : new ArrayList<>(g2pWords);
-            return this;
-        }
-
-        public Builder weakPhoneme(String weakPhoneme) {
-            this.weakPhoneme = weakPhoneme;
-            return this;
-        }
+        public Builder targetText(String v) { this.targetText = v; return this; }
+        public Builder perceived(List<String> v) { this.perceived = v; return this; }
+        public Builder canonical(List<String> v) { this.canonical = v; return this; }
+        public Builder errors(List<AnalyzeError> v) { this.errors = v; return this; }
+        public Builder g2pWords(List<G2pWord> v) { this.g2pWords = v; return this; }
+        public Builder weakPhoneme(String v) { this.weakPhoneme = v; return this; }
 
         public LlmContext build() {
             return new LlmContext(targetText, perceived, canonical, errors, g2pWords, weakPhoneme);

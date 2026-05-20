@@ -1,8 +1,6 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.controller;
 
 import com.capstoneecho.echo_back.global.common.ApiResponse;
-import com.capstoneecho.echo_back.global.common.BusinessException;
-import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.member.dto.UserResponse;
@@ -10,8 +8,8 @@ import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailRespo
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
 import com.capstoneecho.echo_back.pronunciation.feedback.service.FeedbackService;
+import com.capstoneecho.echo_back.pronunciation.recording.support.AudioBytesReader;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,7 +41,7 @@ public class FeedbackController {
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId,
             @RequestParam("audio") MultipartFile audio) {
-        byte[] audioBytes = readAudioBytes(audio);
+        byte[] audioBytes = AudioBytesReader.read(audio);
         return ApiResponse.success(
                 feedbackService.retryWord(principal.userId(), feedbackId, audioBytes));
     }
@@ -53,13 +51,5 @@ public class FeedbackController {
             @CurrentUser JwtPrincipal principal,
             @PathVariable Long feedbackId) {
         return ApiResponse.success(feedbackService.complete(principal.userId(), feedbackId));
-    }
-
-    private static byte[] readAudioBytes(MultipartFile audio) {
-        try {
-            return audio.getBytes();
-        } catch (IOException ex) {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED, ex.getMessage());
-        }
     }
 }

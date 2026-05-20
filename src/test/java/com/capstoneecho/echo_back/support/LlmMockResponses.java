@@ -1,7 +1,7 @@
 package com.capstoneecho.echo_back.support;
 
 import com.capstoneecho.echo_back.external.llm.RecordingGuidance;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
+import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.List;
 
 /**

@@ -6,11 +6,8 @@ import java.util.Locale;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * 로컬 스텁 TTS 구현. ID3v2 헤더 magic ({@code 0x49 0x44 0x33}) 으로 시작하는
- * 고정 길이(~100 bytes) non-empty MP3 페이로드를 반환한다. 외부 TTS 프로바이더
- * 통합 전 골든 테스트와 클라이언트 통합 검증에만 사용한다.
- */
+// 로컬 스텁 TTS 구현. ID3v2 헤더 magic (0x49 0x44 0x33) 으로 시작하는
+// 고정 길이 (~100 bytes) non-empty MP3 페이로드를 돌려준다.
 @Component
 @ConditionalOnProperty(name = "app.tts.provider", havingValue = "local-stub", matchIfMissing = true)
 public class DefaultTtsClient implements TtsClient {

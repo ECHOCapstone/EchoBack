@@ -1,10 +1,10 @@
 package com.capstoneecho.echo_back.global.config;
 
+import java.time.ZoneId;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-// 어플리케이션 설정을 한 곳에서 노출하는 record. application*.yaml 의 app.* 키를 그대로 매핑한다.
-// 프로파일별 yaml 이 같은 record 를 다른 값으로 채운다.
+// application*.yaml 의 app.* 키를 도메인별 nested record 로 노출하는 단일 출처.
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(
         Jwt jwt,
@@ -14,7 +14,9 @@ public record AppProperties(
         Storage storage,
         Tts tts,
         Stats stats,
-        Auth auth
+        Auth auth,
+        Gamification gamification,
+        Messages messages
 ) {
 
     public record Jwt(String secret, long expirationMs) {}
@@ -35,11 +37,46 @@ public record AppProperties(
 
     public record Tts(String provider) {}
 
-    public record Stats(String zone) {}
+    // 통계 / 출석 집계에 쓰는 타임존과 배지 정의를 묶는다.
+    public record Stats(String zone, List<Badge> badges) {
 
-    // 인증 관련 외부화. demoGoogle 은 OAuth2 시연 사용자의 식별자를 환경별로 바꿀 수 있게 해 둔다.
+        // zone 미설정 / blank 면 시스템 zone 으로 폴백한다.
+        public ZoneId resolvedZone() {
+            return (zone == null || zone.isBlank()) ? ZoneId.systemDefault() : ZoneId.of(zone);
+        }
+
+        public List<Badge> safeBadges() {
+            return badges == null ? List.of() : badges;
+        }
+
+        // condition 은 BadgePolicy 가 해석하는 enum-like 식별자 (FIRST_FEEDBACK, STREAK).
+        public record Badge(String id, String name, String condition, int threshold) {}
+    }
+
+    // OAuth2 시연 사용자 식별자 외부화. 환경별 yaml 에서 다른 값을 주입한다.
     public record Auth(DemoGoogle demoGoogle) {
 
         public record DemoGoogle(String email, String nickname) {}
     }
+
+    // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우 등).
+    public record Gamification(
+            int completionExp,
+            int streakCap,
+            int dailyRecommended,
+            int weeklyTopN,
+            int weeklyWindowDays,
+            double scoreFallbackOnError,
+            String defaultRankingUnitTitle,
+            String defaultPracticeWord
+    ) {}
+
+    // LLM 실패 시 사용자에게 노출되는 폴백 문구 및 공통 유저 메시지.
+    public record Messages(
+            String recordingGuidanceFallback,
+            String feedbackGuidanceFallback,
+            String retryGuidanceFallback,
+            String uploadTooLarge,
+            String ttsTextRequired
+    ) {}
 }

@@ -10,3 +10,7 @@ spring:
   web:
     error:
       include-stacktrace: always
+
+app:
+  jwt:
+    secret: "dev-jwt-secret-please-replace-with-something-long-and-random-1234567890"

@@ -87,7 +87,7 @@ class StatsServiceTest {
         completeFeedbackAt(user, script, "Boundary", boundary);
         transactionTemplate.executeWithoutResult(s -> {
             User u = userRepository.findById(user.getId()).orElseThrow();
-            u.recordCompletion(boundary, 10, kst());
+            u.recordCompletion(boundary, 10, 7, kst());
         });
 
         StatsResponse response = statsService.getMyStats(user.getId(), 2026, 5);
@@ -109,7 +109,7 @@ class StatsServiceTest {
                 Instant dayN = u.getLastStudyAt() == null
                         ? Instant.parse("2026-04-01T00:00:00Z")
                         : u.getLastStudyAt().atZone(kst()).plusDays(1).toInstant();
-                u.recordCompletion(dayN, 10, kst());
+                u.recordCompletion(dayN, 10, 7, kst());
             });
         }
 

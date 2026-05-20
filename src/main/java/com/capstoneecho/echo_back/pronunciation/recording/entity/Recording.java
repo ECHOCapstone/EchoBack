@@ -164,11 +164,8 @@ public class Recording {
         this.createdAt = Instant.now();
     }
 
-    /**
-     * 분석 단계의 {@code wrongWords} JSON 캐시를 채운다. NULL/빈 문자열 입력은 컬럼을 NULL 로 둔다.
-     *
-     * <p>JSON 형태는 FRONT_API_SPEC §12 {@code WrongWord} 와 일치: {@code [{"word":"...","index":0},...]}.
-     */
+    // wrongWords JSON 캐시를 채운다. NULL / 빈 문자열 입력은 컬럼을 NULL 로 남긴다.
+    // 저장 포맷: [{"word":"...","index":0}, ...].
     public void applyWrongWordsJson(String json) {
         this.wrongWordsJson = (json == null || json.isBlank()) ? null : json;
     }

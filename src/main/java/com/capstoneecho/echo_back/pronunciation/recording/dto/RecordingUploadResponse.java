@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.pronunciation.recording.dto;
 
+import com.capstoneecho.echo_back.external.llm.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
@@ -37,14 +38,9 @@ public record RecordingUploadResponse(
             Integer canonicalIndex
     ) {}
 
-    /**
-     * 저장된 {@link Recording} 으로부터 응답 DTO 를 재구성한다.
-     *
-     * <p>{@code wrongWordsJson} 을 {@link WrongWord}{@code []} 로 역직렬화한다.
-     * NULL/빈 문자열 또는 파싱 실패 시 빈 리스트로 폴백하고 WARN 로그를 남긴다.
-     * 음소 시퀀스(perceived/canonical/peakSoftmax/errors) 는 현 시점에서 엔티티에 정규화 저장되지
-     * 않으므로 빈 리스트로 둔다.
-     */
+    // 저장된 Recording 으로부터 응답 DTO 를 재구성한다.
+    // wrongWordsJson 은 List<WrongWord> 로 역직렬화하고, 파싱 실패 / NULL 입력은 빈 리스트로 폴백한다.
+    // 엔티티에 정규화 저장되지 않는 음소 시퀀스 필드는 빈 리스트로 채워진다.
     public static RecordingUploadResponse from(Recording recording, ObjectMapper objectMapper) {
         if (recording == null) {
             throw new IllegalArgumentException("recording is required");

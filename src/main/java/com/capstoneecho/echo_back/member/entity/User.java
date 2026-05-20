@@ -27,10 +27,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
-    private static final int STREAK_CAP = 7;
+    // 닉네임 컬럼 길이 (DB) 와 일치한다. 잘림 정책은 자르기 (truncate) 로 통일.
     private static final int NICKNAME_MAX = 30;
+
+    // Spring Security BCryptPasswordEncoder 결과 ($2a / $2b / $2y prefix, 53 chars suffix).
     private static final Pattern BCRYPT_PATTERN =
-            Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
+            Pattern.compile("^\\$2[abxy]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,6 +74,7 @@ public class User {
         this.createdAt = Instant.now();
     }
 
+    // 표준 회원가입 경로. passwordHash 는 반드시 BCrypt 결과여야 한다 (생패스워드 저장 방지 검증).
     public static User signup(String username, String email, String passwordHashBCrypt, String nickname) {
         requireNonBlank(username, "username");
         requireNonBlank(email, "email");
@@ -82,6 +85,7 @@ public class User {
         return new User(username, email, passwordHashBCrypt, truncateNickname(nickname));
     }
 
+    // OAuth2 경로. 비밀번호 해시는 null 로 남겨 BCrypt 검증을 우회한다 (소셜 로그인 전용).
     public static User fromOAuth2(String email, String nickname) {
         requireNonBlank(email, "email");
         requireNonBlank(nickname, "nickname");
@@ -95,11 +99,8 @@ public class User {
         this.nickname = truncateNickname(nickname);
     }
 
-    public void mergeOAuth2Login() {
-        // 동일 email 의 표준 회원에 OAuth2 로그인을 연결하는 훅. 현재는 별도 provider 트랙킹이 없어 no-op.
-    }
-
-    public void recordCompletion(Instant now, int expReward, ZoneId statsZone) {
+    // 학습 완료 보상. 같은 KST 일자면 streak 유지, 어제면 +1 (상한 적용), 그 외엔 1 로 재시작.
+    public void recordCompletion(Instant now, int expReward, int streakCap, ZoneId statsZone) {
         if (now == null) {
             throw new IllegalArgumentException("now is required");
         }
@@ -109,6 +110,9 @@ public class User {
         if (expReward < 0) {
             throw new IllegalArgumentException("expReward must be >= 0");
         }
+        if (streakCap < 1) {
+            throw new IllegalArgumentException("streakCap must be >= 1");
+        }
 
         LocalDate today = now.atZone(statsZone).toLocalDate();
         if (this.lastStudyAt == null) {
@@ -116,9 +120,9 @@ public class User {
         } else {
             LocalDate lastDay = this.lastStudyAt.atZone(statsZone).toLocalDate();
             if (lastDay.equals(today)) {
-                // 같은 KST 일자 — streak 유지
+                // 같은 KST 일자: streak 유지.
             } else if (lastDay.plusDays(1).equals(today)) {
-                this.streak = Math.min(STREAK_CAP, this.streak + 1);
+                this.streak = Math.min(streakCap, this.streak + 1);
             } else {
                 this.streak = 1;
             }

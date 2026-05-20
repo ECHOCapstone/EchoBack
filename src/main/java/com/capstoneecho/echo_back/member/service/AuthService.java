@@ -88,10 +88,6 @@ public class AuthService {
         String demoEmail = demoGoogle.email();
         String demoNickname = demoGoogle.nickname();
         User user = userRepository.findByEmail(demoEmail)
-                .map(existing -> {
-                    existing.mergeOAuth2Login();
-                    return existing;
-                })
                 .orElseGet(() -> userRepository.save(
                         User.fromOAuth2(demoEmail, demoNickname)));
         return issueToken(user);

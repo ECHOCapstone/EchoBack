@@ -1,3 +1,66 @@
 spring:
   application:
     name: ECHO_back
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+  jackson:
+    time-zone: Asia/Seoul
+
+app:
+  jwt:
+    expiration-ms: 86400000
+  cors:
+    allowed-origins:
+      - "http://localhost:3000"
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    exposed-headers:
+      - Authorization
+    allow-credentials: true
+    max-age-sec: 3600
+  model-server:
+    base-url: "http://localhost:8000"
+    timeout-ms: 10000
+  llm:
+    provider: rule-based
+  storage:
+    local-root: build/local-storage
+  tts:
+    provider: local-stub
+  stats:
+    zone: Asia/Seoul
+    badges:
+      - id: FIRST_FEEDBACK
+        name: "첫 피드백"
+        condition: COMPLETED_FEEDBACK_COUNT
+        threshold: 1
+      - id: STREAK_7
+        name: "7일 연속 학습"
+        condition: USER_STREAK
+        threshold: 7
+  auth:
+    demo-google:
+      email: "demo.google@echo.local"
+      nickname: "DemoGoogleUser"
+  gamification:
+    completion-exp: 10
+    streak-cap: 7
+    daily-recommended: 3
+    weekly-top-n: 5
+    weekly-window-days: 7
+    score-fallback-on-error: 70.0
+    default-ranking-unit-title: "오늘의 랭킹"
+    default-practice-word: "the"
+  messages:
+    recording-guidance-fallback: "발음을 더 또렷하게 따라 읽어 보세요."
+    feedback-guidance-fallback: "꾸준한 연습이 발음 개선에 도움이 됩니다."
+    retry-guidance-fallback: "해당 단어를 한 번 더 천천히 따라 읽어 보세요."
+    upload-too-large: "업로드 가능한 파일 크기를 초과했습니다."
+    tts-text-required: "text 는 비어 있을 수 없습니다."

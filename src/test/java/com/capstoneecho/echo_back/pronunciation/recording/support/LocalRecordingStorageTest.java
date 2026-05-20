@@ -38,6 +38,8 @@ class LocalRecordingStorageTest {
                 new AppProperties.Storage(tempDir.toString()),
                 null,
                 null,
+                null,
+                null,
                 null
         );
         storage = new LocalRecordingStorage(properties);

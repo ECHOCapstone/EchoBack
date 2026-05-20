@@ -2,7 +2,7 @@ package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
+import com.capstoneecho.echo_back.global.config.AppProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RuleBasedLlmFeedbackGeneratorTest {
 
-    private final RuleBasedLlmFeedbackGenerator generator = new RuleBasedLlmFeedbackGenerator();
+    private static final AppProperties FIXTURE = new AppProperties(
+            null, null, null, null, null, null, null, null,
+            new AppProperties.Gamification(10, 7, 3, 5, 7, 70.0, "오늘의 랭킹", "the"),
+            new AppProperties.Messages(
+                    "발음을 더 또렷하게 따라 읽어 보세요.",
+                    "꾸준한 연습이 발음 개선에 도움이 됩니다.",
+                    "해당 단어를 한 번 더 천천히 따라 읽어 보세요.",
+                    "업로드 가능한 파일 크기를 초과했습니다.",
+                    "text 는 비어 있을 수 없습니다."
+            )
+    );
+
+    private final RuleBasedLlmFeedbackGenerator generator = new RuleBasedLlmFeedbackGenerator(FIXTURE);
 
     @Test
     @DisplayName("summarizeRecording: errors 없음 → wrongWords 빈 배열 + non-empty guidance")

@@ -2,6 +2,8 @@ package com.capstoneecho.echo_back.learning.script.service;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptDetailResponse;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptSummaryResponse;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
@@ -10,7 +12,6 @@ import com.capstoneecho.echo_back.learning.script.repository.LearningStepReposit
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
 import com.capstoneecho.echo_back.learning.script.support.RecommendedScriptSelector;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,20 +20,24 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ScriptService {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final int DAILY_RECOMMENDED_COUNT = 3;
-
     private final ScriptRepository scriptRepository;
     private final LearningStepRepository learningStepRepository;
     private final RecommendedScriptSelector recommendedScriptSelector;
+    private final StatsZoneProvider statsZoneProvider;
+    private final int dailyRecommendedCount;
 
     public ScriptService(
             ScriptRepository scriptRepository,
             LearningStepRepository learningStepRepository,
-            RecommendedScriptSelector recommendedScriptSelector) {
+            RecommendedScriptSelector recommendedScriptSelector,
+            StatsZoneProvider statsZoneProvider,
+            AppProperties appProperties) {
         this.scriptRepository = scriptRepository;
         this.learningStepRepository = learningStepRepository;
         this.recommendedScriptSelector = recommendedScriptSelector;
+        this.statsZoneProvider = statsZoneProvider;
+        AppProperties.Gamification g = appProperties.gamification();
+        this.dailyRecommendedCount = g == null ? 3 : g.dailyRecommended();
     }
 
     public ScriptDetailResponse getScript(Long scriptId) {
@@ -45,11 +50,12 @@ public class ScriptService {
         return ScriptDetailResponse.of(script, steps);
     }
 
+    // 같은 userId × 같은 날짜 조합이면 같은 추천 셋이 나오도록 결정적 셔플을 쓴다.
     public List<ScriptSummaryResponse> recommendToday(Long userId) {
         List<Script> presets = scriptRepository.findByPresetTrueOrderByIdAsc();
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now(statsZoneProvider.zone());
         List<Script> picked = recommendedScriptSelector.select(
-                userId, today, presets, DAILY_RECOMMENDED_COUNT);
+                userId, today, presets, dailyRecommendedCount);
         return picked.stream()
                 .map(ScriptSummaryResponse::from)
                 .toList();

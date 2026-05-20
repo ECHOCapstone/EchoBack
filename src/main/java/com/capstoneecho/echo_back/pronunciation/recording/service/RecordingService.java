@@ -19,12 +19,14 @@ import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.repository.SessionSentenceRepository;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
-import com.capstoneecho.echo_back.pronunciation.recording.dto.WrongWord;
+import com.capstoneecho.echo_back.external.llm.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
+import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +51,8 @@ public class RecordingService {
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
+    private final WavHeaderValidator wavHeaderValidator;
+    private final ScoringPolicy scoringPolicy;
 
     public RecordingService(
             UserRepository userRepository,
@@ -60,7 +64,9 @@ public class RecordingService {
             RecordingStorage recordingStorage,
             ModelServerClient modelServerClient,
             LlmClient llmClient,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            WavHeaderValidator wavHeaderValidator,
+            ScoringPolicy scoringPolicy) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
@@ -71,15 +77,19 @@ public class RecordingService {
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
         this.objectMapper = objectMapper;
+        this.wavHeaderValidator = wavHeaderValidator;
+        this.scoringPolicy = scoringPolicy;
     }
 
+    // 녹음 1건을 업로드한다: 헤더 검증 → 부모 (script/step 또는 session/sentence) 매핑 →
+    // G2P+분석 → LLM 요약 → 디스크 저장 → 엔티티 저장 순. 트랜잭션이 깨지면 파일도 같이 정리한다.
     @Transactional
     public RecordingUploadResponse upload(
             Long userId, RecordingUploadRequest request, byte[] audioBytes) {
         if (request == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
-        validateAudio(audioBytes);
+        wavHeaderValidator.require(audioBytes);
 
         Mode mode = detectMode(request);
         ResolvedParents parents = resolveParents(userId, request, mode);
@@ -92,7 +102,7 @@ public class RecordingService {
         LlmContext context = LlmContext.builder()
                 .targetText(targetText)
                 .perceived(analyze.perceived())
-                .canonical(analyze.canonical().orElse(List.of()))
+                .canonical(analyze.canonicalOrEmpty())
                 .errors(analyze.errors())
                 .g2pWords(g2p.words())
                 .build();
@@ -123,6 +133,7 @@ public class RecordingService {
         }
     }
 
+    // 트랜잭션이 롤백되면 방금 저장한 오디오 파일이 orphan 으로 남는 것을 막는다.
     private void registerStorageCleanupOnNonCommit(String audioPath) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -142,18 +153,7 @@ public class RecordingService {
         });
     }
 
-    private void validateAudio(byte[] audioBytes) {
-        if (audioBytes == null || audioBytes.length < 12) {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED);
-        }
-        if (audioBytes[0] != 'R'
-                || audioBytes[1] != 'I'
-                || audioBytes[2] != 'F'
-                || audioBytes[3] != 'F') {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED);
-        }
-    }
-
+    // 요청에 어떤 부모 식별자가 채워졌는지로 두 흐름 (스크립트-스텝 / 세션-문장) 을 구분한다.
     private Mode detectMode(RecordingUploadRequest r) {
         boolean hasScript = r.scriptId() != null;
         boolean hasStep = r.stepId() != null;
@@ -198,6 +198,7 @@ public class RecordingService {
         };
     }
 
+    // 부모 컨텍스트에서 분석 대상 텍스트를 뽑는다. 단계 → 문장 → 전체 스크립트 순으로 우선한다.
     private String resolveTargetText(ResolvedParents parents) {
         if (parents.step() != null) {
             String t = parents.step().getTargetText();
@@ -232,9 +233,7 @@ public class RecordingService {
         List<RecordingUploadResponse.PhonemeErrorView> errorViews = analyze.errors().stream()
                 .map(RecordingService::toErrorView)
                 .toList();
-        Double stepScore = analyze.per()
-                .map(per -> Math.max(0.0, Math.min(100.0, (1.0 - per) * 100.0)))
-                .orElse(null);
+        Double stepScore = analyze.per() == null ? null : scoringPolicy.perToScore(analyze.per());
         Long scriptId = parents.script() == null ? null : parents.script().getId();
         Long stepId = parents.step() == null ? null : parents.step().getId();
         Long sessionId = parents.session() == null ? null : parents.session().getId();
@@ -248,7 +247,7 @@ public class RecordingService {
                 sentenceId,
                 analyze.durationSec(),
                 List.copyOf(analyze.perceived()),
-                analyze.canonical().map(List::copyOf).orElse(List.of()),
+                List.copyOf(analyze.canonicalOrEmpty()),
                 List.copyOf(analyze.peakSoftmax()),
                 stepScore,
                 guidance.guidanceKr(),

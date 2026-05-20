@@ -86,13 +86,13 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("updateNickname 은 20자 초과 닉네임을 VALIDATION_FAILED 로 거부한다")
+    @DisplayName("updateNickname 은 30자 초과 닉네임을 VALIDATION_FAILED 로 거부한다")
     void updateNicknameRejectsTooLong() {
         User saved = userRepository.save(
                 User.signup("dan", "dan@example.com", VALID_BCRYPT, "Dan"));
 
         assertThatThrownBy(() -> memberService.updateNickname(
-                saved.getId(), new NicknameUpdateRequest("a".repeat(21))))
+                saved.getId(), new NicknameUpdateRequest("a".repeat(31))))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);

@@ -193,14 +193,14 @@ class FeedbackServiceTest {
         UserResponse first = feedbackService.complete(user.getId(), fb.getId());
         UserResponse second = feedbackService.complete(user.getId(), fb.getId());
 
-        assertThat(first.exp()).isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
+        assertThat(first.exp()).isEqualTo(10);
         assertThat(first.streak()).isEqualTo(1);
         assertThat(first.username()).isEqualTo(user.getUsername());
-        assertThat(second.exp()).isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
+        assertThat(second.exp()).isEqualTo(10);
         assertThat(second.streak()).isEqualTo(1);
 
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(reloaded.getExp()).isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
+        assertThat(reloaded.getExp()).isEqualTo(10);
         assertThat(reloaded.getStreak()).isEqualTo(1);
         PronunciationFeedback reloadedFb = feedbackRepository.findById(fb.getId()).orElseThrow();
         assertThat(reloadedFb.isCompleted()).isTrue();
@@ -258,11 +258,11 @@ class FeedbackServiceTest {
     private static AnalyzeResult perfectAnalyzeResult() {
         return new AnalyzeResult(
                 List.of("HH", "AH", "L", "OW"),
-                Optional.of(List.of("HH", "AH", "L", "OW")),
+                List.of("HH", "AH", "L", "OW"),
                 List.of(0.9, 0.85, 0.8, 0.75),
                 List.of(),
                 List.of(),
-                Optional.of(0.0),
+                0.0,
                 1.23);
     }
 

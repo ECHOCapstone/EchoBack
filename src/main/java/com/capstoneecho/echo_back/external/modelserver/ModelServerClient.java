@@ -8,7 +8,6 @@ import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
@@ -95,11 +94,11 @@ public class ModelServerClient {
     private static AnalyzeResult toResult(AnalyzeWire wire) {
         return new AnalyzeResult(
                 wire.perceived(),
-                Optional.ofNullable(wire.canonical()),
+                wire.canonical(),
                 wire.peakSoftmax(),
                 wire.alignment(),
                 wire.errors(),
-                Optional.ofNullable(wire.per()),
+                wire.per(),
                 wire.durationSec()
         );
     }

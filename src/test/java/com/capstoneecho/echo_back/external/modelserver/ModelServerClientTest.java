@@ -65,6 +65,8 @@ class ModelServerClientTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
         );
         return new ModelServerClient(restClient, props);
@@ -129,8 +131,8 @@ class ModelServerClientTest {
         assertThat(capturedBody.get()).contains("HH AH L OW");
 
         assertThat(result.perceived()).containsExactly("HH", "AH");
-        assertThat(result.canonical()).isPresent();
-        assertThat(result.canonical().orElseThrow())
+        assertThat(result.canonical()).isNotNull();
+        assertThat(result.canonical())
                 .containsExactly("HH", "AH", "L", "OW");
         assertThat(result.peakSoftmax()).containsExactly(0.9, 0.8);
         assertThat(result.errors()).hasSize(1);
@@ -139,8 +141,8 @@ class ModelServerClientTest {
         assertThat(err.canonicalIndex()).isEqualTo(2);
         assertThat(err.canonical()).isEqualTo("L");
         assertThat(err.perceived()).isNull();
-        assertThat(result.per()).isPresent();
-        assertThat(result.per().orElseThrow()).isEqualTo(0.5);
+        assertThat(result.per()).isNotNull();
+        assertThat(result.per()).isEqualTo(0.5);
         assertThat(result.durationSec()).isEqualTo(1.23);
     }
 
@@ -166,8 +168,8 @@ class ModelServerClientTest {
 
         assertThat(capturedBody.get()).contains("name=\"audio\"");
         assertThat(capturedBody.get()).doesNotContain("name=\"canonical\"");
-        assertThat(result.canonical()).isEmpty();
-        assertThat(result.per()).isEmpty();
+        assertThat(result.canonical()).isNull();
+        assertThat(result.per()).isNull();
         assertThat(result.errors()).isEmpty();
     }
 

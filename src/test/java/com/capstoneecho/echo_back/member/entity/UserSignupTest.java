@@ -80,28 +80,28 @@ class UserSignupTest {
         User u = User.signup("d", "d@example.com", VALID_BCRYPT, "Dan");
 
         Instant day1 = Instant.parse("2026-01-01T10:00:00Z");
-        u.recordCompletion(day1, 100, KST);
+        u.recordCompletion(day1, 100, 7, KST);
         assertThat(u.getStreak()).isEqualTo(1);
         assertThat(u.getExp()).isEqualTo(100);
         assertThat(u.getLastStudyAt()).isEqualTo(day1);
 
         Instant day1Again = day1.plusSeconds(3600);
-        u.recordCompletion(day1Again, 50, KST);
+        u.recordCompletion(day1Again, 50, 7, KST);
         assertThat(u.getStreak()).isEqualTo(1);
         assertThat(u.getExp()).isEqualTo(150);
 
         Instant day2 = day1.plusSeconds(86400);
-        u.recordCompletion(day2, 10, KST);
+        u.recordCompletion(day2, 10, 7, KST);
         assertThat(u.getStreak()).isEqualTo(2);
         assertThat(u.getExp()).isEqualTo(160);
 
         for (int i = 3; i < 20; i++) {
-            u.recordCompletion(day1.plusSeconds(86400L * (i - 1)), 0, KST);
+            u.recordCompletion(day1.plusSeconds(86400L * (i - 1)), 0, 7, KST);
         }
         assertThat(u.getStreak()).isEqualTo(7);
 
         Instant farFuture = Instant.parse("2026-04-01T10:00:00Z");
-        u.recordCompletion(farFuture, 0, KST);
+        u.recordCompletion(farFuture, 0, 7, KST);
         assertThat(u.getStreak()).isEqualTo(1);
     }
 
@@ -111,11 +111,11 @@ class UserSignupTest {
         User u = User.fromOAuth2("e@example.com", "Eve");
         Instant now = Instant.parse("2026-01-01T00:00:00Z");
 
-        assertThatThrownBy(() -> u.recordCompletion(null, 10, KST))
+        assertThatThrownBy(() -> u.recordCompletion(null, 10, 7, KST))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> u.recordCompletion(now, 10, null))
+        assertThatThrownBy(() -> u.recordCompletion(now, 10, 7, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> u.recordCompletion(now, -1, KST))
+        assertThatThrownBy(() -> u.recordCompletion(now, -1, 7, KST))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

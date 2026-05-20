@@ -8,6 +8,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
@@ -20,7 +21,6 @@ import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailRespo
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
-import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeOp;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PracticeWordResolver;
@@ -29,18 +29,15 @@ import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.WeakPhonemeAnalyzer;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
+import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
 public class FeedbackService {
-
-    static final int DEFAULT_COMPLETION_EXP = 10;
 
     private final UserRepository userRepository;
     private final ScriptRepository scriptRepository;
@@ -54,6 +51,10 @@ public class FeedbackService {
     private final PracticeWordResolver practiceWordResolver;
     private final PronunciationPromptBuilder promptBuilder;
     private final MemberService memberService;
+    private final WavHeaderValidator wavHeaderValidator;
+    private final int completionExp;
+    private final String feedbackFallback;
+    private final String retryFallback;
 
     public FeedbackService(
             UserRepository userRepository,
@@ -67,7 +68,9 @@ public class FeedbackService {
             WeakPhonemeAnalyzer weakPhonemeAnalyzer,
             PracticeWordResolver practiceWordResolver,
             PronunciationPromptBuilder promptBuilder,
-            MemberService memberService) {
+            MemberService memberService,
+            WavHeaderValidator wavHeaderValidator,
+            AppProperties appProperties) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.sessionRepository = sessionRepository;
@@ -80,8 +83,15 @@ public class FeedbackService {
         this.practiceWordResolver = practiceWordResolver;
         this.promptBuilder = promptBuilder;
         this.memberService = memberService;
+        this.wavHeaderValidator = wavHeaderValidator;
+        AppProperties.Gamification g = appProperties.gamification();
+        this.completionExp = g == null ? 10 : g.completionExp();
+        AppProperties.Messages m = appProperties.messages();
+        this.feedbackFallback = m == null ? "" : m.feedbackGuidanceFallback();
+        this.retryFallback = m == null ? "" : m.retryGuidanceFallback();
     }
 
+    // 학습 단위 피드백 1건을 생성한다. recordingIds 는 같은 script 또는 같은 session 의 자식만 모인다.
     public FeedbackDetailResponse generate(Long userId, FeedbackGenerateRequest request) {
         if (request == null
                 || request.recordingIds() == null
@@ -99,11 +109,10 @@ public class FeedbackService {
         List<Long> recordingIds = request.recordingIds();
 
         PronunciationFeedback feedback;
-        List<Recording> recordings;
         if (hasScript) {
             Script script = scriptRepository.findById(request.scriptId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
-            recordings = recordingRepository
+            List<Recording> recordings = recordingRepository
                     .findAllByUser_IdAndScript_IdAndIdInOrderByCreatedAtAsc(
                             userId, script.getId(), recordingIds);
             requireFullMatch(recordings, recordingIds);
@@ -117,7 +126,7 @@ public class FeedbackService {
         } else {
             Session session = sessionRepository.findByIdAndUser_Id(request.sessionId(), userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-            recordings = recordingRepository
+            List<Recording> recordings = recordingRepository
                     .findAllByUser_IdAndSession_IdAndIdInOrderByCreatedAtAsc(
                             userId, session.getId(), recordingIds);
             requireFullMatch(recordings, recordingIds);
@@ -130,19 +139,19 @@ public class FeedbackService {
                     aggregated.weakPhoneme(), practiceWord, guidance);
         }
 
-        attachAggregatedErrors(feedback, recordings);
         PronunciationFeedback saved = feedbackRepository.save(feedback);
         return FeedbackDetailResponse.from(saved);
     }
 
+    // 한 단어 재시도. WAV 검증 → G2P → 분석 → 점수 및 가이드 산출.
     public RetryWordResult retryWord(Long userId, Long feedbackId, byte[] audioBytes) {
-        validateAudio(audioBytes);
+        wavHeaderValidator.require(audioBytes);
         PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
 
         String word = feedback.getPracticeWord();
         if (word == null || word.isBlank()) {
-            word = PracticeWordResolver.DEFAULT_PRACTICE_WORD;
+            word = practiceWordResolver.defaultWord();
         }
 
         G2pResult g2p = modelServerClient.g2p(word);
@@ -150,7 +159,7 @@ public class FeedbackService {
         AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
 
         List<String> perceived = analyze.perceived() == null ? List.of() : analyze.perceived();
-        List<String> canonicalPhonemes = analyze.canonical().orElse(List.of());
+        List<String> canonicalPhonemes = analyze.canonicalOrEmpty();
         boolean correct = perceived.equals(canonicalPhonemes);
         double score = scoringPolicy.singleWordScore(analyze);
 
@@ -179,11 +188,12 @@ public class FeedbackService {
         return FeedbackDetailResponse.from(feedback);
     }
 
+    // 완료 토글: 동시에 두 요청이 들어와도 정확히 한 번만 EXP 가 지급되도록 원자 UPDATE 후 분기.
     public UserResponse complete(Long userId, Long feedbackId) {
         Instant now = Instant.now();
         int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
         if (affected == 1) {
-            return memberService.awardCompletionRewards(userId, DEFAULT_COMPLETION_EXP);
+            return memberService.awardCompletionRewards(userId, completionExp);
         }
         PronunciationFeedback existing = feedbackRepository
                 .findByIdAndUser_Id(feedbackId, userId)
@@ -202,12 +212,10 @@ public class FeedbackService {
         }
     }
 
+    // 평균 점수, 가장 빈도 높은 약점 음소, LLM 컨텍스트를 한 묶음으로 만든다.
     private Aggregated aggregate(List<Recording> recordings) {
         double accuracy = scoringPolicy.aggregate(recordings);
-        List<AnalyzeError> aggregatedErrors = new ArrayList<>();
-        for (Recording r : recordings) {
-            aggregatedErrors.addAll(parseErrors(r));
-        }
+        List<AnalyzeError> aggregatedErrors = List.of();
         String weak = weakPhonemeAnalyzer.topOneFromErrors(aggregatedErrors);
         String targetText = firstNonBlank(recordings);
         LlmContext context = promptBuilder.buildAggregateContext(
@@ -225,37 +233,6 @@ public class FeedbackService {
         return "";
     }
 
-    private void attachAggregatedErrors(
-            PronunciationFeedback feedback, List<Recording> recordings) {
-        for (Recording r : recordings) {
-            for (AnalyzeError e : parseErrors(r)) {
-                PhonemeOp op = mapOp(e.op());
-                if (op == null) {
-                    continue;
-                }
-                feedback.recordPhonemeError(op, e.canonical(), e.perceived(), e.canonicalIndex());
-            }
-        }
-    }
-
-    private static List<AnalyzeError> parseErrors(Recording r) {
-        // 025 시점에는 Recording 에 errors_json 을 채우지 않으므로 빈 리스트로 폴백.
-        return List.of();
-    }
-
-    private static PhonemeOp mapOp(String op) {
-        if (op == null) {
-            return null;
-        }
-        String upper = op.trim().toUpperCase(Locale.ROOT);
-        return switch (upper) {
-            case "SUB", "SUBSTITUTION" -> PhonemeOp.SUB;
-            case "DEL", "DELETION" -> PhonemeOp.DEL;
-            case "INS", "INSERTION" -> PhonemeOp.INS;
-            default -> null;
-        };
-    }
-
     private String safeSummarizeFeedback(LlmContext context) {
         try {
             String s = llmClient.summarizeFeedback(context);
@@ -263,9 +240,9 @@ public class FeedbackService {
                 return s;
             }
         } catch (RuntimeException ignored) {
-            // fall through
+            // 호출 실패 시에도 사용자 경험을 위해 폴백 문구를 돌려준다.
         }
-        return "꾸준한 연습이 발음 개선에 도움이 됩니다.";
+        return feedbackFallback;
     }
 
     private String safeRetryGuidance(LlmContext context) {
@@ -275,21 +252,9 @@ public class FeedbackService {
                 return s;
             }
         } catch (RuntimeException ignored) {
-            // fall through
+            // 같은 의미로 단어 재시도용 폴백.
         }
-        return "해당 단어를 한 번 더 천천히 따라 읽어 보세요.";
-    }
-
-    private void validateAudio(byte[] audioBytes) {
-        if (audioBytes == null || audioBytes.length < 12) {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED);
-        }
-        if (audioBytes[0] != 'R'
-                || audioBytes[1] != 'I'
-                || audioBytes[2] != 'F'
-                || audioBytes[3] != 'F') {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED);
-        }
+        return retryFallback;
     }
 
     private record Aggregated(double accuracy, String weakPhoneme, LlmContext context) {}

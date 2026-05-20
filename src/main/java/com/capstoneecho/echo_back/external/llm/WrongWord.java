@@ -1,13 +1,9 @@
-package com.capstoneecho.echo_back.pronunciation.recording.dto;
+package com.capstoneecho.echo_back.external.llm;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-/**
- * FRONT_API_SPEC §12 정렬: LLM 또는 rule-based 폴백이 짚어 준 단어와 그 0-based 단어 인덱스.
- *
- * <p>{@code index} 는 {@code targetText} 를 공백 split 한 단어 배열에서의 위치다.
- */
+// LLM 이 짚어 준 약점 단어와 그 0-based 단어 인덱스. 인덱스는 targetText 를 공백 split 한 배열 기준이다.
 public record WrongWord(String word, int index) {
 
     @JsonCreator

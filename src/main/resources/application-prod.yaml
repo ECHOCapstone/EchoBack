@@ -18,10 +18,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-  servlet:
-    multipart:
-      max-file-size: 25MB
-      max-request-size: 25MB
   jackson:
     time-zone: UTC
   web:
@@ -32,7 +28,6 @@ logging:
   level:
     root: INFO
     com.capstoneecho: INFO
-  # 운영 로그는 UTC 로 기록한다 (stats 집계는 별도로 KST 변환).
   pattern:
     dateformat: "yyyy-MM-dd'T'HH:mm:ss.SSSXXX,UTC"
 
@@ -53,33 +48,13 @@ management:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    expiration-ms: 86400000
   cors:
     allowed-origins:
       - ${APP_CORS_ALLOWED_ORIGIN:https://echo.example.com}
-    allowed-methods:
-      - GET
-      - POST
-      - PUT
-      - PATCH
-      - DELETE
-      - OPTIONS
-    exposed-headers:
-      - Authorization
-    allow-credentials: true
-    max-age-sec: 3600
   model-server:
     base-url: ${MODEL_SERVER_BASE_URL}
-    timeout-ms: 10000
-  llm:
-    provider: rule-based
   storage:
     local-root: ${APP_STORAGE_LOCAL_ROOT:/var/echo/storage}
-  tts:
-    provider: local-stub
-  # stats 집계는 사용자 출석 도메인 특성상 KST 고정.
-  stats:
-    zone: Asia/Seoul
   auth:
     demo-google:
       email: ${APP_AUTH_DEMO_GOOGLE_EMAIL}

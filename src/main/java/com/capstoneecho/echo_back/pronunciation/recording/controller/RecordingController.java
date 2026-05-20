@@ -1,14 +1,12 @@
 package com.capstoneecho.echo_back.pronunciation.recording.controller;
 
 import com.capstoneecho.echo_back.global.common.ApiResponse;
-import com.capstoneecho.echo_back.global.common.BusinessException;
-import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.CurrentUser;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
 import com.capstoneecho.echo_back.pronunciation.recording.service.RecordingService;
-import java.io.IOException;
+import com.capstoneecho.echo_back.pronunciation.recording.support.AudioBytesReader;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,19 +34,11 @@ public class RecordingController {
             @RequestParam(value = "stepId", required = false) Long stepId,
             @RequestParam(value = "sessionId", required = false) Long sessionId,
             @RequestParam(value = "sessionSentenceId", required = false) Long sessionSentenceId) {
-        byte[] audioBytes = readAudioBytes(audio);
+        byte[] audioBytes = AudioBytesReader.read(audio);
         RecordingUploadRequest request = new RecordingUploadRequest(
                 scriptId, stepId, sessionId, sessionSentenceId);
         RecordingUploadResponse response =
                 recordingService.upload(principal.userId(), request, audioBytes);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
-    }
-
-    private static byte[] readAudioBytes(MultipartFile audio) {
-        try {
-            return audio.getBytes();
-        } catch (IOException ex) {
-            throw new BusinessException(ErrorCode.AUDIO_DECODE_FAILED, ex.getMessage());
-        }
     }
 }

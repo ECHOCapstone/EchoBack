@@ -111,7 +111,7 @@ class FeedbackServiceConcurrencyTest {
         assertThat(reloaded.getExp())
                 .as("EXP should be awarded exactly once across %s concurrent complete() calls",
                         threads)
-                .isEqualTo(FeedbackService.DEFAULT_COMPLETION_EXP);
+                .isEqualTo(10);
 
         PronunciationFeedback reloadedFb =
                 feedbackRepository.findById(fb.getId()).orElseThrow();

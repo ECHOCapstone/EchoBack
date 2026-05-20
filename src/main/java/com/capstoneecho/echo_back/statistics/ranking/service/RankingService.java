@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.statistics.ranking.service;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
@@ -24,22 +25,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RankingService {
 
-    private static final String DEFAULT_UNIT_TITLE = "오늘의 랭킹";
-
     private final FeedbackRepository feedbackRepository;
     private final DemoRankingEntryRepository demoRankingEntryRepository;
     private final UserRepository userRepository;
-    private final AppProperties appProperties;
+    private final StatsZoneProvider statsZoneProvider;
+    private final String defaultUnitTitle;
 
     public RankingService(
             FeedbackRepository feedbackRepository,
             DemoRankingEntryRepository demoRankingEntryRepository,
             UserRepository userRepository,
+            StatsZoneProvider statsZoneProvider,
             AppProperties appProperties) {
         this.feedbackRepository = feedbackRepository;
         this.demoRankingEntryRepository = demoRankingEntryRepository;
         this.userRepository = userRepository;
-        this.appProperties = appProperties;
+        this.statsZoneProvider = statsZoneProvider;
+        AppProperties.Gamification gamification = appProperties.gamification();
+        this.defaultUnitTitle =
+                (gamification == null || gamification.defaultRankingUnitTitle() == null)
+                        ? ""
+                        : gamification.defaultRankingUnitTitle();
     }
 
     public RankingResponse today(Long userId) {
@@ -47,7 +53,7 @@ public class RankingService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
-        ZoneId zone = resolveZone();
+        ZoneId zone = statsZoneProvider.zone();
         LocalDate today = LocalDate.now(zone);
         Instant start = today.atStartOfDay(zone).toInstant();
         Instant end = today.plusDays(1).atStartOfDay(zone).toInstant();
@@ -55,7 +61,7 @@ public class RankingService {
         List<PronunciationFeedback> todays = feedbackRepository.findCompletedInRange(start, end);
 
         Map<Long, BestForUser> bestByUser = new HashMap<>();
-        String unitTitle = DEFAULT_UNIT_TITLE;
+        String unitTitle = defaultUnitTitle;
         Instant latestForUnit = null;
         for (PronunciationFeedback f : todays) {
             Long fbUserId = f.getUser().getId();
@@ -101,6 +107,8 @@ public class RankingService {
         return new RankingResponse(unitTitle, myRank, rows.size(), myAccuracy, List.copyOf(entries));
     }
 
+    // 가장 최근 완료된 피드백의 스크립트 제목을 단위 제목으로 채택한다.
+    // 스크립트가 없거나 빈 제목이면 피드백 자체 제목 → app.gamification 폴백 순.
     private String resolveUnitTitle(PronunciationFeedback f) {
         if (f.getScript() != null && f.getScript().getTitle() != null
                 && !f.getScript().getTitle().isBlank()) {
@@ -110,11 +118,6 @@ public class RankingService {
             return f.getTitle();
         }
         return null;
-    }
-
-    private ZoneId resolveZone() {
-        String zone = appProperties.stats() == null ? null : appProperties.stats().zone();
-        return (zone == null || zone.isBlank()) ? ZoneId.systemDefault() : ZoneId.of(zone);
     }
 
     private record BestForUser(String nickname, double accuracy, boolean isMe) {}

@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.statistics.stats.service;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
@@ -26,29 +27,34 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class StatsService {
 
-    static final int WEEKLY_TOP_N = 5;
-    static final int WEEKLY_WINDOW_DAYS = 7;
+    // 사용자가 입력하는 year 의 안전 범위. 명백한 오타 / 악의 입력만 차단한다.
     private static final int YEAR_MIN = 2000;
     private static final int YEAR_MAX = 2999;
 
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
     private final BadgePolicy badgePolicy;
-    private final AppProperties appProperties;
+    private final StatsZoneProvider statsZoneProvider;
+    private final int weeklyTopN;
+    private final int weeklyWindowDays;
 
     public StatsService(
             UserRepository userRepository,
             FeedbackRepository feedbackRepository,
             BadgePolicy badgePolicy,
+            StatsZoneProvider statsZoneProvider,
             AppProperties appProperties) {
         this.userRepository = userRepository;
         this.feedbackRepository = feedbackRepository;
         this.badgePolicy = badgePolicy;
-        this.appProperties = appProperties;
+        this.statsZoneProvider = statsZoneProvider;
+        AppProperties.Gamification g = appProperties.gamification();
+        this.weeklyTopN = g == null ? 5 : g.weeklyTopN();
+        this.weeklyWindowDays = g == null ? 7 : g.weeklyWindowDays();
     }
 
     public StatsResponse getMyStats(Long userId, Integer year, Integer month) {
-        ZoneId zone = resolveZone();
+        ZoneId zone = statsZoneProvider.zone();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -60,11 +66,6 @@ public class StatsService {
 
         return new StatsResponse(
                 user.getStreak(), user.getExp(), attendance, weeklyErrors, badges);
-    }
-
-    private ZoneId resolveZone() {
-        String zone = appProperties.stats() == null ? null : appProperties.stats().zone();
-        return (zone == null || zone.isBlank()) ? ZoneId.systemDefault() : ZoneId.of(zone);
     }
 
     private YearMonth resolveYearMonth(Integer year, Integer month, ZoneId zone) {
@@ -84,6 +85,7 @@ public class StatsService {
         return YearMonth.of(year, month);
     }
 
+    // 한 달치 일자 → 누적 연속 학습일 매핑. 학습 누락 일에는 누적이 초기화된다.
     private Attendance buildAttendance(Long userId, YearMonth ym, ZoneId zone) {
         Instant start = ym.atDay(1).atStartOfDay(zone).toInstant();
         Instant end = ym.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
@@ -108,9 +110,10 @@ public class StatsService {
         return new Attendance(ym.getYear(), ym.getMonthValue(), days);
     }
 
+    // 최근 N 일 동안 가장 자주 약점으로 잡힌 음소 상위 K 개를 빈도순으로 돌려준다.
     private List<PhonemeFrequency> buildWeeklyErrors(Long userId, ZoneId zone) {
         Instant now = Instant.now();
-        Instant start = now.atZone(zone).minusDays(WEEKLY_WINDOW_DAYS).toInstant();
+        Instant start = now.atZone(zone).minusDays(weeklyWindowDays).toInstant();
         List<String> weakPhonemes = feedbackRepository.findWeakPhonemesInRange(userId, start, now);
 
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -122,7 +125,7 @@ public class StatsService {
         }
         return counts.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
-                .limit(WEEKLY_TOP_N)
+                .limit(weeklyTopN)
                 .map(e -> new PhonemeFrequency(e.getKey(), e.getValue()))
                 .toList();
     }
