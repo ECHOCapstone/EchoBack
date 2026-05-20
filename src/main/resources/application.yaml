@@ -33,7 +33,8 @@ app:
     provider: ${APP_LLM_PROVIDER:rule-based}
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${APP_LLM_GEMINI_MODEL:gemini-2.5-flash}
+      # 구조화 출력 지원 모델 중 가장 저렴한 옵션. gemini-3.5-flash 로 올리면 품질 ↑ / 비용 ↑.
+      model: ${APP_LLM_GEMINI_MODEL:gemini-3.1-flash-lite}
       base-url: https://generativelanguage.googleapis.com
       timeout-ms: 10000
   storage:

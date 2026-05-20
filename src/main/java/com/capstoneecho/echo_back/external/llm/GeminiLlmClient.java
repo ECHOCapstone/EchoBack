@@ -146,8 +146,8 @@ public class GeminiLlmClient implements LlmClient {
         }
     }
 
-    // v1beta API 는 generationConfig.responseMimeType + responseSchema 로 JSON 출력을 강제한다.
-    // (gemini-3 SDK 의 responseFormat.text.{mimeType, schema} 는 다른 신식 필드라 2.x 모델에서 400 을 낸다.)
+    // Gemini 3 시리즈 신식 형식: generationConfig.responseFormat.text.{mimeType, schema} 로 JSON 강제.
+    // (gemini.md REST 예시와 일치. v1beta 의 구식 responseMimeType + responseSchema 는 3.x 에서 deprecated.)
     // systemInstruction 으로 아학편 가이드를 주입한다.
     private Map<String, Object> buildBody(String userPrompt, Map<String, Object> schema) {
         Map<String, Object> userPart = Map.of("text", userPrompt);
@@ -158,11 +158,15 @@ public class GeminiLlmClient implements LlmClient {
         Map<String, Object> systemContent = Map.of(
                 "parts", List.of(Map.of("text", prompts.raw("system"))));
 
+        Map<String, Object> responseFormat = Map.of(
+                "text", Map.of(
+                        "mimeType", "application/json",
+                        "schema", schema));
+
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", TEMPERATURE);
         generationConfig.put("maxOutputTokens", MAX_OUTPUT_TOKENS);
-        generationConfig.put("responseMimeType", "application/json");
-        generationConfig.put("responseSchema", schema);
+        generationConfig.put("responseFormat", responseFormat);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("systemInstruction", systemContent);
