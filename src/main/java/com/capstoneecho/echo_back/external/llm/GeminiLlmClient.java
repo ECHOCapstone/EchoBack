@@ -146,8 +146,10 @@ public class GeminiLlmClient implements LlmClient {
         }
     }
 
-    // Gemini 3 시리즈 신식 형식: generationConfig.responseFormat.text.{mimeType, schema} 로 JSON 강제.
-    // (gemini.md REST 예시와 일치. v1beta 의 구식 responseMimeType + responseSchema 는 3.x 에서 deprecated.)
+    // v1beta API 의 구식 JSON 강제 필드 (responseMimeType + responseSchema).
+    // gemini.md 의 신식 responseFormat.text.{mimeType, schema} 는 SDK 자동 변환 / 미출시 endpoint 용 형식이라
+    // 현재 v1beta REST 가 mime_type 의 enum 값으로 "application/json" 문자열을 reject 한다.
+    // 구식 필드는 Gemini 1.5 / 2.0 / 2.5 / 3.x 까지 모든 모델에서 동작한다.
     // systemInstruction 으로 아학편 가이드를 주입한다.
     private Map<String, Object> buildBody(String userPrompt, Map<String, Object> schema) {
         Map<String, Object> userPart = Map.of("text", userPrompt);
@@ -158,15 +160,11 @@ public class GeminiLlmClient implements LlmClient {
         Map<String, Object> systemContent = Map.of(
                 "parts", List.of(Map.of("text", prompts.raw("system"))));
 
-        Map<String, Object> responseFormat = Map.of(
-                "text", Map.of(
-                        "mimeType", "application/json",
-                        "schema", schema));
-
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", TEMPERATURE);
         generationConfig.put("maxOutputTokens", MAX_OUTPUT_TOKENS);
-        generationConfig.put("responseFormat", responseFormat);
+        generationConfig.put("responseMimeType", "application/json");
+        generationConfig.put("responseSchema", schema);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("systemInstruction", systemContent);
