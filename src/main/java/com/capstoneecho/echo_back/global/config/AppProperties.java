@@ -31,7 +31,12 @@ public record AppProperties(
 
     public record ModelServer(String baseUrl, long timeoutMs) {}
 
-    public record Llm(String provider) {}
+    // provider 식별자 ("rule-based" | "gemini") 와 provider 별 자격증명 / 엔드포인트.
+    // gemini.apiKey 는 환경 변수 (GEMINI_API_KEY) 로 주입한다 — yaml 평문 금지.
+    public record Llm(String provider, Gemini gemini) {
+
+        public record Gemini(String apiKey, String model, String baseUrl, long timeoutMs) {}
+    }
 
     public record Storage(String localRoot) {}
 
