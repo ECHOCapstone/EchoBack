@@ -6,6 +6,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import org.springframework.core.io.ByteArrayResource;
@@ -103,14 +104,15 @@ public class ModelServerClient {
         );
     }
 
+    // 모델 서버 /analyze 응답은 snake_case 키를 쓰므로 @JsonAlias 로 camelCase 와 양쪽을 모두 받는다.
     @JsonIgnoreProperties(ignoreUnknown = true)
     record AnalyzeWire(
             List<String> perceived,
             List<String> canonical,
-            List<Double> peakSoftmax,
+            @JsonAlias("peak_softmax") List<Double> peakSoftmax,
             List<Object> alignment,
             List<AnalyzeError> errors,
             Double per,
-            double durationSec
+            @JsonAlias("duration_sec") double durationSec
     ) {}
 }
