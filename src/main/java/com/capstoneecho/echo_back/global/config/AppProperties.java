@@ -64,7 +64,8 @@ public record AppProperties(
         public record DemoGoogle(String email, String nickname) {}
     }
 
-    // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우 등).
+    // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우, 통과 점수 등).
+    // passThreshold 는 step 통과 여부를 판정하는 0~100 점수 임계. 기본 80.
     public record Gamification(
             int completionExp,
             int streakCap,
@@ -72,6 +73,7 @@ public record AppProperties(
             int weeklyTopN,
             int weeklyWindowDays,
             double scoreFallbackOnError,
+            double passThreshold,
             String defaultRankingUnitTitle,
             String defaultPracticeWord
     ) {}

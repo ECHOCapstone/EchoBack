@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
-import com.capstoneecho.echo_back.external.llm.LlmContext;
+import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
@@ -68,8 +68,8 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
         when(modelServerClient.g2p(anyString())).thenReturn(AnalyzeMockResponses.helloG2p());
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(AnalyzeMockResponses.perfect());
-        when(llmClient.summarizeRecording(any(LlmContext.class)))
-                .thenReturn(LlmMockResponses.defaultGuidance());
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(LlmMockResponses.defaultStep());
         when(recordingStorage.save(anyLong(), any(byte[].class))).thenReturn("u/recordings/test.wav");
     }
 
@@ -105,8 +105,8 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
         ScriptFlowFixture f = seedScriptFlow("recuser1b", "water bottle");
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(AnalyzeMockResponses.withWaterError());
-        when(llmClient.summarizeRecording(any(LlmContext.class)))
-                .thenReturn(LlmMockResponses.withWrongWord("water", 0));
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(LlmMockResponses.stepWithWrongWord("water", 0));
         String token = issueToken(f.user());
 
         mockMvc.perform(multipartUpload()

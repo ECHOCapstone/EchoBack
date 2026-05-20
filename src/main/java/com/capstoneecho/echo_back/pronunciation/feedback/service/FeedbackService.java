@@ -1,7 +1,11 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.service;
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
-import com.capstoneecho.echo_back.external.llm.LlmContext;
+import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
+import com.capstoneecho.echo_back.external.llm.LlmComprehensiveFeedback;
+import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
+import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
+import com.capstoneecho.echo_back.external.llm.PracticeItem;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
@@ -21,23 +25,32 @@ import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailRespo
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackSummaryResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
+import com.capstoneecho.echo_back.pronunciation.feedback.entity.PhonemeOp;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.PracticeWordResolver;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.PronunciationPromptBuilder;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.WeakPhonemeAnalyzer;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Transactional
 public class FeedbackService {
+
+    private static final Logger log = LoggerFactory.getLogger(FeedbackService.class);
 
     private final UserRepository userRepository;
     private final ScriptRepository scriptRepository;
@@ -48,13 +61,13 @@ public class FeedbackService {
     private final LlmClient llmClient;
     private final ScoringPolicy scoringPolicy;
     private final WeakPhonemeAnalyzer weakPhonemeAnalyzer;
-    private final PracticeWordResolver practiceWordResolver;
-    private final PronunciationPromptBuilder promptBuilder;
+    private final PriorAttemptAssembler priorAttemptAssembler;
     private final MemberService memberService;
     private final WavHeaderValidator wavHeaderValidator;
+    private final ObjectMapper objectMapper;
     private final int completionExp;
-    private final String feedbackFallback;
-    private final String retryFallback;
+    private final double passThreshold;
+    private final String defaultPracticeWord;
 
     public FeedbackService(
             UserRepository userRepository,
@@ -66,10 +79,10 @@ public class FeedbackService {
             LlmClient llmClient,
             ScoringPolicy scoringPolicy,
             WeakPhonemeAnalyzer weakPhonemeAnalyzer,
-            PracticeWordResolver practiceWordResolver,
-            PronunciationPromptBuilder promptBuilder,
+            PriorAttemptAssembler priorAttemptAssembler,
             MemberService memberService,
             WavHeaderValidator wavHeaderValidator,
+            ObjectMapper objectMapper,
             AppProperties appProperties) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
@@ -80,18 +93,22 @@ public class FeedbackService {
         this.llmClient = llmClient;
         this.scoringPolicy = scoringPolicy;
         this.weakPhonemeAnalyzer = weakPhonemeAnalyzer;
-        this.practiceWordResolver = practiceWordResolver;
-        this.promptBuilder = promptBuilder;
+        this.priorAttemptAssembler = priorAttemptAssembler;
         this.memberService = memberService;
         this.wavHeaderValidator = wavHeaderValidator;
+        this.objectMapper = objectMapper;
         AppProperties.Gamification g = appProperties.gamification();
         this.completionExp = g == null ? 10 : g.completionExp();
-        AppProperties.Messages m = appProperties.messages();
-        this.feedbackFallback = m == null ? "" : m.feedbackGuidanceFallback();
-        this.retryFallback = m == null ? "" : m.retryGuidanceFallback();
+        this.passThreshold = g == null ? 80.0 : g.passThreshold();
+        this.defaultPracticeWord = g == null ? "the" : g.defaultPracticeWord();
     }
 
-    // 학습 단위 피드백 1건을 생성한다. recordingIds 는 같은 script 또는 같은 session 의 자식만 모인다.
+    // 챕터 종합 피드백 생성:
+    // (1) recordingIds 로 같은 script (또는 session) 의 녹음들 일괄 조회
+    // (2) Recording.errors_json 을 역직렬화해 chapter 전체 약점 음소 빈도 계산 (weakPhoneme)
+    // (3) step 별 best 점수 + 시도 횟수 요약 → LLM comprehensiveFeedback 호출 (구조화 출력)
+    // (4) LLM 결과의 strengths / weaknesses / nextPracticeItems 를 JSON 으로 캐싱
+    // (5) PronunciationFeedback 엔티티 저장 + 응답
     public FeedbackDetailResponse generate(Long userId, FeedbackGenerateRequest request) {
         if (request == null
                 || request.recordingIds() == null
@@ -108,42 +125,58 @@ public class FeedbackService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         List<Long> recordingIds = request.recordingIds();
 
+        List<Recording> recordings;
+        String chapterTitle;
+        String chapterContent;
         PronunciationFeedback feedback;
         if (hasScript) {
             Script script = scriptRepository.findById(request.scriptId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
-            List<Recording> recordings = recordingRepository
+            recordings = recordingRepository
                     .findAllByUser_IdAndScript_IdAndIdInOrderByCreatedAtAsc(
                             userId, script.getId(), recordingIds);
             requireFullMatch(recordings, recordingIds);
+            chapterTitle = script.getTitle();
+            chapterContent = script.getContent();
             Aggregated aggregated = aggregate(recordings);
-            String practiceWord = practiceWordResolver.resolve(
-                    script, aggregated.weakPhoneme(), aggregated.context());
-            String guidance = safeSummarizeFeedback(aggregated.context());
+            LlmComprehensiveFeedback llm = callComprehensive(
+                    chapterTitle, chapterContent, aggregated);
+            String practiceWord = pickPracticeWord(script, llm);
             feedback = PronunciationFeedback.forScript(
-                    user, script, script.getTitle(), aggregated.accuracy(),
-                    aggregated.weakPhoneme(), practiceWord, guidance);
+                    user, script, chapterTitle, aggregated.accuracy(),
+                    aggregated.weakPhoneme(), practiceWord, llm.summaryKr());
+            applyComprehensive(feedback, llm);
+            attachAggregatedErrors(feedback, recordings);
         } else {
             Session session = sessionRepository.findByIdAndUser_Id(request.sessionId(), userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-            List<Recording> recordings = recordingRepository
+            recordings = recordingRepository
                     .findAllByUser_IdAndSession_IdAndIdInOrderByCreatedAtAsc(
                             userId, session.getId(), recordingIds);
             requireFullMatch(recordings, recordingIds);
+            chapterTitle = session.getTitle();
+            chapterContent = session.getScriptText();
             Aggregated aggregated = aggregate(recordings);
-            String practiceWord = practiceWordResolver.resolve(
-                    null, aggregated.weakPhoneme(), aggregated.context());
-            String guidance = safeSummarizeFeedback(aggregated.context());
+            LlmComprehensiveFeedback llm = callComprehensive(
+                    chapterTitle, chapterContent, aggregated);
+            String practiceWord = pickPracticeWord(null, llm);
             feedback = PronunciationFeedback.forSession(
-                    user, session, session.getTitle(), aggregated.accuracy(),
-                    aggregated.weakPhoneme(), practiceWord, guidance);
+                    user, session, chapterTitle, aggregated.accuracy(),
+                    aggregated.weakPhoneme(), practiceWord, llm.summaryKr());
+            applyComprehensive(feedback, llm);
+            attachAggregatedErrors(feedback, recordings);
         }
 
         PronunciationFeedback saved = feedbackRepository.save(feedback);
-        return FeedbackDetailResponse.from(saved);
+        return FeedbackDetailResponse.from(saved, objectMapper);
     }
 
-    // 한 단어 재시도. WAV 검증 → G2P → 분석 → 점수 및 가이드 산출.
+    // 단어 / 구 재시도 흐름:
+    // (1) WAV 검증 → feedback 조회 → 연습 단어 결정
+    // (2) 모델 서버 g2p / analyze
+    // (3) 같은 feedback 의 이전 retry-word 기록은 현재 모델에 별도 컬럼이 없으므로 빈 priorAttempts 로 호출.
+    //     (PronunciationFeedback 자체의 errors 가 LLM 컨텍스트에서 누적 신호 역할을 한다.)
+    // (4) LLM 구조화 결과로 응답 구성
     public RetryWordResult retryWord(Long userId, Long feedbackId, byte[] audioBytes) {
         wavHeaderValidator.require(audioBytes);
         PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
@@ -151,7 +184,7 @@ public class FeedbackService {
 
         String word = feedback.getPracticeWord();
         if (word == null || word.isBlank()) {
-            word = practiceWordResolver.defaultWord();
+            word = defaultPracticeWord;
         }
 
         G2pResult g2p = modelServerClient.g2p(word);
@@ -160,18 +193,28 @@ public class FeedbackService {
 
         List<String> perceived = analyze.perceived() == null ? List.of() : analyze.perceived();
         List<String> canonicalPhonemes = analyze.canonicalOrEmpty();
-        boolean correct = perceived.equals(canonicalPhonemes);
         double score = scoringPolicy.singleWordScore(analyze);
 
-        LlmContext context = promptBuilder.buildRetryContext(
+        LlmRetryContext context = new LlmRetryContext(
                 word,
                 perceived,
                 canonicalPhonemes,
                 analyze.errors(),
-                feedback.getWeakPhoneme());
-        String guidance = safeRetryGuidance(context);
+                feedback.getWeakPhoneme(),
+                score,
+                List.of());
+        LlmRetryFeedback llm = llmClient.retryFeedback(context);
+        boolean passed = score >= passThreshold && !llm.retryRecommended();
 
-        return new RetryWordResult(correct, perceived, canonicalPhonemes, score, guidance);
+        return new RetryWordResult(
+                llm.correct(),
+                passed,
+                llm.retryRecommended(),
+                perceived,
+                canonicalPhonemes,
+                score,
+                llm.guidanceKr(),
+                llm.phonemeTips());
     }
 
     @Transactional(readOnly = true)
@@ -185,7 +228,7 @@ public class FeedbackService {
     public FeedbackDetailResponse get(Long userId, Long feedbackId) {
         PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-        return FeedbackDetailResponse.from(feedback);
+        return FeedbackDetailResponse.from(feedback, objectMapper);
     }
 
     // 완료 토글: 동시에 두 요청이 들어와도 정확히 한 번만 EXP 가 지급되도록 원자 UPDATE 후 분기.
@@ -212,50 +255,126 @@ public class FeedbackService {
         }
     }
 
-    // 평균 점수, 가장 빈도 높은 약점 음소, LLM 컨텍스트를 한 묶음으로 만든다.
+    // 챕터 누적 통계 + step 별 best 점수 / 시도 횟수 / 약점 음소 요약을 만든다.
+    // Recording.errors_json 을 역직렬화해 모든 음소 오류를 누적한다.
     private Aggregated aggregate(List<Recording> recordings) {
         double accuracy = scoringPolicy.aggregate(recordings);
-        List<AnalyzeError> aggregatedErrors = List.of();
-        String weak = weakPhonemeAnalyzer.topOneFromErrors(aggregatedErrors);
-        String targetText = firstNonBlank(recordings);
-        LlmContext context = promptBuilder.buildAggregateContext(
-                targetText, recordings, aggregatedErrors, weak);
-        return new Aggregated(accuracy, weak, context);
-    }
-
-    private static String firstNonBlank(List<Recording> recordings) {
+        List<AnalyzeError> aggregatedErrors = new ArrayList<>();
+        Map<Long, BestPerStep> bestByStep = new LinkedHashMap<>();
         for (Recording r : recordings) {
-            String t = r.getTargetTextSnapshot();
-            if (t != null && !t.isBlank()) {
-                return t;
-            }
+            List<AnalyzeError> errs = priorAttemptAssembler.parseErrors(r.getErrorsJson());
+            aggregatedErrors.addAll(errs);
+            Long stepId = r.getStep() == null ? null : r.getStep().getId();
+            String targetText = r.getTargetTextSnapshot() == null ? "" : r.getTargetTextSnapshot();
+            String stepWeak = pickWeak(errs);
+            double score = r.getStepScore() == null ? 0.0 : r.getStepScore();
+            bestByStep.merge(
+                    stepId == null ? -1L * (bestByStep.size() + 1) : stepId,
+                    new BestPerStep(targetText, 1, score, stepWeak),
+                    BestPerStep::merge);
         }
-        return "";
+        String dominantWeak = weakPhonemeAnalyzer.topOneFromErrors(aggregatedErrors);
+        List<LlmComprehensiveContext.StepSummary> stepSummaries = bestByStep.values().stream()
+                .map(b -> new LlmComprehensiveContext.StepSummary(
+                        b.targetText(), b.attempts(), b.bestScore(), b.weakPhoneme()))
+                .toList();
+        return new Aggregated(accuracy, dominantWeak, aggregatedErrors, stepSummaries);
     }
 
-    private String safeSummarizeFeedback(LlmContext context) {
+    private LlmComprehensiveFeedback callComprehensive(
+            String chapterTitle, String chapterContent, Aggregated aggregated) {
+        LlmComprehensiveContext context = new LlmComprehensiveContext(
+                chapterTitle,
+                chapterContent,
+                aggregated.stepSummaries(),
+                aggregated.aggregatedErrors(),
+                aggregated.weakPhoneme(),
+                aggregated.accuracy());
+        return llmClient.comprehensiveFeedback(context);
+    }
+
+    private void applyComprehensive(PronunciationFeedback feedback, LlmComprehensiveFeedback llm) {
         try {
-            String s = llmClient.summarizeFeedback(context);
-            if (s != null && !s.isBlank()) {
-                return s;
-            }
-        } catch (RuntimeException ignored) {
-            // 호출 실패 시에도 사용자 경험을 위해 폴백 문구를 돌려준다.
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("strengths", llm.strengths());
+            payload.put("weaknesses", llm.weaknesses());
+            payload.put("nextPracticeItems", llm.nextPracticeItems());
+            feedback.applyComprehensiveJson(objectMapper.writeValueAsString(payload));
+        } catch (RuntimeException ex) {
+            log.warn("Failed to serialize comprehensive feedback; storing NULL", ex);
         }
-        return feedbackFallback;
     }
 
-    private String safeRetryGuidance(LlmContext context) {
-        try {
-            String s = llmClient.retryGuidance(context);
-            if (s != null && !s.isBlank()) {
-                return s;
+    // 챕터에 미리 박힌 단어 → LLM 추천 첫 항목 → 외부화된 폴백 단어 순.
+    private String pickPracticeWord(Script script, LlmComprehensiveFeedback llm) {
+        if (script != null) {
+            String seeded = script.getPracticeWord();
+            if (seeded != null && !seeded.isBlank()) {
+                return seeded;
             }
-        } catch (RuntimeException ignored) {
-            // 같은 의미로 단어 재시도용 폴백.
         }
-        return retryFallback;
+        for (PracticeItem item : llm.nextPracticeItems()) {
+            if (item.kind() == PracticeItem.Kind.WORD && !item.text().isBlank()) {
+                return item.text();
+            }
+        }
+        for (PracticeItem item : llm.nextPracticeItems()) {
+            if (!item.text().isBlank()) {
+                return item.text();
+            }
+        }
+        return defaultPracticeWord;
     }
 
-    private record Aggregated(double accuracy, String weakPhoneme, LlmContext context) {}
+    // 챕터의 모든 시도에서 모인 음소 오류를 PhonemeError 자식으로 저장한다.
+    private void attachAggregatedErrors(
+            PronunciationFeedback feedback, List<Recording> recordings) {
+        for (Recording r : recordings) {
+            for (AnalyzeError e : priorAttemptAssembler.parseErrors(r.getErrorsJson())) {
+                PhonemeOp op = mapOp(e.op());
+                if (op == null) {
+                    continue;
+                }
+                feedback.recordPhonemeError(op, e.canonical(), e.perceived(), e.canonicalIndex());
+            }
+        }
+    }
+
+    private static String pickWeak(List<AnalyzeError> errors) {
+        if (errors == null) return null;
+        for (AnalyzeError e : errors) {
+            if (e.canonical() != null && !e.canonical().isBlank()) return e.canonical();
+        }
+        return null;
+    }
+
+    private static PhonemeOp mapOp(String op) {
+        if (op == null) {
+            return null;
+        }
+        String upper = op.trim().toUpperCase(Locale.ROOT);
+        return switch (upper) {
+            case "SUB", "SUBSTITUTION" -> PhonemeOp.SUB;
+            case "DEL", "DELETION" -> PhonemeOp.DEL;
+            case "INS", "INSERTION" -> PhonemeOp.INS;
+            default -> null;
+        };
+    }
+
+    private record Aggregated(
+            double accuracy,
+            String weakPhoneme,
+            List<AnalyzeError> aggregatedErrors,
+            List<LlmComprehensiveContext.StepSummary> stepSummaries
+    ) {}
+
+    private record BestPerStep(String targetText, int attempts, double bestScore, String weakPhoneme) {
+        BestPerStep merge(BestPerStep other) {
+            int totalAttempts = this.attempts + other.attempts;
+            double best = Math.max(this.bestScore, other.bestScore);
+            String weak = other.weakPhoneme == null ? this.weakPhoneme : other.weakPhoneme;
+            String text = this.targetText.isBlank() ? other.targetText : this.targetText;
+            return new BestPerStep(text, totalAttempts, best, weak);
+        }
+    }
 }

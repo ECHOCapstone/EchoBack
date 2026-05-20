@@ -89,6 +89,11 @@ public class PronunciationFeedback {
     @Column(name = "script_text", columnDefinition = "TEXT")
     private String scriptText;
 
+    // LLM 종합 피드백의 strengths / weaknesses / nextPracticeItems 를 JSON 으로 캐싱한다.
+    // 저장 포맷: {"strengths":[...], "weaknesses":[...], "nextPracticeItems":[{text,kind,reason}, ...]}
+    @Column(name = "comprehensive_json", columnDefinition = "TEXT")
+    private String comprehensiveJson;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -179,6 +184,11 @@ public class PronunciationFeedback {
             return;
         }
         this.guidanceKr = newGuidance;
+    }
+
+    // LLM 종합 결과 JSON 을 통째로 캐싱한다. 빈 입력은 NULL 로 남긴다.
+    public void applyComprehensiveJson(String json) {
+        this.comprehensiveJson = (json == null || json.isBlank()) ? null : json;
     }
 
     @PrePersist

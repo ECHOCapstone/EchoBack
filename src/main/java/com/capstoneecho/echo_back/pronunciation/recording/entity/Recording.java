@@ -170,6 +170,35 @@ public class Recording {
         this.wrongWordsJson = (json == null || json.isBlank()) ? null : json;
     }
 
+    // 모델 서버의 음소 오류 목록을 JSON 으로 직렬화해 저장한다.
+    // 종합 피드백 단계에서 챕터 전체 약점 음소 빈도를 계산할 때 다시 역직렬화한다.
+    // 저장 포맷: [{"op":"SUB","canonical":"R","perceived":"L","canonicalIndex":3}, ...].
+    public void applyErrorsJson(String json) {
+        this.errorsJson = (json == null || json.isBlank()) ? null : json;
+    }
+
+    // 모델 서버가 돌려준 perceived / canonical / peakSoftmax 음소 시퀀스를 캐시한다.
+    // 단순 String 으로 저장 (공백 구분). 종합 단계에서 누적 컨텍스트 구성용.
+    public void applyAnalysisSnapshot(String perceived, String canonical, String peakSoftmax) {
+        this.perceived = blankToNull(perceived);
+        this.canonical = blankToNull(canonical);
+        this.peakSoftmax = blankToNull(peakSoftmax);
+    }
+
+    // step 점수를 저장한다 (0~100). null 입력은 모르는 점수로 남긴다.
+    public void applyStepScore(Double score) {
+        this.stepScore = score;
+    }
+
+    // LLM 이 만든 한국어 가이던스를 저장한다. 빈 입력은 NULL 로 남긴다.
+    public void applyGuidanceKr(String guidanceKr) {
+        this.guidanceKr = blankToNull(guidanceKr);
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s;
+    }
+
     private static void requireNonNull(Object value, String field) {
         if (value == null) {
             throw new IllegalArgumentException(field + " is required");

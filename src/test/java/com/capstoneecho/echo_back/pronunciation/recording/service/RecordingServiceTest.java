@@ -13,8 +13,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
-import com.capstoneecho.echo_back.external.llm.LlmContext;
-import com.capstoneecho.echo_back.external.llm.RecordingGuidance;
+import com.capstoneecho.echo_back.external.llm.LlmStepContext;
+import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
+import com.capstoneecho.echo_back.external.llm.PhonemeTip;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
@@ -100,8 +101,10 @@ class RecordingServiceTest {
                 .thenReturn(new G2pResult("HH AH L OW", List.of()));
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(perfectAnalyzeResult());
-        when(llmClient.summarizeRecording(any(LlmContext.class)))
-                .thenReturn(new RecordingGuidance("발음을 더 또렷하게 따라 읽어 보세요.", List.of()));
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(new LlmStepFeedback(
+                        85, false, "발음을 더 또렷하게 따라 읽어 보세요.",
+                        List.of(), List.of(), List.of(), List.of()));
         when(recordingStorage.save(anyLong(), any(byte[].class)))
                 .thenReturn("u/202605/test.wav");
     }
@@ -221,9 +224,12 @@ class RecordingServiceTest {
 
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(analyzeWithErrors());
-        when(llmClient.summarizeRecording(any(LlmContext.class)))
-                .thenReturn(new RecordingGuidance(
-                        "ɔ 모음을 더 둥글게.", List.of(new WrongWord("water", 0))));
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(new LlmStepFeedback(
+                        72, true, "ɔ 모음을 더 둥글게.",
+                        List.of(), List.of(),
+                        List.of(new WrongWord("water", 0)),
+                        List.<PhonemeTip>of()));
 
         RecordingUploadResponse withErrors = recordingService.upload(
                 f.userId(),
@@ -242,8 +248,10 @@ class RecordingServiceTest {
 
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(perfectAnalyzeResult());
-        when(llmClient.summarizeRecording(any(LlmContext.class)))
-                .thenReturn(new RecordingGuidance("좋아요.", List.of()));
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(new LlmStepFeedback(
+                        92, false, "좋아요.",
+                        List.of(), List.of(), List.of(), List.of()));
 
         RecordingUploadResponse perfect = recordingService.upload(
                 f.userId(),

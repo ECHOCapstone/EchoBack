@@ -1,23 +1,44 @@
 package com.capstoneecho.echo_back.support;
 
-import com.capstoneecho.echo_back.external.llm.RecordingGuidance;
+import com.capstoneecho.echo_back.external.llm.LlmComprehensiveFeedback;
+import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
+import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
+import com.capstoneecho.echo_back.external.llm.PracticeItem;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.List;
 
-/**
- * 컨트롤러 테스트에서 LlmClient 를 mock 할 때 재사용하는 응답 모음.
- */
+// LlmClient mock 응답 모음. 새 인터페이스 (stepFeedback / retryFeedback / comprehensiveFeedback) 에 맞춘다.
 public final class LlmMockResponses {
 
-    public static RecordingGuidance defaultGuidance() {
-        return new RecordingGuidance("발음을 더 또렷하게 따라 읽어 보세요.", List.of());
-    }
-
-    public static RecordingGuidance withWrongWord(String word, int index) {
-        return new RecordingGuidance(
-                "ɔ 모음을 더 둥글게 발음해 보세요.", List.of(new WrongWord(word, index)));
-    }
-
     private LlmMockResponses() {
+    }
+
+    public static LlmStepFeedback defaultStep() {
+        return new LlmStepFeedback(
+                85, false,
+                "발음을 더 또렷하게 따라 읽어 보세요.",
+                List.of(), List.of(), List.of(), List.of());
+    }
+
+    public static LlmStepFeedback stepWithWrongWord(String word, int index) {
+        return new LlmStepFeedback(
+                70, true,
+                "ɔ 모음을 더 둥글게 발음해 보세요.",
+                List.of(), List.of(),
+                List.of(new WrongWord(word, index)),
+                List.of());
+    }
+
+    public static LlmRetryFeedback defaultRetry() {
+        return new LlmRetryFeedback(85, true, false, "잘 했어요.", List.of());
+    }
+
+    public static LlmComprehensiveFeedback defaultComprehensive() {
+        return new LlmComprehensiveFeedback(
+                85,
+                "전반적으로 좋은 발음이었어요.",
+                List.of(),
+                List.of(),
+                List.of(new PracticeItem("the", PracticeItem.Kind.WORD, "기본 단어")));
     }
 }

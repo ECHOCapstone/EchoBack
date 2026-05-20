@@ -1,14 +1,15 @@
 package com.capstoneecho.echo_back.pronunciation.recording.service;
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
-import com.capstoneecho.echo_back.external.llm.LlmContext;
-import com.capstoneecho.echo_back.external.llm.RecordingGuidance;
+import com.capstoneecho.echo_back.external.llm.LlmStepContext;
+import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.LearningStepRepository;
@@ -19,10 +20,10 @@ import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.repository.SessionSentenceRepository;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
-import com.capstoneecho.echo_back.external.llm.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
@@ -53,6 +54,8 @@ public class RecordingService {
     private final ObjectMapper objectMapper;
     private final WavHeaderValidator wavHeaderValidator;
     private final ScoringPolicy scoringPolicy;
+    private final PriorAttemptAssembler priorAttemptAssembler;
+    private final double passThreshold;
 
     public RecordingService(
             UserRepository userRepository,
@@ -66,7 +69,9 @@ public class RecordingService {
             LlmClient llmClient,
             ObjectMapper objectMapper,
             WavHeaderValidator wavHeaderValidator,
-            ScoringPolicy scoringPolicy) {
+            ScoringPolicy scoringPolicy,
+            PriorAttemptAssembler priorAttemptAssembler,
+            AppProperties appProperties) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
@@ -79,10 +84,18 @@ public class RecordingService {
         this.objectMapper = objectMapper;
         this.wavHeaderValidator = wavHeaderValidator;
         this.scoringPolicy = scoringPolicy;
+        this.priorAttemptAssembler = priorAttemptAssembler;
+        AppProperties.Gamification g = appProperties.gamification();
+        this.passThreshold = g == null ? 80.0 : g.passThreshold();
     }
 
-    // 녹음 1건을 업로드한다: 헤더 검증 → 부모 (script/step 또는 session/sentence) 매핑 →
-    // G2P+분석 → LLM 요약 → 디스크 저장 → 엔티티 저장 순. 트랜잭션이 깨지면 파일도 같이 정리한다.
+    // 녹음 1건 업로드 흐름:
+    // (1) WAV 검증 → 부모 (script-step 또는 session-sentence) 매핑 → 목표 텍스트 추출
+    // (2) 모델 서버 g2p + analyze 호출
+    // (3) 같은 step / sentence 의 이전 시도들을 priorAttempts 로 묶어 LLM 호출 (구조화 출력)
+    // (4) 오디오 디스크 저장 + Recording 엔티티 저장 (errorsJson / wrongWordsJson / stepScore / guidanceKr 캐싱)
+    // (5) 점수 임계와 LLM 판정을 합쳐 passed / retryRecommended 를 응답에 포함
+    // 트랜잭션이 롤백되면 디스크에 쓴 오디오 파일도 같이 정리한다.
     @Transactional
     public RecordingUploadResponse upload(
             Long userId, RecordingUploadRequest request, byte[] audioBytes) {
@@ -99,38 +112,120 @@ public class RecordingService {
         String canonical = g2p.phonemes() == null ? "" : g2p.phonemes();
         AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
 
-        LlmContext context = LlmContext.builder()
-                .targetText(targetText)
-                .perceived(analyze.perceived())
-                .canonical(analyze.canonicalOrEmpty())
-                .errors(analyze.errors())
-                .g2pWords(g2p.words())
-                .build();
-        RecordingGuidance guidance = llmClient.summarizeRecording(context);
+        Double stepScore = analyze.per() == null ? null : scoringPolicy.perToScore(analyze.per());
+        List<Recording> priorRecordings = findPriorAttempts(userId, parents);
+        LlmStepContext context = buildStepContext(
+                parents, targetText, analyze, g2p, stepScore, priorRecordings);
+        LlmStepFeedback feedback = llmClient.stepFeedback(context);
 
         String audioPath = recordingStorage.save(userId, audioBytes);
         registerStorageCleanupOnNonCommit(audioPath);
 
         Recording recording = buildRecording(mode, parents, audioPath, targetText);
-        recording.applyWrongWordsJson(serializeWrongWords(guidance.wrongWords()));
+        recording.applyAnalysisSnapshot(
+                joinTokens(analyze.perceived()),
+                joinTokens(analyze.canonicalOrEmpty()),
+                joinDoubles(analyze.peakSoftmax()));
+        recording.applyErrorsJson(serializeErrors(analyze.errors()));
+        recording.applyWrongWordsJson(serializeWrongWords(feedback));
+        recording.applyStepScore(stepScore);
+        recording.applyGuidanceKr(feedback.guidanceKr());
         Recording saved = recordingRepository.save(recording);
 
-        return toResponse(saved, parents, analyze, guidance);
+        boolean passed = stepScore != null && stepScore >= passThreshold && !feedback.retryRecommended();
+        return RecordingUploadResponse.fromUpload(
+                saved,
+                analyze.perceived(),
+                analyze.canonicalOrEmpty(),
+                analyze.peakSoftmax(),
+                analyze.errors().stream().map(RecordingService::toErrorView).toList(),
+                feedback,
+                passed);
     }
 
-    private String serializeWrongWords(List<WrongWord> wrongWords) {
-        if (wrongWords == null || wrongWords.isEmpty()) {
+    // 같은 부모 (script+step 또는 session+sentence) 에서 작성 시각 오름차순 이전 시도 목록.
+    private List<Recording> findPriorAttempts(Long userId, ResolvedParents parents) {
+        if (parents.step() != null && parents.script() != null) {
+            return recordingRepository.findAllByUser_IdAndScript_IdAndStep_IdOrderByCreatedAtAsc(
+                    userId, parents.script().getId(), parents.step().getId());
+        }
+        if (parents.sentence() != null && parents.session() != null) {
+            return recordingRepository
+                    .findAllByUser_IdAndSession_IdAndSessionSentence_IdOrderByCreatedAtAsc(
+                            userId, parents.session().getId(), parents.sentence().getId());
+        }
+        return List.of();
+    }
+
+    // LLM 호출에 들어갈 컨텍스트. priorAttempts 가 채워지면 LLM 이 누적 학습 흐름을 인지한다.
+    private LlmStepContext buildStepContext(
+            ResolvedParents parents,
+            String targetText,
+            AnalyzeResult analyze,
+            G2pResult g2p,
+            Double stepScore,
+            List<Recording> priorRecordings) {
+        String chapterTitle = parents.script() == null ? "" : parents.script().getTitle();
+        return new LlmStepContext(
+                chapterTitle,
+                targetText,
+                analyze.perceived(),
+                analyze.canonicalOrEmpty(),
+                analyze.errors(),
+                g2p.words(),
+                pickWeakPhoneme(analyze.errors()),
+                stepScore,
+                priorAttemptAssembler.from(priorRecordings));
+    }
+
+    private static String pickWeakPhoneme(List<AnalyzeError> errors) {
+        if (errors == null) return null;
+        for (AnalyzeError e : errors) {
+            if (e.canonical() != null && !e.canonical().isBlank()) {
+                return e.canonical();
+            }
+        }
+        return null;
+    }
+
+    private String serializeWrongWords(LlmStepFeedback feedback) {
+        if (feedback.wrongWords().isEmpty()) {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(wrongWords);
+            return objectMapper.writeValueAsString(feedback.wrongWords());
         } catch (RuntimeException ex) {
-            log.warn(
-                    "Failed to serialize wrongWords ({} items) for recording; persisting NULL",
-                    wrongWords.size(),
-                    ex);
+            log.warn("Failed to serialize wrongWords; persisting NULL", ex);
             return null;
         }
+    }
+
+    private String serializeErrors(List<AnalyzeError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(errors);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to serialize analyze errors; persisting NULL", ex);
+            return null;
+        }
+    }
+
+    private static String joinTokens(List<String> tokens) {
+        if (tokens == null || tokens.isEmpty()) return null;
+        return String.join(" ", tokens);
+    }
+
+    private static String joinDoubles(List<Double> values) {
+        if (values == null || values.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) sb.append(' ');
+            Double v = values.get(i);
+            sb.append(v == null ? "0" : v.toString());
+        }
+        return sb.toString();
     }
 
     // 트랜잭션이 롤백되면 방금 저장한 오디오 파일이 orphan 으로 남는 것을 막는다.
@@ -146,8 +241,7 @@ public class RecordingService {
                 } catch (RuntimeException ex) {
                     log.warn(
                             "Failed to clean up orphan recording audio after non-commit (path={})",
-                            audioPath,
-                            ex);
+                            audioPath, ex);
                 }
             }
         });
@@ -223,37 +317,6 @@ public class RecordingService {
             case SESSION_SENTENCE -> Recording.forSessionSentence(
                     p.user(), p.session(), p.sentence(), audioPath, targetText);
         };
-    }
-
-    private RecordingUploadResponse toResponse(
-            Recording saved,
-            ResolvedParents parents,
-            AnalyzeResult analyze,
-            RecordingGuidance guidance) {
-        List<RecordingUploadResponse.PhonemeErrorView> errorViews = analyze.errors().stream()
-                .map(RecordingService::toErrorView)
-                .toList();
-        Double stepScore = analyze.per() == null ? null : scoringPolicy.perToScore(analyze.per());
-        Long scriptId = parents.script() == null ? null : parents.script().getId();
-        Long stepId = parents.step() == null ? null : parents.step().getId();
-        Long sessionId = parents.session() == null ? null : parents.session().getId();
-        Long sentenceId = parents.sentence() == null ? null : parents.sentence().getId();
-
-        return new RecordingUploadResponse(
-                saved.getId(),
-                scriptId,
-                sessionId,
-                stepId,
-                sentenceId,
-                analyze.durationSec(),
-                List.copyOf(analyze.perceived()),
-                List.copyOf(analyze.canonicalOrEmpty()),
-                List.copyOf(analyze.peakSoftmax()),
-                stepScore,
-                guidance.guidanceKr(),
-                errorViews,
-                List.<WrongWord>copyOf(guidance.wrongWords()),
-                saved.getCreatedAt());
     }
 
     private static RecordingUploadResponse.PhonemeErrorView toErrorView(AnalyzeError e) {

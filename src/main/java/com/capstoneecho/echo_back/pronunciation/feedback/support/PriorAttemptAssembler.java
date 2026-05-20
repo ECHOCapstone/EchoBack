@@ -1,0 +1,50 @@
+package com.capstoneecho.echo_back.pronunciation.feedback.support;
+
+import com.capstoneecho.echo_back.external.llm.PriorAttempt;
+import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+
+// Recording 엔티티 목록을 LLM 호출용 PriorAttempt 리스트로 변환한다.
+// errors_json 컬럼이 비어 있으면 빈 오류 리스트로 폴백해 호출이 깨지지 않게 한다.
+@Component
+public class PriorAttemptAssembler {
+
+    private static final TypeReference<List<AnalyzeError>> ERROR_LIST_TYPE = new TypeReference<>() {};
+
+    private final ObjectMapper objectMapper;
+
+    public PriorAttemptAssembler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    public List<PriorAttempt> from(List<Recording> recordings) {
+        if (recordings == null || recordings.isEmpty()) {
+            return List.of();
+        }
+        List<PriorAttempt> out = new ArrayList<>(recordings.size());
+        for (Recording r : recordings) {
+            out.add(new PriorAttempt(
+                    r.getCreatedAt(),
+                    r.getStepScore(),
+                    r.getPerceived(),
+                    parseErrors(r.getErrorsJson())));
+        }
+        return out;
+    }
+
+    public List<AnalyzeError> parseErrors(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, ERROR_LIST_TYPE);
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+    }
+}

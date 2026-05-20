@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
-import com.capstoneecho.echo_back.external.llm.LlmContext;
+import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
+import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
+import com.capstoneecho.echo_back.external.llm.LlmStepContext;
+import com.capstoneecho.echo_back.support.LlmMockResponses;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
@@ -64,11 +67,12 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
         when(modelServerClient.g2p(anyString())).thenReturn(AnalyzeMockResponses.helloG2p());
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(AnalyzeMockResponses.perfect());
-        when(llmClient.summarizeFeedback(any(LlmContext.class)))
-                .thenReturn("꾸준한 연습이 발음 개선에 도움이 됩니다.");
-        when(llmClient.retryGuidance(any(LlmContext.class)))
-                .thenReturn("천천히 한 번 더 따라 읽어 보세요.");
-        when(llmClient.suggestPracticeWord(any(LlmContext.class))).thenReturn("hello");
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(LlmMockResponses.defaultStep());
+        when(llmClient.retryFeedback(any(LlmRetryContext.class)))
+                .thenReturn(LlmMockResponses.defaultRetry());
+        when(llmClient.comprehensiveFeedback(any(LlmComprehensiveContext.class)))
+                .thenReturn(LlmMockResponses.defaultComprehensive());
     }
 
     @Test
@@ -127,8 +131,8 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 feedbackRepository.save(
                         PronunciationFeedback.forScript(
                                 user, script, "RetryScript", 75.0, "TH", "think", "old")));
-        when(llmClient.retryGuidance(any(LlmContext.class)))
-                .thenReturn("새 가이드: 천천히 따라 읽어 보세요.");
+        when(llmClient.retryFeedback(any(LlmRetryContext.class)))
+                .thenReturn(LlmMockResponses.defaultRetry());
 
         String token = issueToken(user);
 
@@ -143,7 +147,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.canonical").isArray())
                 .andExpect(jsonPath("$.data.canonical[0]").value("HH"))
                 .andExpect(jsonPath("$.data.score").value(100.0))
-                .andExpect(jsonPath("$.data.guidanceKr").value("새 가이드: 천천히 따라 읽어 보세요."))
+                .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty())
                 .andExpect(jsonPath("$.data.id").doesNotExist())
                 .andExpect(jsonPath("$.data.accuracy").doesNotExist())
                 .andDo(document("feedback/retry-word"));
@@ -162,6 +166,9 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                                 user, script, "RetryScriptWrong", 60.0, "AH", "water", "old")));
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(AnalyzeMockResponses.withWaterError());
+        when(llmClient.retryFeedback(any(LlmRetryContext.class)))
+                .thenReturn(new com.capstoneecho.echo_back.external.llm.LlmRetryFeedback(
+                        75, false, true, "둥글게 발음해 보세요.", java.util.List.of()));
 
         String token = issueToken(user);
 

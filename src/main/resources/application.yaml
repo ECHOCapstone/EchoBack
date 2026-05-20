@@ -62,6 +62,7 @@ app:
     weekly-top-n: 5
     weekly-window-days: 7
     score-fallback-on-error: 70.0
+    pass-threshold: 80.0
     default-ranking-unit-title: "오늘의 랭킹"
     default-practice-word: "the"
   messages:

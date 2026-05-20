@@ -7,7 +7,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
-import com.capstoneecho.echo_back.external.llm.LlmContext;
+import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
+import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
+import com.capstoneecho.echo_back.external.llm.LlmStepContext;
+import com.capstoneecho.echo_back.support.LlmMockResponses;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
@@ -93,12 +96,12 @@ class FeedbackServiceTest {
                 .thenReturn(new G2pResult("HH AH L OW", List.of()));
         when(modelServerClient.analyze(any(byte[].class), anyString()))
                 .thenReturn(perfectAnalyzeResult());
-        when(llmClient.summarizeFeedback(any(LlmContext.class)))
-                .thenReturn("꾸준한 연습이 발음 개선에 도움이 됩니다.");
-        when(llmClient.retryGuidance(any(LlmContext.class)))
-                .thenReturn("천천히 한 번 더 따라 읽어 보세요.");
-        when(llmClient.suggestPracticeWord(any(LlmContext.class)))
-                .thenReturn("hello");
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(LlmMockResponses.defaultStep());
+        when(llmClient.retryFeedback(any(LlmRetryContext.class)))
+                .thenReturn(LlmMockResponses.defaultRetry());
+        when(llmClient.comprehensiveFeedback(any(LlmComprehensiveContext.class)))
+                .thenReturn(LlmMockResponses.defaultComprehensive());
     }
 
     @Test
@@ -217,8 +220,8 @@ class FeedbackServiceTest {
                         PronunciationFeedback.forScript(
                                 user, script, "T", 70.0, "TH", "think", "old guide")));
 
-        when(llmClient.retryGuidance(any(LlmContext.class)))
-                .thenReturn("새 가이드: 천천히 따라 읽어 보세요.");
+        when(llmClient.retryFeedback(any(LlmRetryContext.class)))
+                .thenReturn(LlmMockResponses.defaultRetry());
 
         RetryWordResult response =
                 feedbackService.retryWord(user.getId(), fb.getId(), VALID_WAV);
@@ -227,7 +230,7 @@ class FeedbackServiceTest {
         assertThat(response.perceived()).containsExactly("HH", "AH", "L", "OW");
         assertThat(response.canonical()).containsExactly("HH", "AH", "L", "OW");
         assertThat(response.score()).isEqualTo(100.0);
-        assertThat(response.guidanceKr()).isEqualTo("새 가이드: 천천히 따라 읽어 보세요.");
+        assertThat(response.guidanceKr()).isNotBlank();
 
         PronunciationFeedback reloaded = feedbackRepository.findById(fb.getId()).orElseThrow();
         assertThat(reloaded.getGuidanceKr())

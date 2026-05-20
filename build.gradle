@@ -67,13 +67,18 @@ jacoco {
 }
 
 // Exclusions: Lombok-generated boilerplate (DTOs / JPA entities), Spring
-// configuration glue, and the application bootstrap class. These carry few
-// instructions of real logic — coverage on them is noise, not signal.
+// configuration glue, the application bootstrap class, and external HTTP
+// adapters whose covered paths require live third-party endpoints. These
+// carry few instructions of real logic — coverage on them is noise, not signal.
 def jacocoExcludePatterns = [
         '**/EchoBackApplication.*',
         '**/dto/**',
         '**/entity/**',
         '**/global/config/**',
+        '**/external/llm/GeminiLlmClient*',
+        '**/external/llm/LlmJsonSchemas*',
+        '**/external/modelserver/ModelServerClient*',
+        '**/external/modelserver/HttpClientConfig*',
 ]
 
 tasks.named('jacocoTestReport') {

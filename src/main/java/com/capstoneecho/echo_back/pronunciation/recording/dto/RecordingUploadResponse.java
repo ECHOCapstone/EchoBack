@@ -1,5 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.recording.dto;
 
+import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
+import com.capstoneecho.echo_back.external.llm.PhonemeTip;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -10,6 +12,10 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+// 녹음 1건 업로드 후 클라이언트에 돌려주는 응답.
+// 모델 서버 분석 결과 (perceived / canonical / errors / stepScore) 와
+// LLM 구조화 결과 (guidanceKr / passed / retryRecommended / wrongWords / phonemeTips ...) 를 함께 담는다.
+// passed 는 step 통과 임계 (app.gamification.pass-threshold) 기준 — 클라이언트의 "다음으로 / 재학습" 분기 SSOT.
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RecordingUploadResponse(
         Long id,
@@ -22,9 +28,14 @@ public record RecordingUploadResponse(
         List<String> canonical,
         List<Double> peakSoftmax,
         Double stepScore,
+        boolean passed,
+        boolean retryRecommended,
         String guidanceKr,
+        List<String> strengths,
+        List<String> weaknesses,
         List<PhonemeErrorView> errors,
         List<WrongWord> wrongWords,
+        List<PhonemeTip> phonemeTips,
         Instant createdAt
 ) {
 
@@ -38,9 +49,9 @@ public record RecordingUploadResponse(
             Integer canonicalIndex
     ) {}
 
-    // 저장된 Recording 으로부터 응답 DTO 를 재구성한다.
-    // wrongWordsJson 은 List<WrongWord> 로 역직렬화하고, 파싱 실패 / NULL 입력은 빈 리스트로 폴백한다.
-    // 엔티티에 정규화 저장되지 않는 음소 시퀀스 필드는 빈 리스트로 채워진다.
+    // 저장된 Recording 으로부터 read-side 응답을 재구성한다.
+    // wrongWordsJson 은 List<WrongWord> 로 역직렬화하며, 파싱 실패 / NULL 입력은 빈 리스트로 폴백한다.
+    // 음소 시퀀스는 엔티티에 정규화 저장되지 않으므로 빈 리스트로 채워진다.
     public static RecordingUploadResponse from(Recording recording, ObjectMapper objectMapper) {
         if (recording == null) {
             throw new IllegalArgumentException("recording is required");
@@ -65,10 +76,52 @@ public record RecordingUploadResponse(
                 List.of(),
                 List.of(),
                 recording.getStepScore(),
+                false,
+                false,
                 recording.getGuidanceKr(),
                 List.of(),
+                List.of(),
+                List.of(),
                 deserializeWrongWords(recording.getId(), recording.getWrongWordsJson(), objectMapper),
+                List.of(),
                 recording.getCreatedAt());
+    }
+
+    // step 업로드 직후 LLM 결과 + 모델 서버 결과를 합쳐 응답을 만든다.
+    public static RecordingUploadResponse fromUpload(
+            Recording saved,
+            List<String> perceived,
+            List<String> canonical,
+            List<Double> peakSoftmax,
+            List<PhonemeErrorView> errors,
+            LlmStepFeedback feedback,
+            boolean passed) {
+        Long scriptId = saved.getScript() == null ? null : saved.getScript().getId();
+        Long stepId = saved.getStep() == null ? null : saved.getStep().getId();
+        Long sessionId = saved.getSession() == null ? null : saved.getSession().getId();
+        Long sentenceId = saved.getSessionSentence() == null
+                ? null
+                : saved.getSessionSentence().getId();
+        return new RecordingUploadResponse(
+                saved.getId(),
+                scriptId,
+                sessionId,
+                stepId,
+                sentenceId,
+                saved.getDurationSec(),
+                perceived == null ? List.of() : List.copyOf(perceived),
+                canonical == null ? List.of() : List.copyOf(canonical),
+                peakSoftmax == null ? List.of() : List.copyOf(peakSoftmax),
+                saved.getStepScore(),
+                passed,
+                feedback.retryRecommended(),
+                feedback.guidanceKr(),
+                feedback.strengths(),
+                feedback.weaknesses(),
+                errors == null ? List.of() : List.copyOf(errors),
+                feedback.wrongWords(),
+                feedback.phonemeTips(),
+                saved.getCreatedAt());
     }
 
     private static List<WrongWord> deserializeWrongWords(
