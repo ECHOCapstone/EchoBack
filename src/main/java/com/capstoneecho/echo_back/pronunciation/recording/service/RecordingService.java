@@ -142,7 +142,8 @@ public class RecordingService {
                 analyze.peakSoftmax(),
                 analyze.errors().stream().map(RecordingService::toErrorView).toList(),
                 feedback,
-                passed);
+                passed,
+                analyze.speechRate());
     }
 
     // 같은 부모 (script+step 또는 session+sentence) 의 이전 시도들을 오름차순으로 가져온 뒤,

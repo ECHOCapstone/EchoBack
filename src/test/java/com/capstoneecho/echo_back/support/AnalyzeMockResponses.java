@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.support;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import java.util.List;
 
 // RecordingController / Service 테스트에서 재사용하는 ModelServerClient mock 응답 모음.
@@ -20,7 +21,8 @@ public final class AnalyzeMockResponses {
                 List.of(),
                 List.of(),
                 0.0,
-                1.23);
+                1.23,
+                SpeechRate.NORMAL);
     }
 
     public static AnalyzeResult withWaterError() {
@@ -32,7 +34,8 @@ public final class AnalyzeMockResponses {
                 List.of(),
                 List.of(err),
                 0.25,
-                2.0);
+                2.0,
+                SpeechRate.NORMAL);
     }
 
     private AnalyzeMockResponses() {

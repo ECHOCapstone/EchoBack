@@ -311,7 +311,8 @@ class RecordingServiceTest {
                 List.of(),
                 List.of(),
                 0.0,
-                1.23);
+                1.23,
+                com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate.NORMAL);
     }
 
     private static AnalyzeResult analyzeWithErrors() {
@@ -323,6 +324,7 @@ class RecordingServiceTest {
                 List.of(),
                 List.of(err),
                 0.25,
-                2.0);
+                2.0,
+                com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate.NORMAL);
     }
 }

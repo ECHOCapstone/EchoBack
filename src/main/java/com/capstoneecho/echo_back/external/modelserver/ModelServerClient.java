@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.external.modelserver;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
@@ -100,11 +101,13 @@ public class ModelServerClient {
                 wire.alignment(),
                 wire.errors(),
                 wire.per(),
-                wire.durationSec()
+                wire.durationSec(),
+                wire.speechRate()
         );
     }
 
     // 모델 서버 /analyze 응답은 snake_case 키를 쓰므로 @JsonAlias 로 camelCase 와 양쪽을 모두 받는다.
+    // speechRate 는 fast / normal / slow 분류, 누락 시 SpeechRate.fromString 이 NORMAL 로 폴백한다.
     @JsonIgnoreProperties(ignoreUnknown = true)
     record AnalyzeWire(
             List<String> perceived,
@@ -113,6 +116,7 @@ public class ModelServerClient {
             List<Object> alignment,
             List<AnalyzeError> errors,
             Double per,
-            @JsonAlias("duration_sec") double durationSec
+            @JsonAlias("duration_sec") double durationSec,
+            @JsonAlias("speech_rate") SpeechRate speechRate
     ) {}
 }

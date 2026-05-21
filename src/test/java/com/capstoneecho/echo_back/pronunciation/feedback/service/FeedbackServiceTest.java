@@ -266,7 +266,8 @@ class FeedbackServiceTest {
                 List.of(),
                 List.of(),
                 0.0,
-                1.23);
+                1.23,
+                com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate.NORMAL);
     }
 
     private record ScriptFixture(User user, Script script, LearningStep step) {}

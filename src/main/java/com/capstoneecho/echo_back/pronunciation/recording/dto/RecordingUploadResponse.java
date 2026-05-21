@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.pronunciation.recording.dto;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PhonemeTip;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
+import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
@@ -36,6 +37,8 @@ public record RecordingUploadResponse(
         List<PhonemeErrorView> errors,
         List<WrongWord> wrongWords,
         List<PhonemeTip> phonemeTips,
+        // 모델 서버가 분류한 발화 속도. FAST 면 프론트가 "조금 천천히" 안내를 노출한다.
+        SpeechRate speechRate,
         Instant createdAt
 ) {
 
@@ -84,6 +87,8 @@ public record RecordingUploadResponse(
                 List.of(),
                 deserializeWrongWords(recording.getId(), recording.getWrongWordsJson(), objectMapper),
                 List.of(),
+                // 조회 응답은 엔티티에 발화 속도가 저장되지 않아 NORMAL 로 폴백.
+                SpeechRate.NORMAL,
                 recording.getCreatedAt());
     }
 
@@ -95,7 +100,8 @@ public record RecordingUploadResponse(
             List<Double> peakSoftmax,
             List<PhonemeErrorView> errors,
             LlmStepFeedback feedback,
-            boolean passed) {
+            boolean passed,
+            SpeechRate speechRate) {
         Long scriptId = saved.getScript() == null ? null : saved.getScript().getId();
         Long stepId = saved.getStep() == null ? null : saved.getStep().getId();
         Long sessionId = saved.getSession() == null ? null : saved.getSession().getId();
@@ -121,6 +127,7 @@ public record RecordingUploadResponse(
                 errors == null ? List.of() : List.copyOf(errors),
                 feedback.wrongWords(),
                 feedback.phonemeTips(),
+                speechRate == null ? SpeechRate.NORMAL : speechRate,
                 saved.getCreatedAt());
     }
 

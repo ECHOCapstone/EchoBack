@@ -15,6 +15,7 @@ import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
@@ -123,7 +124,8 @@ class PronunciationScenarioE2ETest {
                         List.of(),
                         List.of(),
                         0.0,
-                        0.6));
+                        0.6,
+                        SpeechRate.NORMAL));
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(stepLlm(95, false));
 
@@ -258,7 +260,8 @@ class PronunciationScenarioE2ETest {
                 List.of(),
                 List.of(),
                 0.05,
-                1.0);
+                1.0,
+                SpeechRate.NORMAL);
     }
 
     private static AnalyzeResult withError() {
@@ -270,7 +273,8 @@ class PronunciationScenarioE2ETest {
                 List.of(),
                 List.of(err),
                 0.35,
-                1.0);
+                1.0,
+                SpeechRate.NORMAL);
     }
 
     private static AnalyzeResult silent() {
@@ -281,7 +285,8 @@ class PronunciationScenarioE2ETest {
                 List.of(),
                 List.of(),
                 1.0,
-                0.5);
+                0.5,
+                SpeechRate.NORMAL);
     }
 
     // 백엔드 ScoringPolicy.perToScore: (1 - per) * 100. 원하는 점수에서 역산해 PER 을 만든다.
@@ -294,6 +299,7 @@ class PronunciationScenarioE2ETest {
                 List.of(),
                 List.of(),
                 per,
-                1.0);
+                1.0,
+                SpeechRate.NORMAL);
     }
 }
