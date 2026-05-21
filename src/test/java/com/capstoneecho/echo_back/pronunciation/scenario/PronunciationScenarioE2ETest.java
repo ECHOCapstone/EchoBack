@@ -108,6 +108,42 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
+    @DisplayName("TC-03: 묵음 처리 — G2P 가 묵음 음소를 뺀 canonical 을 돌려주면 그 값이 LLM 컨텍스트로 전달된다")
+    void tc03_silentLettersAreExcludedFromCanonical() {
+        // "knight" 의 K 가 묵음이라 G2P 응답이 N AY T 만 돌려준다고 가정한다.
+        // 백엔드는 모델 서버 G2P 결과를 그대로 LLM 컨텍스트에 실어야 한다 (자체 추측 / 보강 없이).
+        ScriptFlowFixture f = seedScriptFlow("knight");
+        when(modelServerClient.g2p(anyString()))
+                .thenReturn(new G2pResult("N AY T", List.of()));
+        when(modelServerClient.analyze(any(byte[].class), anyString()))
+                .thenReturn(new AnalyzeResult(
+                        List.of("N", "AY", "T"),
+                        List.of("N", "AY", "T"),
+                        List.of(0.92, 0.9, 0.88),
+                        List.of(),
+                        List.of(),
+                        0.0,
+                        0.6));
+        when(llmClient.stepFeedback(any(LlmStepContext.class)))
+                .thenReturn(stepLlm(95, false));
+
+        RecordingUploadResponse r = recordingService.upload(
+                f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
+
+        // (1) 모델 서버에 보낸 canonical 인자에 K 가 없어야 한다.
+        ArgumentCaptor<String> g2pToAnalyze = ArgumentCaptor.forClass(String.class);
+        verify(modelServerClient).analyze(any(byte[].class), g2pToAnalyze.capture());
+        assertThat(g2pToAnalyze.getValue()).isEqualTo("N AY T").doesNotContain("K");
+
+        // (2) LLM 컨텍스트의 canonical / perceived 모두에 K 가 없어야 한다.
+        ArgumentCaptor<LlmStepContext> llmCtx = ArgumentCaptor.forClass(LlmStepContext.class);
+        verify(llmClient).stepFeedback(llmCtx.capture());
+        assertThat(llmCtx.getValue().canonical()).containsExactly("N", "AY", "T");
+        assertThat(llmCtx.getValue().perceived()).containsExactly("N", "AY", "T");
+        assertThat(r.passed()).isTrue();
+    }
+
+    @Test
     @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트 + PER=1) → 점수 0 + retryRecommended=true")
     void tc05_silentInputYieldsZeroScoreAndRetry() {
         ScriptFlowFixture f = seedScriptFlow("apple");
