@@ -119,6 +119,15 @@ tasks.named('check') {
     dependsOn jacocoTestCoverageVerification
 }
 
+// ---- LLM CLI (Gemini 시험) ------------------------------------------------
+// Spring 컨텍스트 없이 LlmFeedbackRunner 만 실행한다. .env.local 의 GEMINI_API_KEY 를 자동 인식.
+tasks.register('runLlmFeedback', JavaExec) {
+    group = 'application'
+    description = 'CLI 로 Gemini generateContent 호출. --args 로 --prompt 또는 retry 모드를 전달한다.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.capstoneecho.echo_back.external.llm.LlmFeedbackRunner'
+}
+
 // ---- REST Docs → Asciidoctor → single HTML --------------------------------
 tasks.named('asciidoctor') {
     inputs.dir snippetsDir
