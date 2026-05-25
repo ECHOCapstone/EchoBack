@@ -1,8 +1,5 @@
 # echo-back-app
 
-ECHO 백엔드 (영환). 지용님 root 트리(`src/main/java/com/capstoneecho/echo_back/`) 와 분리된
-독립 Gradle 프로젝트로, 프론트엔드 + 모델 서버를 끝단까지 연결하는 동작 가능 구현이다.
-
 ## 패키지
 
 `com.capstoneecho.echo_back.app` 하위 도메인별 분리.
