@@ -34,13 +34,13 @@
             {
               "orderIndex": 3,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Very 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Very 를 발음해 보세요.",
               "targetText": "Very"
             },
             {
               "orderIndex": 4,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Berry 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Berry 를 발음해 보세요.",
               "targetText": "Berry"
             },
             {
@@ -70,7 +70,7 @@
             {
               "orderIndex": 9,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Zoo 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Zoo 를 발음해 보세요.",
               "targetText": "Zoo"
             },
             {
@@ -92,20 +92,20 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "R와 L를 각각 발음해 볼 겁니다.",
+              "prompt": "Rain과 Lamp을 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
               "orderIndex": 1,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 R 을 발음해 보세요.",
-              "targetText": "R"
+              "prompt": "녹음 버튼을 누르고 Rain 을 발음해 보세요.",
+              "targetText": "Rain"
             },
             {
               "orderIndex": 2,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 L 을 발음해 보세요.",
-              "targetText": "L"
+              "prompt": "녹음 버튼을 누르고 Lamp 을 발음해 보세요.",
+              "targetText": "Lamp"
             },
             {
               "orderIndex": 3,
@@ -174,20 +174,20 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "V와 B를 각각 발음해 볼 겁니다.",
+              "prompt": "Voice와 Boat을 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
               "orderIndex": 1,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 V 을 발음해 보세요.",
-              "targetText": "V"
+              "prompt": "녹음 버튼을 누르고 Voice 를 발음해 보세요.",
+              "targetText": "Voice"
             },
             {
               "orderIndex": 2,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 B 을 발음해 보세요.",
-              "targetText": "B"
+              "prompt": "녹음 버튼을 누르고 Boat 을 발음해 보세요.",
+              "targetText": "Boat"
             },
             {
               "orderIndex": 3,
@@ -198,13 +198,13 @@
             {
               "orderIndex": 4,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Very 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Very 를 발음해 보세요.",
               "targetText": "Very"
             },
             {
               "orderIndex": 5,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Berry 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Berry 를 발음해 보세요.",
               "targetText": "Berry"
             },
             {
@@ -256,20 +256,20 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "F와 P를 각각 발음해 볼 겁니다.",
+              "prompt": "Face과 Pen을 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
               "orderIndex": 1,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 F 을 발음해 보세요.",
-              "targetText": "F"
+              "prompt": "녹음 버튼을 누르고 Face 을 발음해 보세요.",
+              "targetText": "Face"
             },
             {
               "orderIndex": 2,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 P 을 발음해 보세요.",
-              "targetText": "P"
+              "prompt": "녹음 버튼을 누르고 Pen 을 발음해 보세요.",
+              "targetText": "Pen"
             },
             {
               "orderIndex": 3,
@@ -298,13 +298,13 @@
             {
               "orderIndex": 7,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Coffee 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Coffee 를 발음해 보세요.",
               "targetText": "Coffee"
             },
             {
               "orderIndex": 8,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Copy 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Copy 를 발음해 보세요.",
               "targetText": "Copy"
             },
             {
@@ -338,20 +338,20 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "무성 TH 와 유성 DH 를 각각 발음해 볼 겁니다.",
+              "prompt": "무성 Thin과 유성 Those를 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
               "orderIndex": 1,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 TH 을 발음해 보세요.",
-              "targetText": "TH"
+              "prompt": "녹음 버튼을 누르고 Thin 을 발음해 보세요.",
+              "targetText": "Thin"
             },
             {
               "orderIndex": 2,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 DH 을 발음해 보세요.",
-              "targetText": "DH"
+              "prompt": "녹음 버튼을 누르고 Those 를 발음해 보세요.",
+              "targetText": "Those"
             },
             {
               "orderIndex": 3,
@@ -380,13 +380,13 @@
             {
               "orderIndex": 7,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Three 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Three 를 발음해 보세요.",
               "targetText": "Three"
             },
             {
               "orderIndex": 8,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Free 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Free 를 발음해 보세요.",
               "targetText": "Free"
             },
             {
@@ -420,20 +420,20 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "Z와 J를 각각 발음해 볼 겁니다.",
+              "prompt": "Zone과 John을 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
               "orderIndex": 1,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Z 을 발음해 보세요.",
-              "targetText": "Z"
+              "prompt": "녹음 버튼을 누르고 Zone 을 발음해 보세요.",
+              "targetText": "Zone"
             },
             {
               "orderIndex": 2,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 J 을 발음해 보세요.",
-              "targetText": "J"
+              "prompt": "녹음 버튼을 누르고 John 을 발음해 보세요.",
+              "targetText": "John"
             },
             {
               "orderIndex": 3,
@@ -444,13 +444,13 @@
             {
               "orderIndex": 4,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Zoo 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Zoo 를 발음해 보세요.",
               "targetText": "Zoo"
             },
             {
               "orderIndex": 5,
               "kind": "RECORD",
-              "prompt": "녹음 버튼을 누르고 Jew 을 발음해 보세요.",
+              "prompt": "녹음 버튼을 누르고 Jew 를 발음해 보세요.",
               "targetText": "Jew"
             },
             {
@@ -509,7 +509,7 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "A 와 E 를 각각 발음해 볼 겁니다.",
+              "prompt": "Cat과 Bed을 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
@@ -573,7 +573,7 @@
             {
               "orderIndex": 0,
               "kind": "INTRO",
-              "prompt": "I 와 EE 를 각각 발음해 볼 겁니다.",
+              "prompt": "Bit과 Beat을 각각 발음해 볼 겁니다.",
               "targetText": null
             },
             {
