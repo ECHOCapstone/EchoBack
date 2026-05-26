@@ -17,7 +17,11 @@ spring:
             # 콜백 경로를 프로젝트 컨벤션 (/api/auth/oauth2/{registrationId}/<action>) 에 맞춤.
             # SecurityConfig.loginProcessingUrl 과 같이 맞춰야 하며, Google Cloud Console 의
             # Authorized redirect URI 도 이 패턴으로 등록돼 있어야 한다.
-            redirect-uri: "{baseUrl}/api/auth/oauth2/{registrationId}/callback"
+            # 운영 환경에선 백엔드 host 가 prod 도메인이라 {baseUrl} 자동 치환이 자연스럽지만,
+            # 컨테이너 8080 포트를 호스트에 노출하지 못하는 dev 환경에서는 프론트 origin 으로
+            # 강제 고정한다. vite proxy 가 /api/* 를 백엔드로 forward 하므로 동일 origin 으로
+            # 흐름이 닫힌다. APP_OAUTH2_REDIRECT_URI 환경변수로 운영 시 override 가능.
+            redirect-uri: ${APP_OAUTH2_REDIRECT_URI:http://localhost:5173/api/auth/oauth2/{registrationId}/callback}
             scope:
               - openid
               - email
