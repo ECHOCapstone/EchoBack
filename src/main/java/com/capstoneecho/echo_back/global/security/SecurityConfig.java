@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.global.security;
 
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
+import com.capstoneecho.echo_back.global.security.oauth2.CustomOAuth2AuthorizationRequestResolver;
 import com.capstoneecho.echo_back.global.security.oauth2.CustomOAuth2UserService;
 import com.capstoneecho.echo_back.global.security.oauth2.CustomOidcUserService;
 import com.capstoneecho.echo_back.global.security.oauth2.OAuth2LoginFailureHandler;
@@ -40,6 +41,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthFilter jwtAuthFilter,
             JwtAuthEntryPoint jwtAuthEntryPoint,
+            CustomOAuth2AuthorizationRequestResolver customAuthorizationRequestResolver,
             CustomOAuth2UserService customOAuth2UserService,
             CustomOidcUserService customOidcUserService,
             OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
@@ -55,17 +57,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Liveness/readiness probes are open so load balancers and
                         // orchestrators can ping the app without credentials.
+                        // OAuth2 시작 (/api/auth/oauth2/{registrationId}/authorization) /
+                        // 콜백 (/api/auth/oauth2/{registrationId}/callback) 경로는
+                        // 모두 /api/auth/** permitAll 에 포함되므로 별도 추가 불필요.
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/health",
                                 "/api/tts",
                                 "/error",
                                 "/actuator/health",
-                                "/actuator/health/**",
-                                // Spring 이 자동 등록하는 OAuth2 authorize / callback 경로.
-                                // 인증 전 단계이므로 반드시 permitAll 이어야 한다.
-                                "/oauth2/**",
-                                "/login/oauth2/**"
+                                "/actuator/health/**"
                         ).permitAll()
                         // Other Actuator endpoints (info/metrics/...) carry
                         // operational metadata and stay behind ROLE_ADMIN until
@@ -76,6 +77,12 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))
                 .oauth2Login(oauth2 -> oauth2
+                        // 시작 경로를 /api/auth/oauth2/{registrationId}/authorization 으로 노출.
+                        .authorizationEndpoint(endpoint ->
+                                endpoint.authorizationRequestResolver(customAuthorizationRequestResolver))
+                        // 콜백 경로를 /api/auth/oauth2/{registrationId}/callback 으로 노출.
+                        // application.yaml 의 registration.redirect-uri 와 같이 맞춰야 한다.
+                        .loginProcessingUrl("/api/auth/oauth2/*/callback")
                         // OIDC (openid scope 포함) 와 비 OIDC provider 양쪽 모두 mapper 가 실행되도록
                         // userService / oidcUserService 모두 등록한다. Google 은 openid 가 있으므로
                         // 실제로는 OIDC 경로가 사용되지만, 향후 Kakao 같은 비 OIDC provider 도 대비.

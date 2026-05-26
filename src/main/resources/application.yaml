@@ -14,6 +14,10 @@ spring:
           google:
             client-id: ${GOOGLE_CLIENT_ID:}
             client-secret: ${GOOGLE_CLIENT_SECRET:}
+            # 콜백 경로를 프로젝트 컨벤션 (/api/auth/oauth2/{registrationId}/<action>) 에 맞춤.
+            # SecurityConfig.loginProcessingUrl 과 같이 맞춰야 하며, Google Cloud Console 의
+            # Authorized redirect URI 도 이 패턴으로 등록돼 있어야 한다.
+            redirect-uri: "{baseUrl}/api/auth/oauth2/{registrationId}/callback"
             scope:
               - openid
               - email
