@@ -22,7 +22,8 @@ class RuleBasedLlmFeedbackGeneratorTest {
                     "꾸준한 연습이 발음 개선에 도움이 됩니다.",
                     "해당 단어를 한 번 더 천천히 따라 읽어 보세요.",
                     "업로드 가능한 파일 크기를 초과했습니다.",
-                    "text 는 비어 있을 수 없습니다."));
+                    "text 는 비어 있을 수 없습니다."),
+            null);
 
     private final RuleBasedLlmFallback fallback = new RuleBasedLlmFallback(FIXTURE);
     private final RuleBasedLlmFeedbackGenerator generator = new RuleBasedLlmFeedbackGenerator(fallback);
