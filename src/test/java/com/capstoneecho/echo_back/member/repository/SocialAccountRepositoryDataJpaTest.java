@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.capstoneecho.echo_back.member.entity.Provider;
 import com.capstoneecho.echo_back.member.entity.SocialAccount;
 import com.capstoneecho.echo_back.member.entity.User;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,9 @@ class SocialAccountRepositoryDataJpaTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EntityManager em;
 
     private User saveUser(String email, String nickname) {
         return userRepository.save(User.fromOAuth2(email, nickname));
@@ -58,6 +62,23 @@ class SocialAccountRepositoryDataJpaTest {
                 .get()
                 .extracting(SocialAccount::getProviderUid)
                 .isEqualTo("sub-2");
+    }
+
+    @Test
+    @DisplayName("findByProviderAndProviderUid 는 JOIN FETCH 로 user 까지 즉시 로드한다 (LazyInitializationException 회귀 방지)")
+    void findByProviderAndProviderUidEagerlyLoadsUser() {
+        User user = saveUser("eager@x.com", "Eager");
+        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-fj", "eager@x.com", "t"));
+        em.flush();
+        em.clear();
+
+        SocialAccount loaded = repository.findByProviderAndProviderUid(Provider.GOOGLE, "sub-fj")
+                .orElseThrow();
+        em.detach(loaded);  // proxy 라면 이 시점 이후 lazy 필드 접근에서 LazyInitializationException
+
+        assertThat(loaded.getUser().getEmail()).isEqualTo("eager@x.com");
+        assertThat(loaded.getUser().getUsername()).isEqualTo("eager@x.com");
+        assertThat(loaded.getUser().getNickname()).isEqualTo("Eager");
     }
 
     @Test
