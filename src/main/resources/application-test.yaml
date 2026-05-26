@@ -11,6 +11,18 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
     open-in-view: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: "test-google-client-id"
+            client-secret: "test-google-client-secret"
+            redirect-uri: "{baseUrl}/api/auth/oauth2/{registrationId}/callback"
+            scope:
+              - openid
+              - email
+              - profile
 
 app:
   jwt:
@@ -26,3 +38,6 @@ app:
   auth:
     demo-google:
       email: "demo.google@echo.test"
+  oauth2:
+    frontend-redirect-uri: "http://localhost:3000/oauth/callback"
+    frontend-error-uri: "http://localhost:3000/login"

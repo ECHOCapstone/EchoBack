@@ -16,7 +16,8 @@ public record AppProperties(
         Stats stats,
         Auth auth,
         Gamification gamification,
-        Messages messages
+        Messages messages,
+        OAuth2 oauth2
 ) {
 
     public record Jwt(String secret, long expirationMs) {}
@@ -63,6 +64,10 @@ public record AppProperties(
 
         public record DemoGoogle(String email, String nickname) {}
     }
+
+    // 실제 Google OAuth2 로그인 성공 / 실패 후 브라우저를 보낼 프론트엔드 URL.
+    // 토큰은 frontendRedirectUri 뒤에 URL fragment (#token=...&expiresIn=...) 로 붙는다.
+    public record OAuth2(String frontendRedirectUri, String frontendErrorUri) {}
 
     // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우, 통과 점수 등).
     // passThreshold 는 step 통과 여부를 판정하는 0~100 점수 임계. 기본 80.
