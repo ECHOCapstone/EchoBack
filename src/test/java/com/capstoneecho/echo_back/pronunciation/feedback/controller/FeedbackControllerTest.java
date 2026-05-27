@@ -168,7 +168,9 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 .thenReturn(AnalyzeMockResponses.withWaterError());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.LlmRetryFeedback(
-                        75, false, true, "둥글게 발음해 보세요.", java.util.List.of()));
+                        75, false, true, "둥글게 발음해 보세요.",
+                        com.capstoneecho.echo_back.external.llm.PronunciationGuide.empty(),
+                        java.util.List.of()));
 
         String token = issueToken(user);
 

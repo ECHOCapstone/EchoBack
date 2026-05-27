@@ -4,6 +4,7 @@ import com.capstoneecho.echo_back.external.llm.LlmComprehensiveFeedback;
 import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PracticeItem;
+import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.List;
 
@@ -17,6 +18,7 @@ public final class LlmMockResponses {
         return new LlmStepFeedback(
                 85, false,
                 "발음을 더 또렷하게 따라 읽어 보세요.",
+                PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
     }
 
@@ -24,13 +26,14 @@ public final class LlmMockResponses {
         return new LlmStepFeedback(
                 70, true,
                 "ɔ 모음을 더 둥글게 발음해 보세요.",
+                PronunciationGuide.empty(),
                 List.of(), List.of(),
                 List.of(new WrongWord(word, index)),
                 List.of());
     }
 
     public static LlmRetryFeedback defaultRetry() {
-        return new LlmRetryFeedback(85, true, false, "잘 했어요.", List.of());
+        return new LlmRetryFeedback(85, true, false, "잘 했어요.", PronunciationGuide.empty(), List.of());
     }
 
     public static LlmComprehensiveFeedback defaultComprehensive() {

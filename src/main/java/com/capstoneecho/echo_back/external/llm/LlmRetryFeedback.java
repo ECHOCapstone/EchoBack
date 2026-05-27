@@ -11,6 +11,7 @@ public record LlmRetryFeedback(
         boolean correct,
         boolean retryRecommended,
         String guidanceKr,
+        PronunciationGuide pronunciationGuide,
         List<PhonemeTip> phonemeTips
 ) {
 
@@ -20,11 +21,13 @@ public record LlmRetryFeedback(
             @JsonProperty("correct") boolean correct,
             @JsonProperty("retryRecommended") boolean retryRecommended,
             @JsonProperty("guidanceKr") String guidanceKr,
+            @JsonProperty("pronunciationGuide") PronunciationGuide pronunciationGuide,
             @JsonProperty("phonemeTips") List<PhonemeTip> phonemeTips) {
         this.score = clamp(score);
         this.correct = correct;
         this.retryRecommended = retryRecommended;
         this.guidanceKr = guidanceKr == null ? "" : guidanceKr;
+        this.pronunciationGuide = pronunciationGuide == null ? PronunciationGuide.empty() : pronunciationGuide;
         this.phonemeTips = phonemeTips == null ? List.of() : List.copyOf(phonemeTips);
     }
 

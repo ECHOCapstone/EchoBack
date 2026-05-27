@@ -29,11 +29,12 @@ public final class LlmJsonSchemas {
                         entry("score", typedRange("integer", "0~100 점수", 0, 100)),
                         entry("retryRecommended", typed("boolean", "재학습 권고 여부")),
                         entry("guidanceKr", typed("string", "한국어 1~2 문장 피드백")),
+                        entry("pronunciationGuide", pronunciationGuide()),
                         entry("strengths", array(typed("string", null), "잘한 점 1~3개")),
                         entry("weaknesses", array(typed("string", null), "보완할 점 1~3개")),
                         entry("wrongWords", array(wrongWord, "약점이 두드러진 단어 목록")),
                         entry("phonemeTips", array(phonemeTip, "약점 음소별 한국식 단서 1~3개"))),
-                List.of("score", "retryRecommended", "guidanceKr"));
+                List.of("score", "retryRecommended", "guidanceKr", "pronunciationGuide"));
     }
 
     public static Map<String, Object> retryFeedback() {
@@ -50,8 +51,9 @@ public final class LlmJsonSchemas {
                         entry("correct", typed("boolean", "정답 음소 시퀀스 일치 여부 (정성 판정)")),
                         entry("retryRecommended", typed("boolean", "추가 재시도 권고 여부")),
                         entry("guidanceKr", typed("string", "한국어 1~2 문장 피드백")),
+                        entry("pronunciationGuide", pronunciationGuide()),
                         entry("phonemeTips", array(phonemeTip, "약점 음소별 단서"))),
-                List.of("score", "correct", "retryRecommended", "guidanceKr"));
+                List.of("score", "correct", "retryRecommended", "guidanceKr", "pronunciationGuide"));
     }
 
     public static Map<String, Object> comprehensiveFeedback() {
@@ -72,6 +74,20 @@ public final class LlmJsonSchemas {
                         entry("nextPracticeItems", array(practiceItem,
                                 "다음 학습 단어 / 구 / 문장 3~5개 혼합 추천"))),
                 List.of("overallScore", "summaryKr", "nextPracticeItems"));
+    }
+
+    private static Map<String, Object> pronunciationGuide() {
+        return object(
+                ordered(
+                        entry("correctPronunciation", typed("string",
+                                "이렇게 발음해요 — 정확한 발음 표기 (아학편 한글 음차 또는 영문 syllable)")),
+                        entry("perceivedPronunciation", typed("string",
+                                "이렇게 말하신 것 같아요 — 학습자의 실제 발음 표기")),
+                        entry("explanation", typed("string",
+                                "해당 음소가 한국어와 어떻게 다른지 1~2 문장 설명")),
+                        entry("correctionTip", typed("string",
+                                "교정 제안 — 'X 대신 Y 로 발음해 보세요' 형식"))),
+                List.of("correctPronunciation", "perceivedPronunciation", "explanation", "correctionTip"));
     }
 
     private static Map<String, Object> typed(String type, String description) {

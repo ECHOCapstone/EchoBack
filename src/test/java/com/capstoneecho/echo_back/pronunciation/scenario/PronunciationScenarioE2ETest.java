@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
+import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
@@ -249,6 +250,7 @@ class PronunciationScenarioE2ETest {
     private static LlmStepFeedback stepLlm(int score, boolean retry) {
         return new LlmStepFeedback(
                 score, retry, "ok",
+                PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
     }
 

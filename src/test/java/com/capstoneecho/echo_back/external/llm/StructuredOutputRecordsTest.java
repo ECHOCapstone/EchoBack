@@ -16,9 +16,9 @@ class StructuredOutputRecordsTest {
     @DisplayName("LlmStepFeedback: score 는 0~100 으로 clamp, 리스트는 null-safe")
     void stepFeedbackNormalizes() {
         LlmStepFeedback over = new LlmStepFeedback(
-                150, true, "g", null, null, null, null);
+                150, true, "g", PronunciationGuide.empty(), null, null, null, null);
         LlmStepFeedback under = new LlmStepFeedback(
-                -10, false, "g", null, null, null, null);
+                -10, false, "g", PronunciationGuide.empty(), null, null, null, null);
         assertThat(over.score()).isEqualTo(100);
         assertThat(under.score()).isEqualTo(0);
         assertThat(over.strengths()).isEmpty();
@@ -29,7 +29,7 @@ class StructuredOutputRecordsTest {
     @Test
     @DisplayName("LlmRetryFeedback: score clamp + 빈 phonemeTips 폴백")
     void retryFeedbackNormalizes() {
-        LlmRetryFeedback f = new LlmRetryFeedback(200, true, false, "ok", null);
+        LlmRetryFeedback f = new LlmRetryFeedback(200, true, false, "ok", PronunciationGuide.empty(), null);
         assertThat(f.score()).isEqualTo(100);
         assertThat(f.phonemeTips()).isEmpty();
     }

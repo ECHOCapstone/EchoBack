@@ -11,6 +11,7 @@ public record LlmStepFeedback(
         int score,
         boolean retryRecommended,
         String guidanceKr,
+        PronunciationGuide pronunciationGuide,
         List<String> strengths,
         List<String> weaknesses,
         List<WrongWord> wrongWords,
@@ -22,6 +23,7 @@ public record LlmStepFeedback(
             @JsonProperty("score") int score,
             @JsonProperty("retryRecommended") boolean retryRecommended,
             @JsonProperty("guidanceKr") String guidanceKr,
+            @JsonProperty("pronunciationGuide") PronunciationGuide pronunciationGuide,
             @JsonProperty("strengths") List<String> strengths,
             @JsonProperty("weaknesses") List<String> weaknesses,
             @JsonProperty("wrongWords") List<WrongWord> wrongWords,
@@ -29,6 +31,7 @@ public record LlmStepFeedback(
         this.score = clamp(score);
         this.retryRecommended = retryRecommended;
         this.guidanceKr = guidanceKr == null ? "" : guidanceKr;
+        this.pronunciationGuide = pronunciationGuide == null ? PronunciationGuide.empty() : pronunciationGuide;
         this.strengths = strengths == null ? List.of() : List.copyOf(strengths);
         this.weaknesses = weaknesses == null ? List.of() : List.copyOf(weaknesses);
         this.wrongWords = wrongWords == null ? List.of() : List.copyOf(wrongWords);

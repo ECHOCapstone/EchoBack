@@ -36,7 +36,7 @@ public class RuleBasedLlmFallback {
         List<WrongWord> wrongs = resolveWrongWords(
                 context.targetText(), context.errors(), context.g2pWords());
         return new LlmStepFeedback(
-                score, retry, recordingGuidance,
+                score, retry, recordingGuidance, PronunciationGuide.empty(),
                 List.of(), List.of(), wrongs, List.of());
     }
 
@@ -44,7 +44,7 @@ public class RuleBasedLlmFallback {
         int score = roundScore(context.currentScore());
         boolean correct = score >= passThreshold && context.errors().isEmpty();
         boolean retry = !correct;
-        return new LlmRetryFeedback(score, correct, retry, retryGuidance, List.of());
+        return new LlmRetryFeedback(score, correct, retry, retryGuidance, PronunciationGuide.empty(), List.of());
     }
 
     public LlmComprehensiveFeedback comprehensiveFeedback(LlmComprehensiveContext context) {
