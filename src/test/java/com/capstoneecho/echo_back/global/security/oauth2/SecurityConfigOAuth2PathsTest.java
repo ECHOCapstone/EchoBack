@@ -21,6 +21,13 @@ class SecurityConfigOAuth2PathsTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("새 시작 경로 /api/auth/oauth2/kakao/authorization 도 인증 없이 접근 가능하다 (302, 401 아님)")
+    void oauth2KakaoAuthorizationIsPermitted() throws Exception {
+        mockMvc.perform(get("/api/auth/oauth2/kakao/authorization"))
+                .andExpect(status().is3xxRedirection());
+    }
+
+    @Test
     @DisplayName("옛 시작 경로 /oauth2/authorization/google 은 더 이상 redirect 하지 않는다 (path 이전 회귀 가드)")
     void legacyAuthorizationPathNoLongerActive() throws Exception {
         // permitAll 에서 제거됐고 custom resolver 도 안 잡으므로 401 (또는 4xx).

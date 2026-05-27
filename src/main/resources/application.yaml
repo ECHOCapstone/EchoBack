@@ -26,6 +26,25 @@ spring:
               - openid
               - email
               - profile
+          kakao:
+            client-id: ${KAKAO_REST_API_KEY:}
+            client-secret: ${KAKAO_CLIENT_SECRET:}
+            # 카카오 token endpoint 는 client_secret_post 단일 지원. Spring 기본값(client_secret_basic)
+            # 으로 두면 토큰 교환이 invalid_client 로 실패한다.
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: ${APP_OAUTH2_REDIRECT_URI:http://localhost:5173/api/auth/oauth2/{registrationId}/callback}
+            scope:
+              # ID Token 발급 트리거. 콘솔의 "OpenID Connect 활성화" 토글이 ON 이어야 실제로 id_token 이 내려온다.
+              - openid
+              - profile_nickname
+              - account_email
+            client-name: Kakao
+        provider:
+          kakao:
+            # issuer-uri 한 줄로 authorization / token / userinfo / jwks endpoint 가 OIDC discovery 로 자동 해소된다.
+            # 부팅 시 https://kauth.kakao.com/.well-known/openid-configuration 호출이 발생하므로 오프라인 CI 에서는 주의.
+            issuer-uri: https://kauth.kakao.com
 
 app:
   jwt:
