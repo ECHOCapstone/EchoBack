@@ -1,0 +1,17 @@
+# CI 전용 profile. application-test.yaml 위에 머지되어 datasource 만 Testcontainers MySQL 로 덮는다.
+# 활성화: GitHub Actions 잡에서 SPRING_PROFILES_ACTIVE=test,ci (또는 -Dspring.profiles.active=test,ci).
+# 로컬 ./gradlew test 는 이 profile 을 활성화하지 않으므로 H2 그대로 사용한다.
+spring:
+  datasource:
+    # Testcontainers JDBC 통합: ContainerDatabaseDriver 가 mysql:8.0 컨테이너를 JVM 단위로 띄우고 재사용한다.
+    # TC_DAEMON=true → JVM 종료 직전까지 컨테이너 유지 (테스트 클래스 간 재사용으로 기동 비용 절감).
+    url: "jdbc:tc:mysql:8.0:///echo_ci?TC_DAEMON=true"
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
