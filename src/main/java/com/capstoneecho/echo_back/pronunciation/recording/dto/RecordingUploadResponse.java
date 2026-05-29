@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.pronunciation.recording.dto;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PhonemeTip;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
+import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -39,6 +40,8 @@ public record RecordingUploadResponse(
         List<PhonemeTip> phonemeTips,
         // 모델 서버가 분류한 발화 속도. FAST 면 프론트가 "조금 천천히" 안내를 노출한다.
         SpeechRate speechRate,
+        // 단어별 canonical 음소 (g2p words). 프론트가 음소를 단어 경계로 잘라 보여줄 때 사용한다.
+        List<G2pWord> canonicalWords,
         Instant createdAt
 ) {
 
@@ -89,6 +92,8 @@ public record RecordingUploadResponse(
                 List.of(),
                 // 조회 응답은 엔티티에 발화 속도가 저장되지 않아 NORMAL 로 폴백.
                 SpeechRate.NORMAL,
+                // 조회 응답은 단어별 음소를 보관하지 않으므로 빈 리스트.
+                List.of(),
                 recording.getCreatedAt());
     }
 
@@ -101,7 +106,8 @@ public record RecordingUploadResponse(
             List<PhonemeErrorView> errors,
             LlmStepFeedback feedback,
             boolean passed,
-            SpeechRate speechRate) {
+            SpeechRate speechRate,
+            List<G2pWord> canonicalWords) {
         Long scriptId = saved.getScript() == null ? null : saved.getScript().getId();
         Long stepId = saved.getStep() == null ? null : saved.getStep().getId();
         Long sessionId = saved.getSession() == null ? null : saved.getSession().getId();
@@ -128,6 +134,7 @@ public record RecordingUploadResponse(
                 feedback.wrongWords(),
                 feedback.phonemeTips(),
                 speechRate == null ? SpeechRate.NORMAL : speechRate,
+                canonicalWords == null ? List.of() : List.copyOf(canonicalWords),
                 saved.getCreatedAt());
     }
 
