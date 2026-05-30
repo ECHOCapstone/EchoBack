@@ -53,10 +53,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         Long userId = ((Number) userIdAttr).longValue();
         String email = stringAttribute(principal, OAuth2Attributes.INTERNAL_EMAIL);
         String username = stringAttribute(principal, OAuth2Attributes.INTERNAL_USERNAME);
+        String role = stringAttribute(principal, OAuth2Attributes.INTERNAL_ROLE);
 
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("username", username);
         claims.put("email", email);
+        claims.put("role", role);
         String token = jwtProvider.issue(userId, claims);
         long expiresInSec = Math.max(0L, jwtExpirationMs / 1000L);
 

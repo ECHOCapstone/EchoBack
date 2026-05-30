@@ -85,7 +85,8 @@ public class JwtProvider {
             return new JwtPrincipal(
                     userId,
                     asString(claims.get("username")),
-                    asString(claims.get("email"))
+                    asString(claims.get("email")),
+                    asString(claims.get("role"))
             );
         } catch (JwtException | IllegalArgumentException ex) {
             throw new BusinessException(ErrorCode.INVALID_TOKEN);

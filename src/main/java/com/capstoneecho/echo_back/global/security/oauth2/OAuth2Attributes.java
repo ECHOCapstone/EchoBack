@@ -11,6 +11,7 @@ final class OAuth2Attributes {
     static final String INTERNAL_USER_ID = "_internal_user_id";
     static final String INTERNAL_EMAIL = "_internal_email";
     static final String INTERNAL_USERNAME = "_internal_username";
+    static final String INTERNAL_ROLE = "_internal_role";
 
     // OAuth2User.getName() 이 안정적 식별자(OIDC sub)를 반환하도록 쓰는 nameAttributeKey.
     static final String NAME_ATTRIBUTE_KEY = "sub";
@@ -24,6 +25,7 @@ final class OAuth2Attributes {
         enriched.put(INTERNAL_USER_ID, user.getId());
         enriched.put(INTERNAL_EMAIL, user.getEmail());
         enriched.put(INTERNAL_USERNAME, user.getUsername());
+        enriched.put(INTERNAL_ROLE, user.getRole().name());
         return enriched;
     }
 }
