@@ -40,7 +40,14 @@ public record AppProperties(
     // gemini.apiKey 는 환경 변수 (GEMINI_API_KEY) 로 주입한다 — yaml 평문 금지.
     public record Llm(String provider, Gemini gemini) {
 
-        public record Gemini(String apiKey, String model, String baseUrl, long timeoutMs) {}
+        // models 는 어드민이 고를 수 있는 모델 후보 목록. model 은 그중 기본값.
+        public record Gemini(
+                String apiKey, String model, String baseUrl, long timeoutMs, List<String> models) {
+
+            public List<String> safeModels() {
+                return models == null ? List.of() : models;
+            }
+        }
     }
 
     public record Storage(String localRoot) {}

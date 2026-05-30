@@ -1,12 +1,11 @@
 package com.capstoneecho.echo_back.external.llm;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-// app.llm.provider=rule-based (기본) 일 때 컨텍스트에 등록되는 LlmClient 구현체.
-// 모든 분석 결과를 RuleBasedLlmFallback 으로 위임해 외부 호출 없이 결정적으로 채운다.
+// 외부 호출 없이 결정적으로 피드백을 채우는 규칙 기반 LlmClient 구현체.
+// 모든 분석 결과를 RuleBasedLlmFallback 으로 위임한다. 항상 등록되며, 활성 provider 선택은
+// DispatchingLlmClient 가 런타임에 수행한다.
 @Component
-@ConditionalOnProperty(name = "app.llm.provider", havingValue = "rule-based", matchIfMissing = true)
 public class RuleBasedLlmFeedbackGenerator implements LlmClient {
 
     private final RuleBasedLlmFallback fallback;

@@ -80,6 +80,12 @@ app:
       model: ${APP_LLM_GEMINI_MODEL:gemini-3.1-flash-lite}
       base-url: https://generativelanguage.googleapis.com
       timeout-ms: 10000
+      # 어드민이 고를 수 있는 모델 후보. 구조화 출력을 지원하는 모델만 둔다.
+      models:
+        - gemini-3.1-flash-lite
+        - gemini-3.1-flash
+        - gemini-2.5-flash
+        - gemini-2.0-flash
   storage:
     local-root: build/local-storage
   tts:

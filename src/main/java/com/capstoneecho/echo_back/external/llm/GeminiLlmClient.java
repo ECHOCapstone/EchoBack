@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.SettingsService;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -9,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -20,8 +20,8 @@ import tools.jackson.databind.ObjectMapper;
 // 세 종류의 피드백을 JSON 으로 받아 record 로 역직렬화한다.
 // 시스템 프롬프트 (아학편 가이드 포함) 는 PromptCatalog 의 system.md 에서 로드해
 // systemInstruction 필드로 매 요청에 주입한다.
+// 항상 등록되며, 실제 호출 여부는 DispatchingLlmClient 가 활성 provider 와 isAvailable() 로 결정한다.
 @Component
-@ConditionalOnProperty(name = "app.llm.provider", havingValue = "gemini")
 public class GeminiLlmClient implements LlmClient {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiLlmClient.class);
@@ -30,40 +30,43 @@ public class GeminiLlmClient implements LlmClient {
     private static final double TEMPERATURE = 0.4;
     private static final int MAX_OUTPUT_TOKENS = 1024;
 
+    private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+    private static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final PromptCatalog prompts;
     private final RuleBasedLlmFallback fallback;
+    private final SettingsService settings;
     private final String apiKey;
-    private final String model;
+    private final String defaultModel;
+    private final boolean available;
 
     public GeminiLlmClient(
             AppProperties appProperties,
             ObjectMapper objectMapper,
             PromptCatalog prompts,
-            RuleBasedLlmFallback fallback) {
-        AppProperties.Llm llm = appProperties.llm();
-        if (llm == null || llm.gemini() == null) {
-            throw new IllegalStateException("app.llm.gemini configuration is required");
-        }
-        AppProperties.Llm.Gemini g = llm.gemini();
-        if (g.apiKey() == null || g.apiKey().isBlank()) {
-            throw new IllegalStateException(
-                    "app.llm.gemini.api-key must be configured (set GEMINI_API_KEY env)");
-        }
-        if (g.model() == null || g.model().isBlank()) {
-            throw new IllegalStateException("app.llm.gemini.model must be configured");
-        }
-        if (g.baseUrl() == null || g.baseUrl().isBlank()) {
-            throw new IllegalStateException("app.llm.gemini.base-url must be configured");
-        }
-        this.apiKey = g.apiKey();
-        this.model = g.model();
+            RuleBasedLlmFallback fallback,
+            SettingsService settings) {
         this.objectMapper = objectMapper;
         this.prompts = prompts;
         this.fallback = fallback;
+        this.settings = settings;
 
-        Duration timeout = Duration.ofMillis(g.timeoutMs() <= 0 ? 10_000 : g.timeoutMs());
+        AppProperties.Llm llm = appProperties.llm();
+        AppProperties.Llm.Gemini g = llm == null ? null : llm.gemini();
+        String key = g == null ? null : g.apiKey();
+        String configuredModel = g == null ? null : g.model();
+        String baseUrl = g == null ? null : g.baseUrl();
+        long timeoutMs = g == null ? 0L : g.timeoutMs();
+
+        this.apiKey = key == null ? "" : key;
+        this.defaultModel = (configuredModel == null || configuredModel.isBlank())
+                ? DEFAULT_MODEL : configuredModel;
+        // apiKey 가 있어야 호출 가능하다. 없으면 DispatchingLlmClient 가 규칙 기반으로 보낸다.
+        this.available = !this.apiKey.isBlank();
+
+        Duration timeout = Duration.ofMillis(timeoutMs <= 0 ? 10_000 : timeoutMs);
         HttpClient httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(timeout)
@@ -71,9 +74,14 @@ public class GeminiLlmClient implements LlmClient {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
         factory.setReadTimeout(timeout);
         this.restClient = RestClient.builder()
-                .baseUrl(g.baseUrl())
+                .baseUrl((baseUrl == null || baseUrl.isBlank()) ? DEFAULT_BASE_URL : baseUrl)
                 .requestFactory(factory)
                 .build();
+    }
+
+    // apiKey 가 설정돼 호출 가능한 상태인지. DispatchingLlmClient 가 라우팅 판단에 쓴다.
+    public boolean isAvailable() {
+        return available;
     }
 
     @Override
@@ -122,6 +130,8 @@ public class GeminiLlmClient implements LlmClient {
     // Gemini generateContent 호출. 실패 / 빈 응답 / JSON 파싱 실패 시 null 을 돌려 호출 측이 폴백을 사용한다.
     private <T> T call(String userPrompt, Map<String, Object> schema, Class<T> type) {
         Map<String, Object> body = buildBody(userPrompt, schema);
+        // 호출 시점의 활성 모델을 설정에서 읽는다 (어드민이 런타임에 바꿀 수 있다).
+        String model = settings.getOrDefault(LlmSettingKeys.GEMINI_MODEL, defaultModel);
         try {
             GeminiResponse response = restClient.post()
                     .uri(uri -> uri
