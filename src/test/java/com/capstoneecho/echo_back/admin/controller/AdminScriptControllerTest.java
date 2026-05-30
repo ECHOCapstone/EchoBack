@@ -48,7 +48,7 @@ class AdminScriptControllerTest extends AbstractControllerIntegrationTest {
 
     private ScriptDetailResponse seedScript(Track track) {
         return adminScriptService.create(new ScriptCreateRequest(
-                track.getId(), 1, "챕터", "내용", Difficulty.EASY, null, null,
+                track.getId(), "챕터", "내용", Difficulty.EASY, null, null,
                 List.of(new AdminStepRequest(StepKind.INTRO, "안내", null),
                         new AdminStepRequest(StepKind.RECORD, "따라 읽기", "hello"))));
     }
@@ -58,7 +58,7 @@ class AdminScriptControllerTest extends AbstractControllerIntegrationTest {
     void createScript() throws Exception {
         Track track = newTrack();
         String body = """
-                {"trackId": %d, "chapterOrder": 1, "title": "챕터1", "content": "내용",
+                {"trackId": %d, "title": "챕터1", "content": "내용",
                  "difficulty": "EASY", "steps": [
                    {"kind": "INTRO", "prompt": "안내"},
                    {"kind": "RECORD", "prompt": "읽기", "targetText": "hello"}]}
@@ -104,7 +104,7 @@ class AdminScriptControllerTest extends AbstractControllerIntegrationTest {
         Track track = newTrack();
         ScriptDetailResponse created = seedScript(track);
         String body = """
-                {"chapterOrder": 2, "title": "바뀐 제목", "content": "새 내용",
+                {"title": "바뀐 제목", "content": "새 내용",
                  "difficulty": "HARD", "steps": [
                    {"kind": "RECORD", "prompt": "읽기", "targetText": "world"}]}
                 """;
