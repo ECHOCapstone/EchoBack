@@ -47,9 +47,9 @@ class OAuth2LoginSuccessHandlerTest {
     private static OAuth2AuthenticationToken token(Long userId, String username, String email) {
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("sub", "google-sub-1");
-        attrs.put(CustomOAuth2UserService.INTERNAL_USER_ID, userId);
-        attrs.put(CustomOAuth2UserService.INTERNAL_USERNAME, username);
-        attrs.put(CustomOAuth2UserService.INTERNAL_EMAIL, email);
+        attrs.put(OAuth2Attributes.INTERNAL_USER_ID, userId);
+        attrs.put(OAuth2Attributes.INTERNAL_USERNAME, username);
+        attrs.put(OAuth2Attributes.INTERNAL_EMAIL, email);
         DefaultOAuth2User principal = new DefaultOAuth2User(
                 Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")),
                 attrs,

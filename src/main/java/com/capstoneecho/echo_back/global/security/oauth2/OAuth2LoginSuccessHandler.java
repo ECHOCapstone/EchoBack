@@ -45,14 +45,14 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     ) throws IOException, ServletException {
         OAuth2User principal = (OAuth2User) authentication.getPrincipal();
 
-        Object userIdAttr = principal.getAttribute(CustomOAuth2UserService.INTERNAL_USER_ID);
+        Object userIdAttr = principal.getAttribute(OAuth2Attributes.INTERNAL_USER_ID);
         if (!(userIdAttr instanceof Number)) {
             throw new IllegalStateException(
                     "OAuth2User 에 내부 userId attribute 가 없습니다. CustomOAuth2UserService 가 적용되지 않은 상태입니다.");
         }
         Long userId = ((Number) userIdAttr).longValue();
-        String email = stringAttribute(principal, CustomOAuth2UserService.INTERNAL_EMAIL);
-        String username = stringAttribute(principal, CustomOAuth2UserService.INTERNAL_USERNAME);
+        String email = stringAttribute(principal, OAuth2Attributes.INTERNAL_EMAIL);
+        String username = stringAttribute(principal, OAuth2Attributes.INTERNAL_USERNAME);
 
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("username", username);
