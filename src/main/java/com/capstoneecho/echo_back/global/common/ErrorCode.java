@@ -20,6 +20,7 @@ public enum ErrorCode {
     SESSION_SENTENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "세션 문장을 찾을 수 없습니다."),
     RECORDING_NOT_FOUND(HttpStatus.NOT_FOUND, "녹음을 찾을 수 없습니다."),
     FEEDBACK_NOT_FOUND(HttpStatus.NOT_FOUND, "피드백을 찾을 수 없습니다."),
+    PROMPT_NOT_FOUND(HttpStatus.NOT_FOUND, "프롬프트를 찾을 수 없습니다."),
 
     USERNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 사용자명입니다."),
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
