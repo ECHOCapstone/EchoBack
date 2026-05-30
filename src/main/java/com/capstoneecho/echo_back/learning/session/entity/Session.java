@@ -93,15 +93,8 @@ public class Session {
         }
         this.scriptText = newScriptText;
         this.sentences.clear();
-        List<String> texts = sentenceSplitter.split(newScriptText);
-        if (texts == null) {
-            return;
-        }
         int idx = 0;
-        for (String text : texts) {
-            if (text == null) {
-                continue;
-            }
+        for (String text : sentenceSplitter.split(newScriptText)) {
             this.sentences.add(SessionSentence.of(this, idx++, text));
         }
     }
