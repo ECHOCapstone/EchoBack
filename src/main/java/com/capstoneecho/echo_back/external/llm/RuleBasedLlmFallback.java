@@ -22,12 +22,12 @@ public class RuleBasedLlmFallback {
 
     public RuleBasedLlmFallback(AppProperties appProperties) {
         AppProperties.Messages m = appProperties.messages();
-        this.recordingGuidance = m == null ? "" : safeMessage(m.recordingGuidanceFallback());
-        this.feedbackGuidance = m == null ? "" : safeMessage(m.feedbackGuidanceFallback());
-        this.retryGuidance = m == null ? "" : safeMessage(m.retryGuidanceFallback());
+        this.recordingGuidance = safeMessage(m.recordingGuidanceFallback());
+        this.feedbackGuidance = safeMessage(m.feedbackGuidanceFallback());
+        this.retryGuidance = safeMessage(m.retryGuidanceFallback());
         AppProperties.Gamification g = appProperties.gamification();
-        this.defaultPracticeWord = g == null ? "the" : g.defaultPracticeWord();
-        this.passThreshold = g == null ? 80.0 : g.passThreshold();
+        this.defaultPracticeWord = g.defaultPracticeWord();
+        this.passThreshold = g.passThreshold();
     }
 
     public LlmStepFeedback stepFeedback(LlmStepContext context) {

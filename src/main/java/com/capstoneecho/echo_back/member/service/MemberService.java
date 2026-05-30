@@ -30,8 +30,7 @@ public class MemberService {
         this.userRepository = userRepository;
         this.requestValidator = requestValidator;
         this.statsZoneProvider = statsZoneProvider;
-        AppProperties.Gamification g = appProperties.gamification();
-        this.streakCap = g == null ? 7 : g.streakCap();
+        this.streakCap = appProperties.gamification().streakCap();
     }
 
     public UserResponse findMe(Long userId) {

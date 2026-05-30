@@ -106,10 +106,10 @@ public class FeedbackService {
         this.wavHeaderValidator = wavHeaderValidator;
         this.objectMapper = objectMapper;
         AppProperties.Gamification g = appProperties.gamification();
-        this.completionExp = g == null ? 10 : g.completionExp();
-        this.passThreshold = g == null ? 80.0 : g.passThreshold();
-        this.priorAttemptsCap = g == null ? 10 : Math.max(1, g.priorAttemptsCap());
-        this.defaultPracticeWord = g == null ? "the" : g.defaultPracticeWord();
+        this.completionExp = g.completionExp();
+        this.passThreshold = g.passThreshold();
+        this.priorAttemptsCap = Math.max(1, g.priorAttemptsCap());
+        this.defaultPracticeWord = g.defaultPracticeWord();
     }
 
     // 챕터 종합 피드백 생성:

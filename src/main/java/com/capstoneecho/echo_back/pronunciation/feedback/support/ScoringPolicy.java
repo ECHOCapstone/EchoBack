@@ -19,8 +19,7 @@ public class ScoringPolicy {
     private final double scoreFallbackOnError;
 
     public ScoringPolicy(AppProperties appProperties) {
-        AppProperties.Gamification g = appProperties.gamification();
-        this.scoreFallbackOnError = g == null ? 70.0 : g.scoreFallbackOnError();
+        this.scoreFallbackOnError = appProperties.gamification().scoreFallbackOnError();
     }
 
     // 여러 녹음 점수의 평균. 점수가 한 건도 없으면 만점으로 본다.
