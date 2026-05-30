@@ -101,7 +101,7 @@ public class ModelServerClient {
                 wire.alignment(),
                 wire.errors(),
                 wire.per(),
-                wire.durationSec(),
+                wire.durationSec() == null ? 0.0 : wire.durationSec(),
                 wire.speechRate()
         );
     }
@@ -116,7 +116,7 @@ public class ModelServerClient {
             List<Object> alignment,
             List<AnalyzeError> errors,
             Double per,
-            @JsonAlias("duration_sec") double durationSec,
+            @JsonAlias("duration_sec") Double durationSec,
             @JsonAlias("speech_rate") SpeechRate speechRate
     ) {}
 }
