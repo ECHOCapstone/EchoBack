@@ -3,8 +3,8 @@ package com.capstoneecho.echo_back.member.service;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.common.RequestValidator;
-import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.dto.NicknameUpdateRequest;
 import com.capstoneecho.echo_back.member.entity.User;
@@ -20,17 +20,17 @@ public class MemberService {
     private final UserRepository userRepository;
     private final RequestValidator requestValidator;
     private final StatsZoneProvider statsZoneProvider;
-    private final int streakCap;
+    private final RuntimeSettings settings;
 
     public MemberService(
             UserRepository userRepository,
             RequestValidator requestValidator,
             StatsZoneProvider statsZoneProvider,
-            AppProperties appProperties) {
+            RuntimeSettings settings) {
         this.userRepository = userRepository;
         this.requestValidator = requestValidator;
         this.statsZoneProvider = statsZoneProvider;
-        this.streakCap = appProperties.gamification().streakCap();
+        this.settings = settings;
     }
 
     public UserResponse findMe(Long userId) {
@@ -53,7 +53,7 @@ public class MemberService {
             throw new IllegalArgumentException("expReward must be >= 0");
         }
         User user = loadUser(userId);
-        user.recordCompletion(Instant.now(), expReward, streakCap, statsZoneProvider.zone());
+        user.recordCompletion(Instant.now(), expReward, settings.streakCap(), statsZoneProvider.zone());
         return UserResponse.from(user);
     }
 

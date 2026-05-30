@@ -10,7 +10,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.LearningStepRepository;
@@ -56,8 +56,7 @@ public class RecordingService {
     private final WavHeaderValidator wavHeaderValidator;
     private final ScoringPolicy scoringPolicy;
     private final PriorAttemptAssembler priorAttemptAssembler;
-    private final double passThreshold;
-    private final int priorAttemptsCap;
+    private final RuntimeSettings settings;
 
     public RecordingService(
             UserRepository userRepository,
@@ -73,7 +72,7 @@ public class RecordingService {
             WavHeaderValidator wavHeaderValidator,
             ScoringPolicy scoringPolicy,
             PriorAttemptAssembler priorAttemptAssembler,
-            AppProperties appProperties) {
+            RuntimeSettings settings) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
@@ -87,9 +86,12 @@ public class RecordingService {
         this.wavHeaderValidator = wavHeaderValidator;
         this.scoringPolicy = scoringPolicy;
         this.priorAttemptAssembler = priorAttemptAssembler;
-        AppProperties.Gamification g = appProperties.gamification();
-        this.passThreshold = g.passThreshold();
-        this.priorAttemptsCap = Math.max(1, g.priorAttemptsCap());
+        this.settings = settings;
+    }
+
+    // priorAttempts 상한은 최소 1 로 보정한다 (잘못된 설정 방어).
+    private int priorAttemptsCap() {
+        return Math.max(1, settings.priorAttemptsCap());
     }
 
     // 녹음 1건 업로드 흐름:
@@ -135,7 +137,7 @@ public class RecordingService {
         recording.applyGuidanceKr(feedback.guidanceKr());
         Recording saved = recordingRepository.save(recording);
 
-        boolean passed = stepScore != null && stepScore >= passThreshold && !feedback.retryRecommended();
+        boolean passed = stepScore != null && stepScore >= settings.passThreshold() && !feedback.retryRecommended();
         return RecordingUploadResponse.fromUpload(
                 saved,
                 analyze.perceived(),
@@ -152,10 +154,11 @@ public class RecordingService {
     // 가장 최근 priorAttemptsCap 개만 잘라 LLM 입력을 적정 토큰량으로 유지한다.
     private List<Recording> findPriorAttempts(Long userId, ResolvedParents parents) {
         List<Recording> all = loadAllPriorAttempts(userId, parents);
-        if (all.size() <= priorAttemptsCap) {
+        int cap = priorAttemptsCap();
+        if (all.size() <= cap) {
             return all;
         }
-        return all.subList(all.size() - priorAttemptsCap, all.size());
+        return all.subList(all.size() - cap, all.size());
     }
 
     private List<Recording> loadAllPriorAttempts(Long userId, ResolvedParents parents) {

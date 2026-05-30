@@ -2,8 +2,8 @@ package com.capstoneecho.echo_back.statistics.stats.service;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
@@ -35,22 +35,19 @@ public class StatsService {
     private final FeedbackRepository feedbackRepository;
     private final BadgePolicy badgePolicy;
     private final StatsZoneProvider statsZoneProvider;
-    private final int weeklyTopN;
-    private final int weeklyWindowDays;
+    private final RuntimeSettings settings;
 
     public StatsService(
             UserRepository userRepository,
             FeedbackRepository feedbackRepository,
             BadgePolicy badgePolicy,
             StatsZoneProvider statsZoneProvider,
-            AppProperties appProperties) {
+            RuntimeSettings settings) {
         this.userRepository = userRepository;
         this.feedbackRepository = feedbackRepository;
         this.badgePolicy = badgePolicy;
         this.statsZoneProvider = statsZoneProvider;
-        AppProperties.Gamification g = appProperties.gamification();
-        this.weeklyTopN = g.weeklyTopN();
-        this.weeklyWindowDays = g.weeklyWindowDays();
+        this.settings = settings;
     }
 
     public StatsResponse getMyStats(Long userId, Integer year, Integer month) {
@@ -113,7 +110,7 @@ public class StatsService {
     // 최근 N 일 동안 가장 자주 약점으로 잡힌 음소 상위 K 개를 빈도순으로 돌려준다.
     private List<PhonemeFrequency> buildWeeklyErrors(Long userId, ZoneId zone) {
         Instant now = Instant.now();
-        Instant start = now.atZone(zone).minusDays(weeklyWindowDays).toInstant();
+        Instant start = now.atZone(zone).minusDays(settings.weeklyWindowDays()).toInstant();
         List<String> weakPhonemes = feedbackRepository.findWeakPhonemesInRange(userId, start, now);
 
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -125,7 +122,7 @@ public class StatsService {
         }
         return counts.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
-                .limit(weeklyTopN)
+                .limit(settings.weeklyTopN())
                 .map(e -> new PhonemeFrequency(e.getKey(), e.getValue()))
                 .toList();
     }

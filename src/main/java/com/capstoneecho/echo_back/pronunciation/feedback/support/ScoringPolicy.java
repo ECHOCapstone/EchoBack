@@ -2,7 +2,7 @@ package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import java.util.Collection;
 import java.util.List;
@@ -15,11 +15,10 @@ public class ScoringPolicy {
     private static final double PERFECT_SCORE = 100.0;
     private static final double ZERO_SCORE = 0.0;
 
-    // PER 가 비어 있을 때 사용하는 폴백 점수. app.gamification.score-fallback-on-error 로 외부화.
-    private final double scoreFallbackOnError;
+    private final RuntimeSettings settings;
 
-    public ScoringPolicy(AppProperties appProperties) {
-        this.scoreFallbackOnError = appProperties.gamification().scoreFallbackOnError();
+    public ScoringPolicy(RuntimeSettings settings) {
+        this.settings = settings;
     }
 
     // 여러 녹음 점수의 평균. 점수가 한 건도 없으면 만점으로 본다.
@@ -50,7 +49,7 @@ public class ScoringPolicy {
         Double per = analyze.per();
         if (per == null) {
             List<AnalyzeError> errors = analyze.errors();
-            return (errors == null || errors.isEmpty()) ? PERFECT_SCORE : scoreFallbackOnError;
+            return (errors == null || errors.isEmpty()) ? PERFECT_SCORE : settings.scoreFallbackOnError();
         }
         return perToScore(per);
     }

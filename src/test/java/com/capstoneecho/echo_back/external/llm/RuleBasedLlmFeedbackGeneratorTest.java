@@ -3,11 +3,15 @@ package com.capstoneecho.echo_back.external.llm;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.AppSettingRepository;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
+import com.capstoneecho.echo_back.global.settings.SettingsService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 // 규칙 기반 폴백 + LlmClient 어댑터가 구조화 record 를 그대로 채워 돌려주는지 검증한다.
 // AppProperties 는 외부 yaml 없이 fixture 만으로 구성한다 (단위 테스트).
@@ -25,7 +29,10 @@ class RuleBasedLlmFeedbackGeneratorTest {
                     "text 는 비어 있을 수 없습니다."),
             null, null);
 
-    private final RuleBasedLlmFallback fallback = new RuleBasedLlmFallback(FIXTURE);
+    // 오버라이드 없는 SettingsService → RuntimeSettings 가 FIXTURE 의 yaml 기본값을 그대로 돌려준다.
+    private final RuntimeSettings runtimeSettings =
+            new RuntimeSettings(new SettingsService(mock(AppSettingRepository.class)), FIXTURE);
+    private final RuleBasedLlmFallback fallback = new RuleBasedLlmFallback(runtimeSettings);
     private final RuleBasedLlmFeedbackGenerator generator = new RuleBasedLlmFeedbackGenerator(fallback);
 
     @Test

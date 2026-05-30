@@ -39,11 +39,44 @@ public class SettingsService {
         return Optional.ofNullable(cache.get(key));
     }
 
+    // 정수 오버라이드. 값이 없거나 파싱 실패면 기본값을 돌려준다.
+    public int getInt(String key, int defaultValue) {
+        String override = cache.get(key);
+        if (override == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(override.trim());
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    // 실수 오버라이드. 값이 없거나 파싱 실패면 기본값을 돌려준다.
+    public double getDouble(String key, double defaultValue) {
+        String override = cache.get(key);
+        if (override == null) {
+            return defaultValue;
+        }
+        try {
+            return Double.parseDouble(override.trim());
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
     @Transactional
     public void set(String key, String value) {
         repository.findById(key).ifPresentOrElse(
                 existing -> existing.updateValue(value),
                 () -> repository.save(AppSetting.of(key, value)));
         cache.put(key, value);
+    }
+
+    // 오버라이드를 지운다. 이후 get* 는 호출자가 넘긴 기본값(yaml)을 돌려준다.
+    @Transactional
+    public void clear(String key) {
+        repository.deleteById(key);
+        cache.remove(key);
     }
 }

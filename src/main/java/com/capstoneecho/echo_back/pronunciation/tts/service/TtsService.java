@@ -2,7 +2,7 @@ package com.capstoneecho.echo_back.pronunciation.tts.service;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.pronunciation.tts.dto.TtsRequest;
 import com.capstoneecho.echo_back.pronunciation.tts.support.TtsClient;
 import java.util.Locale;
@@ -13,17 +13,16 @@ import org.springframework.stereotype.Service;
 public class TtsService {
 
     private final TtsClient ttsClient;
-    private final String textRequiredMessage;
+    private final RuntimeSettings settings;
 
-    public TtsService(TtsClient ttsClient, AppProperties appProperties) {
+    public TtsService(TtsClient ttsClient, RuntimeSettings settings) {
         this.ttsClient = ttsClient;
-        AppProperties.Messages m = appProperties.messages();
-        this.textRequiredMessage = m == null ? "" : m.ttsTextRequired();
+        this.settings = settings;
     }
 
     public byte[] synthesize(TtsRequest request) {
         if (request == null || request.text() == null || request.text().isBlank()) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, textRequiredMessage);
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, settings.ttsTextRequired());
         }
         Locale lang = parseLang(request.lang());
         return ttsClient.synthesize(request.text(), lang);

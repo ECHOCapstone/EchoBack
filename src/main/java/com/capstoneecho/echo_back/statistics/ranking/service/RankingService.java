@@ -2,8 +2,8 @@ package com.capstoneecho.echo_back.statistics.ranking.service;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
@@ -29,19 +29,19 @@ public class RankingService {
     private final DemoRankingEntryRepository demoRankingEntryRepository;
     private final UserRepository userRepository;
     private final StatsZoneProvider statsZoneProvider;
-    private final String defaultUnitTitle;
+    private final RuntimeSettings settings;
 
     public RankingService(
             FeedbackRepository feedbackRepository,
             DemoRankingEntryRepository demoRankingEntryRepository,
             UserRepository userRepository,
             StatsZoneProvider statsZoneProvider,
-            AppProperties appProperties) {
+            RuntimeSettings settings) {
         this.feedbackRepository = feedbackRepository;
         this.demoRankingEntryRepository = demoRankingEntryRepository;
         this.userRepository = userRepository;
         this.statsZoneProvider = statsZoneProvider;
-        this.defaultUnitTitle = appProperties.gamification().defaultRankingUnitTitle();
+        this.settings = settings;
     }
 
     public RankingResponse today(Long userId) {
@@ -57,7 +57,7 @@ public class RankingService {
         List<PronunciationFeedback> todays = feedbackRepository.findCompletedInRange(start, end);
 
         Map<Long, Ranked> bestByUser = new HashMap<>();
-        String unitTitle = defaultUnitTitle;
+        String unitTitle = settings.defaultRankingUnitTitle();
         Instant latestForUnit = null;
         for (PronunciationFeedback f : todays) {
             Long fbUserId = f.getUser().getId();
