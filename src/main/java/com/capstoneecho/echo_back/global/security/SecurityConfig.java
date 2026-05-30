@@ -67,6 +67,8 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/health/**"
                         ).permitAll()
+                        // 음소 조음 이미지는 <img src> 로 직접 로드되므로(Authorization 헤더 불가) 공개한다.
+                        .requestMatchers("/api/phonemes/**").permitAll()
                         // Other Actuator endpoints (info/metrics/...) carry
                         // operational metadata and stay behind ROLE_ADMIN until
                         // we split them off onto a separate management port.
