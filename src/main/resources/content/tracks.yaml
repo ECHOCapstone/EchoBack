@@ -1,0 +1,1020 @@
+tracks:
+  - title: "기본 발음 트랙"
+    description: "한국인이 자주 헷갈리는 자음 R/L · V/B · F/P · TH · Z 발음의 기본기를 다지는 입문 트랙."
+    displayOrder: 0
+    chapters:
+      - chapterOrder: 0
+        title: "발음 워밍업"
+        content: "본격적인 학습에 앞서 한국인이 자주 헷갈리는 단어들을 가볍게 점검해 봅니다."
+        difficulty: "EASY"
+        practiceWord: "right"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "한국인이 자주 틀리는 발음을 가볍게 짚어보고 시작할 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Light 을 발음해 보세요."
+            targetText: "Light"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Right 을 발음해 보세요."
+            targetText: "Right"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Very 를 발음해 보세요."
+            targetText: "Very"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Berry 를 발음해 보세요."
+            targetText: "Berry"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Fan 을 발음해 보세요."
+            targetText: "Fan"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Pan 을 발음해 보세요."
+            targetText: "Pan"
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Think 을 발음해 보세요."
+            targetText: "Think"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Sink 을 발음해 보세요."
+            targetText: "Sink"
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Zoo 를 발음해 보세요."
+            targetText: "Zoo"
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 June 을 발음해 보세요."
+            targetText: "June"
+      - chapterOrder: 1
+        title: "발음 연습: R vs L"
+        content: "헷갈리는 R 과 L 발음을 단계적으로 구별해 봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "right"
+        masteryBadgeName: "R vs L 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "Rain과 Lamp을 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Rain 을 발음해 보세요."
+            targetText: "Rain"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Lamp 을 발음해 보세요."
+            targetText: "Lamp"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Right와 Light를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Right 을 발음해 보세요."
+            targetText: "Right"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Light 을 발음해 보세요."
+            targetText: "Light"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Read와 Lead를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Read 을 발음해 보세요."
+            targetText: "Read"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Lead 을 발음해 보세요."
+            targetText: "Lead"
+          - orderIndex: 9
+            kind: "INTRO"
+            prompt: "Collect와 Correct를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Collect 을 발음해 보세요."
+            targetText: "Collect"
+          - orderIndex: 11
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Correct 을 발음해 보세요."
+            targetText: "Correct"
+      - chapterOrder: 2
+        title: "발음 연습: V vs B"
+        content: "헷갈리는 V 와 B 발음을 단계적으로 구별해 봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "very"
+        masteryBadgeName: "V vs B 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "Voice와 Boat을 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Voice 를 발음해 보세요."
+            targetText: "Voice"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Boat 을 발음해 보세요."
+            targetText: "Boat"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Very와 Berry를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Very 를 발음해 보세요."
+            targetText: "Very"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Berry 를 발음해 보세요."
+            targetText: "Berry"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Vase와 Base를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Vase 을 발음해 보세요."
+            targetText: "Vase"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Base 을 발음해 보세요."
+            targetText: "Base"
+          - orderIndex: 9
+            kind: "INTRO"
+            prompt: "Curve와 Curb를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Curve 을 발음해 보세요."
+            targetText: "Curve"
+          - orderIndex: 11
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Curb 을 발음해 보세요."
+            targetText: "Curb"
+      - chapterOrder: 3
+        title: "발음 연습: F vs P"
+        content: "헷갈리는 F 와 P 발음을 단계적으로 구별해 봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "fine"
+        masteryBadgeName: "F vs P 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "Face과 Pen을 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Face 을 발음해 보세요."
+            targetText: "Face"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Pen 을 발음해 보세요."
+            targetText: "Pen"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Fine와 Pine를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Fine 을 발음해 보세요."
+            targetText: "Fine"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Pine 을 발음해 보세요."
+            targetText: "Pine"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Coffee와 Copy를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Coffee 를 발음해 보세요."
+            targetText: "Coffee"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Copy 를 발음해 보세요."
+            targetText: "Copy"
+          - orderIndex: 9
+            kind: "INTRO"
+            prompt: "Proof와 Group를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Proof 을 발음해 보세요."
+            targetText: "Proof"
+          - orderIndex: 11
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Group 을 발음해 보세요."
+            targetText: "Group"
+      - chapterOrder: 4
+        title: "발음 연습: TH vs DH"
+        content: "무성음 TH (think) 와 유성음 DH (this) 의 차이를 단계적으로 익힙니다."
+        difficulty: "HARD"
+        practiceWord: "think"
+        masteryBadgeName: "TH 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "무성 Thin과 유성 Those를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Thin 을 발음해 보세요."
+            targetText: "Thin"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Those 를 발음해 보세요."
+            targetText: "Those"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Think와 This를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Think 을 발음해 보세요."
+            targetText: "Think"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 This 을 발음해 보세요."
+            targetText: "This"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Three와 Free를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Three 를 발음해 보세요."
+            targetText: "Three"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Free 를 발음해 보세요."
+            targetText: "Free"
+          - orderIndex: 9
+            kind: "INTRO"
+            prompt: "Breathe와 Breed를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Breathe 을 발음해 보세요."
+            targetText: "Breathe"
+          - orderIndex: 11
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Breed 을 발음해 보세요."
+            targetText: "Breed"
+      - chapterOrder: 5
+        title: "발음 연습: Z vs J"
+        content: "마찰음 Z 와 파찰음 J 의 차이를 단계적으로 구별해 봅니다."
+        difficulty: "HARD"
+        practiceWord: "zoo"
+        masteryBadgeName: "Z 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "Zone과 John을 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Zone 을 발음해 보세요."
+            targetText: "Zone"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 John 을 발음해 보세요."
+            targetText: "John"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Zoo와 Jew를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Zoo 를 발음해 보세요."
+            targetText: "Zoo"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Jew 를 발음해 보세요."
+            targetText: "Jew"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Zip와 Jeep를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Zip 을 발음해 보세요."
+            targetText: "Zip"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Jeep 을 발음해 보세요."
+            targetText: "Jeep"
+          - orderIndex: 9
+            kind: "INTRO"
+            prompt: "Buzz와 Budge를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Buzz 을 발음해 보세요."
+            targetText: "Buzz"
+          - orderIndex: 11
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Budge 을 발음해 보세요."
+            targetText: "Budge"
+  - title: "모음 구별 트랙"
+    description: "한국어에 없는 영어 모음 길이/혀 위치 차이를 짝 단어로 익히는 트랙."
+    displayOrder: 1
+    chapters:
+      - chapterOrder: 0
+        title: "발음 연습: A vs E"
+        content: "혀를 더 낮추는 A (cat) 와 살짝 올리는 E (bed) 의 차이를 익혀요."
+        difficulty: "EASY"
+        practiceWord: "cat"
+        masteryBadgeName: "A vs E 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "Cat과 Bed을 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Cat 을 발음해 보세요."
+            targetText: "Cat"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Bed 을 발음해 보세요."
+            targetText: "Bed"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Bad 와 Bed 를 비교해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Bad 을 발음해 보세요."
+            targetText: "Bad"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Bed 을 발음해 보세요."
+            targetText: "Bed"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Sad와 Said를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Sad 을 발음해 보세요."
+            targetText: "Sad"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Said 을 발음해 보세요."
+            targetText: "Said"
+      - chapterOrder: 1
+        title: "발음 연습: I vs EE"
+        content: "짧은 I (bit) 와 긴 EE (beat) 의 길이/긴장 차이를 짝 단어로 연습해요."
+        difficulty: "MEDIUM"
+        practiceWord: "beat"
+        masteryBadgeName: "I vs EE 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "Bit과 Beat을 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Bit 을 발음해 보세요."
+            targetText: "Bit"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Beat 을 발음해 보세요."
+            targetText: "Beat"
+          - orderIndex: 3
+            kind: "INTRO"
+            prompt: "Sit 과 Seat 을 비교해 볼 겁니다."
+            targetText: null
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Sit 을 발음해 보세요."
+            targetText: "Sit"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Seat 을 발음해 보세요."
+            targetText: "Seat"
+          - orderIndex: 6
+            kind: "INTRO"
+            prompt: "Live와 Leave를 각각 발음해 볼 겁니다."
+            targetText: null
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Live 을 발음해 보세요."
+            targetText: "Live"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Leave 을 발음해 보세요."
+            targetText: "Leave"
+  - title: "일상 회화 표현"
+    description: "자기소개부터 자연스러운 일상 대화까지, 실제 영어권 환경에서 바로 쓸 수 있는 표현을 익혀요."
+    displayOrder: 2
+    chapters:
+      - chapterOrder: 0
+        title: "인사와 안부"
+        content: "처음 만난 사람이나 오랜만에 본 지인에게 자연스럽게 건네는 표현을 익혀봅니다."
+        difficulty: "EASY"
+        practiceWord: "hello"
+        masteryBadgeName: "인사 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "기본 인사 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 It's been a while, how have you been 를 발음해 보세요."
+            targetText: "It's been a while, how have you been"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I don't think we've met before 를 발음해 보세요."
+            targetText: "I don't think we've met before"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 It's great to finally meet you in person 를 발음해 보세요."
+            targetText: "It's great to finally meet you in person"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 How's everything going on your end 를 발음해 보세요."
+            targetText: "How's everything going on your end"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Please give my regards to your family 를 발음해 보세요."
+            targetText: "Please give my regards to your family"
+      - chapterOrder: 1
+        title: "자기소개와 배경"
+        content: "이름, 출신, 직업, 관심사를 자연스럽게 소개하는 표현을 익혀봅니다."
+        difficulty: "EASY"
+        practiceWord: "background"
+        masteryBadgeName: "자기소개 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "자기소개 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm currently studying computer science at university 를 발음해 보세요."
+            targetText: "I'm currently studying computer science at university"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I was born and raised in Seoul 를 발음해 보세요."
+            targetText: "I was born and raised in Seoul"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I've been working in marketing for about three years 를 발음해 보세요."
+            targetText: "I've been working in marketing for about three years"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm passionate about photography and traveling 를 발음해 보세요."
+            targetText: "I'm passionate about photography and traveling"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I recently moved here from a different city 를 발음해 보세요."
+            targetText: "I recently moved here from a different city"
+      - chapterOrder: 2
+        title: "자연스러운 대화"
+        content: "친구나 동료와 일상에서 주고받는 자연스러운 영어 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "actually"
+        masteryBadgeName: "일상 대화 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "일상 대화 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Sorry, I didn't quite catch what you said 를 발음해 보세요."
+            targetText: "Sorry, I didn't quite catch what you said"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 That actually sounds like a great plan 를 발음해 보세요."
+            targetText: "That actually sounds like a great plan"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd appreciate it if you could help me out 를 발음해 보세요."
+            targetText: "I'd appreciate it if you could help me out"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Take your time, there's no need to rush 를 발음해 보세요."
+            targetText: "Take your time, there's no need to rush"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Let me get back to you on that later 를 발음해 보세요."
+            targetText: "Let me get back to you on that later"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 That's exactly what I was thinking too 를 발음해 보세요."
+            targetText: "That's exactly what I was thinking too"
+      - chapterOrder: 3
+        title: "의견 표현하기"
+        content: "자기 의견을 분명하면서도 정중하게 전달하는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "opinion"
+        masteryBadgeName: "의견 표현 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "의견을 나누는 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 In my opinion, this approach makes more sense 를 발음해 보세요."
+            targetText: "In my opinion, this approach makes more sense"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I see your point, but I have to disagree 를 발음해 보세요."
+            targetText: "I see your point, but I have to disagree"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you elaborate on what you just mentioned 를 발음해 보세요."
+            targetText: "Could you elaborate on what you just mentioned"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm afraid I have to respectfully disagree 를 발음해 보세요."
+            targetText: "I'm afraid I have to respectfully disagree"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Let me think about it for a moment 를 발음해 보세요."
+            targetText: "Let me think about it for a moment"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 That's a fair point worth considering 를 발음해 보세요."
+            targetText: "That's a fair point worth considering"
+  - title: "장소별 회화 트랙"
+    description: "공항, 식당, 병원, 교통, 호텔, 사무실 등 실제 상황에서 바로 쓸 수 있는 표현을 익혀요."
+    displayOrder: 3
+    chapters:
+      - chapterOrder: 0
+        title: "공항 영어"
+        content: "공항과 출입국 심사대에서 자주 쓰이는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "flight"
+        masteryBadgeName: "공항 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "공항 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm visiting for tourism and staying for two weeks 를 발음해 보세요."
+            targetText: "I'm visiting for tourism and staying for two weeks"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you tell me where to claim my baggage 를 발음해 보세요."
+            targetText: "Could you tell me where to claim my baggage"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like to know if my flight has been delayed 를 발음해 보세요."
+            targetText: "I'd like to know if my flight has been delayed"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Is there a shuttle service to the city center 를 발음해 보세요."
+            targetText: "Is there a shuttle service to the city center"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I think my luggage didn't make it on the flight 를 발음해 보세요."
+            targetText: "I think my luggage didn't make it on the flight"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Where should I go to change my connecting flight 를 발음해 보세요."
+            targetText: "Where should I go to change my connecting flight"
+      - chapterOrder: 1
+        title: "식당 영어"
+        content: "식당과 카페에서 주문하고 결제할 때 쓰는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "order"
+        masteryBadgeName: "식당 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "식당 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could we get a table by the window 를 발음해 보세요."
+            targetText: "Could we get a table by the window"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 What would you recommend as the chef's specialty 를 발음해 보세요."
+            targetText: "What would you recommend as the chef's specialty"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Are there any vegetarian options on the menu 를 발음해 보세요."
+            targetText: "Are there any vegetarian options on the menu"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like the steak medium-rare, please 를 발음해 보세요."
+            targetText: "I'd like the steak medium-rare, please"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you please bring the check when you have a chance 를 발음해 보세요."
+            targetText: "Could you please bring the check when you have a chance"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Is the service charge included in the bill 를 발음해 보세요."
+            targetText: "Is the service charge included in the bill"
+      - chapterOrder: 2
+        title: "병원 영어"
+        content: "병원과 약국에서 자기 상태를 정확히 전달할 때 쓰는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "symptom"
+        masteryBadgeName: "병원 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "병원 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I've been having a persistent headache for days 를 발음해 보세요."
+            targetText: "I've been having a persistent headache for days"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I think I'm running a slight fever 를 발음해 보세요."
+            targetText: "I think I'm running a slight fever"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you check my blood pressure, please 를 발음해 보세요."
+            targetText: "Could you check my blood pressure, please"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm allergic to certain types of antibiotics 를 발음해 보세요."
+            targetText: "I'm allergic to certain types of antibiotics"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 How long should I continue taking this medication 를 발음해 보세요."
+            targetText: "How long should I continue taking this medication"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Are there any side effects I should be aware of 를 발음해 보세요."
+            targetText: "Are there any side effects I should be aware of"
+      - chapterOrder: 3
+        title: "교통 영어"
+        content: "대중교통을 이용하거나 길을 물을 때 쓰는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "transfer"
+        masteryBadgeName: "교통 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "교통 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you tell me the quickest way to downtown 를 발음해 보세요."
+            targetText: "Could you tell me the quickest way to downtown"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Do I need to transfer to get to that station 를 발음해 보세요."
+            targetText: "Do I need to transfer to get to that station"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 How much would it cost to take a taxi from here 를 발음해 보세요."
+            targetText: "How much would it cost to take a taxi from here"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Excuse me, is this seat available 를 발음해 보세요."
+            targetText: "Excuse me, is this seat available"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you let me know when we reach the stop 를 발음해 보세요."
+            targetText: "Could you let me know when we reach the stop"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I think I might have missed my bus 를 발음해 보세요."
+            targetText: "I think I might have missed my bus"
+      - chapterOrder: 4
+        title: "호텔 영어"
+        content: "호텔에서 체크인하고 서비스를 요청할 때 쓰는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "reservation"
+        masteryBadgeName: "호텔 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "호텔 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I have a reservation under the last name Kim 를 발음해 보세요."
+            targetText: "I have a reservation under the last name Kim"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could I get a room with a view if possible 를 발음해 보세요."
+            targetText: "Could I get a room with a view if possible"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 What time does the breakfast buffet open 를 발음해 보세요."
+            targetText: "What time does the breakfast buffet open"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 The air conditioning in my room isn't working properly 를 발음해 보세요."
+            targetText: "The air conditioning in my room isn't working properly"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could I extend my stay for one more night 를 발음해 보세요."
+            targetText: "Could I extend my stay for one more night"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Is there a safe in the room for valuables 를 발음해 보세요."
+            targetText: "Is there a safe in the room for valuables"
+      - chapterOrder: 5
+        title: "사무실 영어"
+        content: "사무실과 비즈니스 미팅에서 격식 있게 쓰는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "deadline"
+        masteryBadgeName: "사무실 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "사무실 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could we go over the agenda before we start 를 발음해 보세요."
+            targetText: "Could we go over the agenda before we start"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like to follow up on our previous discussion 를 발음해 보세요."
+            targetText: "I'd like to follow up on our previous discussion"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Let me share my screen so everyone can see 를 발음해 보세요."
+            targetText: "Let me share my screen so everyone can see"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 We need to finalize this by the end of the week 를 발음해 보세요."
+            targetText: "We need to finalize this by the end of the week"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you walk me through the main findings 를 발음해 보세요."
+            targetText: "Could you walk me through the main findings"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'll circle back with you once I have more information 를 발음해 보세요."
+            targetText: "I'll circle back with you once I have more information"
+  - title: "상황별 회화 트랙"
+    description: "비즈니스, 여행, 콘텐츠 제작, 학술 발표 등 특정 상황에서 쓰는 고급 표현을 익혀요."
+    displayOrder: 4
+    chapters:
+      - chapterOrder: 0
+        title: "비즈니스 발표"
+        content: "프로젝트 발표나 제안 상황에서 쓰는 격식 있는 표현을 익혀봅니다."
+        difficulty: "HARD"
+        practiceWord: "proposal"
+        masteryBadgeName: "비즈니스 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "비즈니스 발표 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Thank you all for taking the time to join us today 를 발음해 보세요."
+            targetText: "Thank you all for taking the time to join us today"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Let me walk you through the key findings of our research 를 발음해 보세요."
+            targetText: "Let me walk you through the key findings of our research"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Our analysis indicates a significant growth opportunity 를 발음해 보세요."
+            targetText: "Our analysis indicates a significant growth opportunity"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like to address any concerns you might have 를 발음해 보세요."
+            targetText: "I'd like to address any concerns you might have"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 We're projecting a steady increase over the next quarter 를 발음해 보세요."
+            targetText: "We're projecting a steady increase over the next quarter"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Please feel free to interrupt me with questions 를 발음해 보세요."
+            targetText: "Please feel free to interrupt me with questions"
+      - chapterOrder: 1
+        title: "여행과 쇼핑"
+        content: "여행 중 쇼핑하거나 환불을 요청할 때 쓰는 표현을 익혀봅니다."
+        difficulty: "HARD"
+        practiceWord: "refund"
+        masteryBadgeName: "여행 쇼핑 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "여행과 쇼핑 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Do you carry this item in a different size 를 발음해 보세요."
+            targetText: "Do you carry this item in a different size"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like to return this and get a refund 를 발음해 보세요."
+            targetText: "I'd like to return this and get a refund"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could I see the receipt for this purchase 를 발음해 보세요."
+            targetText: "Could I see the receipt for this purchase"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Is there a tax-free option for tourists 를 발음해 보세요."
+            targetText: "Is there a tax-free option for tourists"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I noticed there's a small defect on this product 를 발음해 보세요."
+            targetText: "I noticed there's a small defect on this product"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you hold this item while I keep shopping 를 발음해 보세요."
+            targetText: "Could you hold this item while I keep shopping"
+      - chapterOrder: 2
+        title: "콘텐츠 제작"
+        content: "유튜브, SNS 등 콘텐츠 제작 상황에서 쓰는 표현을 익혀봅니다."
+        difficulty: "HARD"
+        practiceWord: "audience"
+        masteryBadgeName: "콘텐츠 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "콘텐츠 제작 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Don't forget to subscribe and hit the notification bell 를 발음해 보세요."
+            targetText: "Don't forget to subscribe and hit the notification bell"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Today we're going to dive into a fascinating topic 를 발음해 보세요."
+            targetText: "Today we're going to dive into a fascinating topic"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Let me know your thoughts in the comments below 를 발음해 보세요."
+            targetText: "Let me know your thoughts in the comments below"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I really appreciate everyone who shared the last video 를 발음해 보세요."
+            targetText: "I really appreciate everyone who shared the last video"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 This collaboration has been in the works for months 를 발음해 보세요."
+            targetText: "This collaboration has been in the works for months"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Stay tuned for more content coming next week 를 발음해 보세요."
+            targetText: "Stay tuned for more content coming next week"
+      - chapterOrder: 3
+        title: "학술 발표"
+        content: "논문 발표나 학회 같은 학술 상황에서 쓰는 표현을 익혀봅니다."
+        difficulty: "HARD"
+        practiceWord: "research"
+        masteryBadgeName: "학술 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "학술 발표 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Previous studies have shown conflicting results in this area 를 발음해 보세요."
+            targetText: "Previous studies have shown conflicting results in this area"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Our methodology builds on the framework established earlier 를 발음해 보세요."
+            targetText: "Our methodology builds on the framework established earlier"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 The data suggests a strong correlation between these variables 를 발음해 보세요."
+            targetText: "The data suggests a strong correlation between these variables"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Further research is needed to validate these findings 를 발음해 보세요."
+            targetText: "Further research is needed to validate these findings"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like to acknowledge the contributions of my colleagues 를 발음해 보세요."
+            targetText: "I'd like to acknowledge the contributions of my colleagues"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 We hypothesized that the outcome would differ significantly 를 발음해 보세요."
+            targetText: "We hypothesized that the outcome would differ significantly"
+      - chapterOrder: 4
+        title: "긴급 상황"
+        content: "병원, 분실, 사고 같은 긴급 상황에서 쓰는 표현을 익혀봅니다."
+        difficulty: "HARD"
+        practiceWord: "emergency"
+        masteryBadgeName: "긴급 상황 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "긴급 상황 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I need to report a lost passport to the embassy 를 발음해 보세요."
+            targetText: "I need to report a lost passport to the embassy"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Could you call an ambulance right away 를 발음해 보세요."
+            targetText: "Could you call an ambulance right away"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I think someone just stole my wallet 를 발음해 보세요."
+            targetText: "I think someone just stole my wallet"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Where is the nearest police station from here 를 발음해 보세요."
+            targetText: "Where is the nearest police station from here"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I've been locked out of my hotel room 를 발음해 보세요."
+            targetText: "I've been locked out of my hotel room"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I need to contact my embassy immediately 를 발음해 보세요."
+            targetText: "I need to contact my embassy immediately"
+      - chapterOrder: 5
+        title: "면접과 자기소개"
+        content: "면접이나 네트워킹 자리에서 자기를 효과적으로 소개하는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "experience"
+        masteryBadgeName: "면접 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "면접과 자기소개 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'd like to start by giving you a brief overview of my background 를 발음해 보세요."
+            targetText: "I'd like to start by giving you a brief overview of my background"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 My greatest strength lies in problem-solving under pressure 를 발음해 보세요."
+            targetText: "My greatest strength lies in problem-solving under pressure"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I've gained extensive experience in this field over the years 를 발음해 보세요."
+            targetText: "I've gained extensive experience in this field over the years"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm particularly drawn to your company's mission and values 를 발음해 보세요."
+            targetText: "I'm particularly drawn to your company's mission and values"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 One of my proudest accomplishments was leading a team project 를 발음해 보세요."
+            targetText: "One of my proudest accomplishments was leading a team project"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I'm always eager to take on new challenges and learn 를 발음해 보세요."
+            targetText: "I'm always eager to take on new challenges and learn"
+      - chapterOrder: 6
+        title: "사교 모임"
+        content: "파티, 모임 등 친목 자리에서 자연스럽게 어울리는 표현을 익혀봅니다."
+        difficulty: "MEDIUM"
+        practiceWord: "casual"
+        masteryBadgeName: "사교 마스터"
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "사교 모임 표현을 한 문장씩 따라 읽어 봅니다."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 So what brings you to the event tonight 를 발음해 보세요."
+            targetText: "So what brings you to the event tonight"
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 I've heard so many great things about you 를 발음해 보세요."
+            targetText: "I've heard so many great things about you"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 We should definitely keep in touch after this 를 발음해 보세요."
+            targetText: "We should definitely keep in touch after this"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Do you happen to know anyone else here 를 발음해 보세요."
+            targetText: "Do you happen to know anyone else here"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 Let me introduce you to a few of my friends 를 발음해 보세요."
+            targetText: "Let me introduce you to a few of my friends"
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "녹음 버튼을 누르고 It was really nice running into you again 를 발음해 보세요."
+            targetText: "It was really nice running into you again"

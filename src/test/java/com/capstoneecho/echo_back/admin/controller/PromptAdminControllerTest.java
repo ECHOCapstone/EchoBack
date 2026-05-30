@@ -9,12 +9,33 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 class PromptAdminControllerTest extends AbstractControllerIntegrationTest {
+
+    // 매 실행마다 새 임시 디렉터리를 편집본 위치로 둬, 이전 실행의 편집본 파일에 오염되지 않게 한다.
+    private static final String CONTENT_DIR;
+
+    static {
+        try {
+            CONTENT_DIR = Files.createTempDirectory("echo-prompt-test").toString();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @DynamicPropertySource
+    static void contentDir(DynamicPropertyRegistry registry) {
+        registry.add("app.content.dir", () -> CONTENT_DIR);
+    }
 
     @Autowired
     private JwtProvider jwtProvider;

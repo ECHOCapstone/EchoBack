@@ -57,6 +57,9 @@ app:
     provider: local-stub
   storage:
     local-root: build/test-storage
+  # 테스트는 프로젝트 data/ 의 실제 편집본에 오염되지 않도록 build 하위를 쓴다.
+  content:
+    dir: build/test-content
   oauth2:
     frontend-redirect-uri: "http://localhost:3000/oauth/callback"
     frontend-error-uri: "http://localhost:3000/login"

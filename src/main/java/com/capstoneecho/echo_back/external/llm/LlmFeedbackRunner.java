@@ -206,7 +206,7 @@ public final class LlmFeedbackRunner {
     }
 
     private static String loadPrompt(String key) throws IOException {
-        String resource = "prompts/" + key + ".md";
+        String resource = "content/prompts/" + key + ".md";
         try (InputStream in = LlmFeedbackRunner.class.getClassLoader().getResourceAsStream(resource)) {
             if (in == null) {
                 throw new IOException("prompt resource not found on classpath: " + resource);

@@ -2,49 +2,55 @@ package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.FileCopyUtils;
 
-// classpath:prompts/*.md 를 로드해 키 (파일명) → 본문 매핑으로 노출하는 단일 출처.
+// classpath:content/prompts/*.md 를 로드해 키 (파일명) → 본문 매핑으로 노출하는 단일 출처.
 // 변수는 {{name}} 형태로 적고 render(key, vars) 가 단순 치환을 수행한다.
 // 정의되지 않은 변수가 본문에 남아 있으면 빈 문자열로 치환되어 LLM 호출을 깨지 않는다.
 //
-// classpath 본문은 기본값이고, prompt_override 테이블 값이 있으면 그 위에 덮어쓴다 (런타임 편집).
+// classpath 본문은 공장 기본값이고, ${app.content.dir}/prompts/<key>.md 파일이 있으면
+// 그 위에 덮어쓴다. 어드민 편집은 그 파일을 직접 쓰므로 재시작 후에도 유지되고, reset 은
+// 파일을 지워 기본값으로 되돌린다.
 @Component
 public class PromptCatalog {
 
-    private static final String LOCATION = "classpath:prompts/*.md";
+    private static final String DEFAULTS_LOCATION = "classpath:content/prompts/*.md";
     private static final String EMPTY_PLACEHOLDER_REGEX = "\\{\\{[a-zA-Z0-9_]+}}";
 
-    private final PromptOverrideRepository overrideRepository;
-    // classpath 기본 본문 (불변). reset 의 기준이자 "재정의됨" 판정의 비교 대상.
+    // 편집본 파일이 놓이는 쓰기 가능 디렉터리. 없으면 첫 쓰기 때 생성한다.
+    private final Path overrideDir;
+    // classpath 공장 기본 본문 (불변). reset 의 기준이자 "재정의됨" 판정의 비교 대상.
     private final Map<String, String> defaults;
-    // 실제 사용 본문 = 기본값 + DB 오버라이드. 편집 시 write-through 한다.
+    // 실제 사용 본문 = 기본값 + 파일 오버라이드. 편집 시 write-through 한다.
     private final Map<String, String> effective;
 
-    public PromptCatalog(PromptOverrideRepository overrideRepository) {
-        this.overrideRepository = overrideRepository;
-        this.defaults = Map.copyOf(loadAll());
+    public PromptCatalog(@Value("${app.content.dir}") String contentDir) {
+        this.overrideDir = Path.of(contentDir, "prompts");
+        this.defaults = Map.copyOf(loadDefaults());
         this.effective = new ConcurrentHashMap<>(this.defaults);
+        applyFileOverrides();
     }
 
-    // 시작 시 DB 오버라이드를 덧씌운다. 알 수 없는 키의 오버라이드(삭제된 프롬프트 등)는 무시한다.
-    @PostConstruct
-    void applyOverrides() {
-        for (PromptOverride override : overrideRepository.findAll()) {
-            if (defaults.containsKey(override.getPromptKey())) {
-                effective.put(override.getPromptKey(), override.getContent());
+    // 시작 시 디스크의 편집본을 덧씌운다. 알 수 없는 키의 파일(삭제된 프롬프트 등)은 무시한다.
+    private void applyFileOverrides() {
+        for (String key : defaults.keySet()) {
+            Path file = overrideDir.resolve(key + ".md");
+            if (Files.isRegularFile(file)) {
+                effective.put(key, readFile(file));
             }
         }
     }
@@ -80,22 +86,18 @@ public class PromptCatalog {
         return view(key);
     }
 
-    // 본문을 재정의하고 DB 에 영속화한다.
-    @Transactional
+    // 본문을 재정의하고 편집본 파일에 영속화한다.
     public PromptView override(String key, String content) {
         requireKnown(key);
-        overrideRepository.findById(key).ifPresentOrElse(
-                existing -> existing.updateContent(content),
-                () -> overrideRepository.save(PromptOverride.of(key, content)));
+        writeFile(key, content);
         effective.put(key, content);
         return view(key);
     }
 
-    // 재정의를 지우고 classpath 기본값으로 되돌린다.
-    @Transactional
+    // 편집본 파일을 지우고 classpath 기본값으로 되돌린다.
     public PromptView reset(String key) {
         requireKnown(key);
-        overrideRepository.deleteById(key);
+        deleteFile(key);
         effective.put(key, defaults.get(key));
         return view(key);
     }
@@ -114,11 +116,36 @@ public class PromptCatalog {
     // 프롬프트 한 건의 현재 상태. overridden 이 true 면 기본값이 아닌 재정의 본문이다.
     public record PromptView(String key, String content, boolean overridden) {}
 
-    private static Map<String, String> loadAll() {
+    private void writeFile(String key, String content) {
+        try {
+            Files.createDirectories(overrideDir);
+            Files.writeString(overrideDir.resolve(key + ".md"), content, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("프롬프트 편집본을 저장할 수 없습니다: " + key, e);
+        }
+    }
+
+    private void deleteFile(String key) {
+        try {
+            Files.deleteIfExists(overrideDir.resolve(key + ".md"));
+        } catch (IOException e) {
+            throw new UncheckedIOException("프롬프트 편집본을 삭제할 수 없습니다: " + key, e);
+        }
+    }
+
+    private static String readFile(Path file) {
+        try {
+            return Files.readString(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("프롬프트 편집본을 읽을 수 없습니다: " + file, e);
+        }
+    }
+
+    private static Map<String, String> loadDefaults() {
         ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Map<String, String> out = new LinkedHashMap<>();
         try {
-            Resource[] files = resolver.getResources(LOCATION);
+            Resource[] files = resolver.getResources(DEFAULTS_LOCATION);
             for (Resource file : files) {
                 String name = file.getFilename();
                 if (name == null || !name.endsWith(".md")) {
@@ -128,10 +155,10 @@ public class PromptCatalog {
                 out.put(key, readAll(file));
             }
         } catch (IOException e) {
-            throw new IllegalStateException("failed to scan " + LOCATION, e);
+            throw new IllegalStateException("failed to scan " + DEFAULTS_LOCATION, e);
         }
         if (out.isEmpty()) {
-            throw new IllegalStateException("no prompt template found at " + LOCATION);
+            throw new IllegalStateException("no prompt template found at " + DEFAULTS_LOCATION);
         }
         return out;
     }
