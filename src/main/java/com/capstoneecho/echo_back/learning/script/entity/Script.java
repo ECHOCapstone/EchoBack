@@ -99,6 +99,25 @@ public class Script {
         return new Script(null, null, title, content, difficulty, false, null, null);
     }
 
+    // 본문/메타 갱신. track 과 preset 은 유지하며 chapterOrder 만 바뀔 수 있다.
+    public void update(
+            String title,
+            String content,
+            Difficulty difficulty,
+            Integer chapterOrder,
+            String practiceWord,
+            String masteryBadgeName
+    ) {
+        requireNonBlank(title, "title");
+        requireNonBlank(content, "content");
+        this.title = title;
+        this.content = content;
+        this.difficulty = difficulty;
+        this.chapterOrder = chapterOrder;
+        this.practiceWord = practiceWord;
+        this.masteryBadgeName = masteryBadgeName;
+    }
+
     private static void requireNonBlank(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
