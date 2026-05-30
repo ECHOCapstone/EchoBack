@@ -7,9 +7,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+    # dialect 는 Hibernate 가 connection 으로부터 자동 감지한다.
+    # 로컬: H2 → H2Dialect, CI(application-ci.yaml 머지): MySQL → MySQLDialect.
     open-in-view: false
   security:
     oauth2:

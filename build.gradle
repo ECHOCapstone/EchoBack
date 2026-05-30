@@ -48,7 +48,11 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
-    testAndDevelopmentOnly 'com.h2database:h2' // MySQL DB 연결 전까지는 H2 사용
+    testAndDevelopmentOnly 'com.h2database:h2' // 로컬 테스트 기본 datasource
+    // CI 전용: GitHub Actions 의 SPRING_PROFILES_ACTIVE=test,ci 환경에서만 활성화된다.
+    // 로컬 ./gradlew test 는 application-test.yaml 의 H2 설정을 그대로 사용한다.
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test + jacoco (mysql:8.0 via Testcontainers)
+    runs-on: ubuntu-latest
+    env:
+      # application-ci.yaml 을 머지해 datasource 를 Testcontainers MySQL 로 덮는다.
+      SPRING_PROFILES_ACTIVE: test,ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run tests with JaCoCo gate
+        run: ./gradlew test jacocoTestCoverageVerification --no-daemon --stacktrace
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/test/**
+            build/test-results/test/**
+            build/reports/jacoco/test/html/**
+          if-no-files-found: ignore
+          retention-days: 7
