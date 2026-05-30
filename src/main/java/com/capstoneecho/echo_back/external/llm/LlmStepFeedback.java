@@ -28,7 +28,7 @@ public record LlmStepFeedback(
             @JsonProperty("weaknesses") List<String> weaknesses,
             @JsonProperty("wrongWords") List<WrongWord> wrongWords,
             @JsonProperty("phonemeTips") List<PhonemeTip> phonemeTips) {
-        this.score = clamp(score);
+        this.score = LlmScores.clampScore(score);
         this.retryRecommended = retryRecommended;
         this.guidanceKr = guidanceKr == null ? "" : guidanceKr;
         this.pronunciationGuide = pronunciationGuide == null ? PronunciationGuide.empty() : pronunciationGuide;
@@ -36,9 +36,5 @@ public record LlmStepFeedback(
         this.weaknesses = weaknesses == null ? List.of() : List.copyOf(weaknesses);
         this.wrongWords = wrongWords == null ? List.of() : List.copyOf(wrongWords);
         this.phonemeTips = phonemeTips == null ? List.of() : List.copyOf(phonemeTips);
-    }
-
-    private static int clamp(int v) {
-        return v < 0 ? 0 : (v > 100 ? 100 : v);
     }
 }

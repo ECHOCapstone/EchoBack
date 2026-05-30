@@ -13,8 +13,6 @@ public interface FeedbackRepository extends JpaRepository<PronunciationFeedback,
 
     Optional<PronunciationFeedback> findByIdAndUser_Id(Long id, Long userId);
 
-    List<PronunciationFeedback> findAllByUser_IdOrderByCompletedAtDesc(Long userId);
-
     List<PronunciationFeedback> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
 
     long countByUser_IdAndCompletedTrue(Long userId);

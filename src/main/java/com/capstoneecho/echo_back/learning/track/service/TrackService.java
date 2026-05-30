@@ -10,6 +10,8 @@ import com.capstoneecho.echo_back.learning.track.dto.TrackSummaryResponse;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,11 +28,14 @@ public class TrackService {
     }
 
     public List<TrackSummaryResponse> listTracks() {
+        Map<Long, Long> chapterCounts = scriptRepository.countChaptersGroupedByTrack().stream()
+                .collect(Collectors.toMap(
+                        ScriptRepository.TrackChapterCount::getTrackId,
+                        ScriptRepository.TrackChapterCount::getChapterCount));
         return trackRepository.findAllByOrderByDisplayOrderAsc().stream()
                 .map(track -> TrackSummaryResponse.of(
                         track,
-                        Math.toIntExact(scriptRepository
-                                .countByTrack_IdAndChapterOrderIsNotNull(track.getId()))))
+                        Math.toIntExact(chapterCounts.getOrDefault(track.getId(), 0L))))
                 .toList();
     }
 

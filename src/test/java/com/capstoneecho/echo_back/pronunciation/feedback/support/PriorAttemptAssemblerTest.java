@@ -1,6 +1,5 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
-import com.capstoneecho.echo_back.external.llm.PriorAttempt;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -35,16 +34,9 @@ class PriorAttemptAssemblerTest {
     }
 
     @Test
-    @DisplayName("from(null / empty) → 빈 PriorAttempt 리스트")
+    @DisplayName("fromRecordings(null / empty) → 빈 PriorAttempt 리스트")
     void fromEmpty() {
-        assertThat(assembler.from(null)).isEmpty();
-        assertThat(assembler.from(List.of())).isEmpty();
-    }
-
-    @Test
-    @DisplayName("from: errors_json 비어 있어도 PriorAttempt 자체는 생성")
-    void fromMissingErrorsJson() {
-        List<PriorAttempt> attempts = assembler.from(List.of());
-        assertThat(attempts).isEmpty();
+        assertThat(assembler.fromRecordings(null)).isEmpty();
+        assertThat(assembler.fromRecordings(List.of())).isEmpty();
     }
 }

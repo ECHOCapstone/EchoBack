@@ -56,11 +56,6 @@ public class PriorAttemptAssembler {
         return out;
     }
 
-    // 호환용 별칭. 기존 호출처 (Recording 만 받던 곳) 가 fromRecordings 와 같은 의미로 그대로 쓰도록 둔다.
-    public List<PriorAttempt> from(List<Recording> recordings) {
-        return fromRecordings(recordings);
-    }
-
     public List<AnalyzeError> parseErrors(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
