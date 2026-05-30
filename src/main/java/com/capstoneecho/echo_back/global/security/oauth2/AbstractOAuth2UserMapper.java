@@ -5,6 +5,7 @@ import com.capstoneecho.echo_back.member.entity.SocialAccount;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.member.service.AdminBootstrap;
 import java.util.Map;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -23,13 +24,16 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
 
     private final UserRepository userRepository;
     private final SocialAccountRepository socialAccountRepository;
+    private final AdminBootstrap adminBootstrap;
 
     protected AbstractOAuth2UserMapper(
             UserRepository userRepository,
-            SocialAccountRepository socialAccountRepository
+            SocialAccountRepository socialAccountRepository,
+            AdminBootstrap adminBootstrap
     ) {
         this.userRepository = userRepository;
         this.socialAccountRepository = socialAccountRepository;
+        this.adminBootstrap = adminBootstrap;
     }
 
     // upsert 대상 provider. SocialAccount 식별 / 생성에 쓰인다.
@@ -51,7 +55,7 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
             throw oauth2Error("invalid_email", provider() + " 응답에서 email 을 받지 못했습니다.");
         }
 
-        return socialAccountRepository.findByProviderAndProviderUid(provider(), sub)
+        User user = socialAccountRepository.findByProviderAndProviderUid(provider(), sub)
                 .map(existing -> {
                     // Case A — 이미 같은 provider 계정으로 로그인한 사용자.
                     existing.updateAccessToken(accessToken);
@@ -73,6 +77,11 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
                                     newUser, provider(), sub, email, accessToken));
                             return newUser;
                         }));
+
+        // 부트스트랩 관리자 계정이면 이 트랜잭션 안에서 승격한다. 인메모리 DB 처럼 부팅 시점에
+        // 계정이 없던 경우, 자동 회원가입이 일어나는 로그인 시점에 바로 ADMIN 권한이 반영된다.
+        adminBootstrap.promoteIfBootstrap(user);
+        return user;
     }
 
     // 표시명이 없으면 이메일 local-part 를 nickname 으로 쓴다.

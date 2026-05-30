@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.global.security.oauth2;
 import com.capstoneecho.echo_back.member.entity.Provider;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.member.service.AdminBootstrap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -15,9 +16,10 @@ public class KakaoOAuth2UserMapper extends AbstractOAuth2UserMapper {
 
     public KakaoOAuth2UserMapper(
             UserRepository userRepository,
-            SocialAccountRepository socialAccountRepository
+            SocialAccountRepository socialAccountRepository,
+            AdminBootstrap adminBootstrap
     ) {
-        super(userRepository, socialAccountRepository);
+        super(userRepository, socialAccountRepository, adminBootstrap);
     }
 
     @Override

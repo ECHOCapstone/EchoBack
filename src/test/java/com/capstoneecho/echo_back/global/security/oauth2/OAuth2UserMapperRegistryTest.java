@@ -31,8 +31,9 @@ class OAuth2UserMapperRegistryTest {
 
     @BeforeEach
     void setUp() {
-        googleMapper = new GoogleOAuth2UserMapper(userRepository, socialAccountRepository);
-        kakaoMapper = new KakaoOAuth2UserMapper(userRepository, socialAccountRepository);
+        // 본 테스트는 resolve 디스패치만 검증하고 upsert 를 호출하지 않으므로 AdminBootstrap 은 쓰이지 않는다.
+        googleMapper = new GoogleOAuth2UserMapper(userRepository, socialAccountRepository, null);
+        kakaoMapper = new KakaoOAuth2UserMapper(userRepository, socialAccountRepository, null);
         registry = new OAuth2UserMapperRegistry(List.of(googleMapper, kakaoMapper));
     }
 

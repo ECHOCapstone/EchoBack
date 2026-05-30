@@ -14,6 +14,7 @@ import com.capstoneecho.echo_back.member.entity.SocialAccount;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.member.service.AdminBootstrap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,11 +35,14 @@ class KakaoOAuth2UserMapperTest {
     @Mock
     private SocialAccountRepository socialAccountRepository;
 
+    @Mock
+    private AdminBootstrap adminBootstrap;
+
     private KakaoOAuth2UserMapper mapper;
 
     @BeforeEach
     void setUp() {
-        mapper = new KakaoOAuth2UserMapper(userRepository, socialAccountRepository);
+        mapper = new KakaoOAuth2UserMapper(userRepository, socialAccountRepository, adminBootstrap);
     }
 
     // 카카오 OIDC userinfo 응답은 sub / email / nickname / picture 키를 사용.
