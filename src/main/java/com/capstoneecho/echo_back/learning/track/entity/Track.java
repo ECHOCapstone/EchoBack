@@ -41,4 +41,13 @@ public class Track {
         }
         return new Track(title, description, displayOrder);
     }
+
+    public void update(String title, String description, int displayOrder) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        this.title = title;
+        this.description = description;
+        this.displayOrder = displayOrder;
+    }
 }
