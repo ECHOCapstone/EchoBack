@@ -63,7 +63,6 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/health",
-                                "/api/tts",
                                 "/error",
                                 "/actuator/health",
                                 "/actuator/health/**"
@@ -72,7 +71,6 @@ public class SecurityConfig {
                         // operational metadata and stay behind ROLE_ADMIN until
                         // we split them off onto a separate management port.
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
-                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))

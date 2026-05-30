@@ -14,7 +14,6 @@ public record AppProperties(
         Storage storage,
         Tts tts,
         Stats stats,
-        Auth auth,
         Gamification gamification,
         Messages messages,
         OAuth2 oauth2
@@ -57,12 +56,6 @@ public record AppProperties(
 
         // condition 은 BadgePolicy 가 해석하는 enum-like 식별자 (FIRST_FEEDBACK, STREAK).
         public record Badge(String id, String name, String condition, int threshold) {}
-    }
-
-    // OAuth2 시연 사용자 식별자 외부화. 환경별 yaml 에서 다른 값을 주입한다.
-    public record Auth(DemoGoogle demoGoogle) {
-
-        public record DemoGoogle(String email, String nickname) {}
     }
 
     // 실제 Google OAuth2 로그인 성공 / 실패 후 브라우저를 보낼 프론트엔드 URL.

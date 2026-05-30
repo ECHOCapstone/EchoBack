@@ -7,10 +7,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
 import java.io.File;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,12 +21,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class TtsControllerTest extends AbstractControllerIntegrationTest {
 
+    @Autowired
+    private JwtProvider jwtProvider;
+
     @Test
     @DisplayName("POST /api/tts → 200 + audio/mpeg + non-empty MP3 with ID3 magic + REST Docs 스니펫")
     void returnsNonEmptyMp3WithId3Magic() throws Exception {
         String body = "{\"text\":\"Hello world.\",\"lang\":\"en\"}";
 
         MvcResult result = mockMvc.perform(post("/api/tts")
+                        .header("Authorization", "Bearer " + bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -47,11 +54,17 @@ class TtsControllerTest extends AbstractControllerIntegrationTest {
         String body = "{\"text\":\"   \"}";
 
         mockMvc.perform(post("/api/tts")
+                        .header("Authorization", "Bearer " + bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    // TTS 는 인증된 사용자만 호출 가능하다. 엔드포인트가 사용자 식별자를 쓰지 않으므로 임의 userId 토큰으로 충분하다.
+    private String bearerToken() {
+        return jwtProvider.issue(1L, Map.of("username", "tts-tester", "email", "tts@test.com"));
     }
 
     private static void assertSnippetCreated(String snippetId) {

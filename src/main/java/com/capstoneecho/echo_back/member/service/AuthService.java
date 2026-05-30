@@ -17,8 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 인증 도메인의 단일 진입점. JWT 발급, 회원 가입 / 로그인 / OAuth2 시연, 중복 확인을 책임진다.
-// 시연용 OAuth2 사용자의 식별자는 AppProperties.auth.demoGoogle 로 외부화되어 하드코딩을 피한다.
+// 인증 도메인의 단일 진입점. JWT 발급, 회원 가입 / 로그인, 중복 확인을 책임진다.
 @Service
 @Transactional
 public class AuthService {
@@ -27,7 +26,6 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final long jwtExpirationMs;
-    private final AppProperties.Auth.DemoGoogle demoGoogle;
 
     public AuthService(
             UserRepository userRepository,
@@ -39,7 +37,6 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtProvider = jwtProvider;
         this.jwtExpirationMs = appProperties.jwt().expirationMs();
-        this.demoGoogle = appProperties.auth() == null ? null : appProperties.auth().demoGoogle();
     }
 
     public AuthTokenResponse signup(SignupRequest request) {
@@ -75,21 +72,6 @@ public class AuthService {
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
         }
 
-        return issueToken(user);
-    }
-
-    // 시연용 OAuth2 사용자 자동 가입 / 로그인. 식별자는 AppProperties 에서 받아 환경별로 조정 가능하다.
-    public AuthTokenResponse loginWithGoogleDemo() {
-        if (demoGoogle == null
-                || demoGoogle.email() == null || demoGoogle.email().isBlank()
-                || demoGoogle.nickname() == null || demoGoogle.nickname().isBlank()) {
-            throw new IllegalStateException("app.auth.demo-google.email / nickname must be configured");
-        }
-        String demoEmail = demoGoogle.email();
-        String demoNickname = demoGoogle.nickname();
-        User user = userRepository.findByEmail(demoEmail)
-                .orElseGet(() -> userRepository.save(
-                        User.fromOAuth2(demoEmail, demoNickname)));
         return issueToken(user);
     }
 

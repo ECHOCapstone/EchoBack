@@ -21,7 +21,7 @@ class OAuth2LoginFailureHandlerTest {
     @BeforeEach
     void setUp() {
         AppProperties props = new AppProperties(
-                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null,
                 new AppProperties.OAuth2("http://localhost:3000/oauth/callback", ERROR_URI)
         );
         handler = new OAuth2LoginFailureHandler(props);

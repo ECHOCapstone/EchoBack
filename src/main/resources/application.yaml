@@ -91,10 +91,6 @@ app:
         name: "7일 연속 학습"
         condition: USER_STREAK
         threshold: 7
-  auth:
-    demo-google:
-      email: "demo.google@echo.local"
-      nickname: "DemoGoogleUser"
   oauth2:
     # Google 로그인 성공 후 프론트엔드로 보낼 URL. JWT 는 fragment (#token=...) 로 붙는다.
     frontend-redirect-uri: ${APP_OAUTH2_FRONTEND_REDIRECT_URI:http://localhost:3000/oauth/callback}

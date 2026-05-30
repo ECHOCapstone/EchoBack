@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RuleBasedLlmFeedbackGeneratorTest {
 
     private static final AppProperties FIXTURE = new AppProperties(
-            null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null,
             new AppProperties.Gamification(
                     10, 7, 3, 5, 7, 70.0, 80.0, 10, "오늘의 랭킹", "the"),
             new AppProperties.Messages(
