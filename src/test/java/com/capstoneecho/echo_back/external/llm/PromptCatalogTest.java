@@ -1,15 +1,25 @@
 package com.capstoneecho.echo_back.external.llm;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class PromptCatalogTest {
 
-    private final PromptCatalog catalog = new PromptCatalog();
+    // DB 오버라이드 없는 상태 — classpath 기본 본문만으로 검증한다.
+    private final PromptOverrideRepository overrideRepository = mock(PromptOverrideRepository.class);
+    private final PromptCatalog catalog = newCatalog();
+
+    private PromptCatalog newCatalog() {
+        when(overrideRepository.findAll()).thenReturn(List.of());
+        return new PromptCatalog(overrideRepository);
+    }
 
     @Test
     @DisplayName("system 프롬프트가 로드되고 아학편 가이드 표가 포함되어 있다")
