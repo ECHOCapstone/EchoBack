@@ -34,6 +34,7 @@ class AppPropertiesTest {
 
         assertThat(appProperties.cors().allowedOrigins()).isNotEmpty();
         assertThat(appProperties.cors().allowedMethods()).contains("GET", "POST");
+        assertThat(appProperties.cors().allowedHeaders()).contains("*");
         assertThat(appProperties.cors().exposedHeaders()).contains("Authorization");
         assertThat(appProperties.cors().allowCredentials()).isTrue();
         assertThat(appProperties.cors().maxAgeSec()).isPositive();

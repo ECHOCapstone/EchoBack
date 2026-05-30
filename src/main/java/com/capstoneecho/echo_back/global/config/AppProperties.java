@@ -24,6 +24,7 @@ public record AppProperties(
     public record Cors(
             List<String> allowedOrigins,
             List<String> allowedMethods,
+            List<String> allowedHeaders,
             List<String> exposedHeaders,
             boolean allowCredentials,
             long maxAgeSec

@@ -59,6 +59,8 @@ app:
       - PATCH
       - DELETE
       - OPTIONS
+    allowed-headers:
+      - "*"
     exposed-headers:
       - Authorization
     allow-credentials: true
