@@ -30,6 +30,8 @@ class ProdProfileSmokeTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.jpa.properties.hibernate.dialect",
                 () -> "org.hibernate.dialect.H2Dialect");
+        // H2 부트 검증용이므로 MySQL 마이그레이션(Flyway) 은 끄고 Hibernate 가 스키마를 만든다.
+        registry.add("spring.flyway.enabled", () -> "false");
     }
 
     @Autowired

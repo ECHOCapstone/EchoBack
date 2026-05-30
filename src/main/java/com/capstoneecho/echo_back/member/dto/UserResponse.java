@@ -10,6 +10,7 @@ public record UserResponse(
         String nickname,
         int streak,
         int exp,
+        String role,
         Instant createdAt
 ) {
 
@@ -21,6 +22,7 @@ public record UserResponse(
                 user.getNickname(),
                 user.getStreak(),
                 user.getExp(),
+                user.getRole().name(),
                 user.getCreatedAt()
         );
     }

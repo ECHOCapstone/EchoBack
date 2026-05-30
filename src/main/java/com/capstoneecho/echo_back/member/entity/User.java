@@ -2,6 +2,8 @@ package com.capstoneecho.echo_back.member.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -58,6 +60,10 @@ public class User {
     @Column(name = "exp", nullable = false)
     private int exp;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Role role;
+
     @Column(name = "last_study_at")
     private Instant lastStudyAt;
 
@@ -72,8 +78,18 @@ public class User {
         this.nickname = nickname;
         this.streak = 0;
         this.exp = 0;
+        this.role = Role.USER;
         this.lastStudyAt = null;
         this.createdAt = Instant.now();
+    }
+
+    public boolean isAdmin() {
+        return this.role == Role.ADMIN;
+    }
+
+    // 부트스트랩/운영 도구가 특정 계정을 관리자로 승격할 때 사용한다.
+    public void promoteToAdmin() {
+        this.role = Role.ADMIN;
     }
 
     // 표준 회원가입 경로. passwordHash 는 반드시 BCrypt 결과여야 한다 (생패스워드 저장 방지 검증).

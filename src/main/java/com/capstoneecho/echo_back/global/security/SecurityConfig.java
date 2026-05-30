@@ -71,6 +71,8 @@ public class SecurityConfig {
                         // operational metadata and stay behind ROLE_ADMIN until
                         // we split them off onto a separate management port.
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        // 관리자 전용 API. JWT 의 role 클레임이 ADMIN 이어야 접근 가능.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))

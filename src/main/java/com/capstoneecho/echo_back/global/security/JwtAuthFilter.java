@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -48,8 +49,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = header.substring(BEARER_PREFIX.length()).trim();
         try {
             JwtPrincipal principal = jwtProvider.parse(token);
+            // role 클레임을 Spring Security 권한(ROLE_USER / ROLE_ADMIN)으로 변환해 hasRole 검사에 쓴다.
+            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + principal.role()));
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(principal, null, List.of());
+                    new UsernamePasswordAuthenticationToken(principal, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (BusinessException ex) {
             SecurityContextHolder.clearContext();

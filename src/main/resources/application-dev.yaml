@@ -3,6 +3,9 @@ spring:
     driver-class-name: org.h2.Driver
     url: jdbc:h2:mem:test
     username: sa
+  # dev 는 H2 이므로 Flyway(MySQL 마이그레이션) 를 끄고 Hibernate 가 스키마를 만든다.
+  flyway:
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: update

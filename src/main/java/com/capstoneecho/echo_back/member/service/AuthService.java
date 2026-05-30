@@ -95,6 +95,7 @@ public class AuthService {
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("username", user.getUsername());
         claims.put("email", user.getEmail());
+        claims.put("role", user.getRole().name());
         String token = jwtProvider.issue(user.getId(), claims);
         long expiresInSec = Math.max(0L, jwtExpirationMs / 1000L);
         return AuthTokenResponse.of(token, expiresInSec, UserResponse.from(user));

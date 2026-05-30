@@ -47,6 +47,9 @@ spring:
             issuer-uri: https://kauth.kakao.com
 
 app:
+  # 부팅 시 이 username 계정을 관리자로 승격한다. 미설정 시 승격 없음.
+  admin:
+    bootstrap-username: ${APP_ADMIN_BOOTSTRAP_USERNAME:}
   jwt:
     expiration-ms: 86400000
   cors:

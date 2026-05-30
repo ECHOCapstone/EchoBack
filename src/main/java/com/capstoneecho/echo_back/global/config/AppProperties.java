@@ -16,8 +16,12 @@ public record AppProperties(
         Stats stats,
         Gamification gamification,
         Messages messages,
-        OAuth2 oauth2
+        OAuth2 oauth2,
+        Admin admin
 ) {
+
+    // 부팅 시 관리자로 승격할 계정. bootstrapUsername 이 비어 있으면 승격을 건너뛴다.
+    public record Admin(String bootstrapUsername) {}
 
     public record Jwt(String secret, long expirationMs) {}
 
