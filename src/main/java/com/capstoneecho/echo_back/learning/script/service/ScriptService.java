@@ -2,8 +2,8 @@ package com.capstoneecho.echo_back.learning.script.service;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptDetailResponse;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptSummaryResponse;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
@@ -24,19 +24,19 @@ public class ScriptService {
     private final LearningStepRepository learningStepRepository;
     private final RecommendedScriptSelector recommendedScriptSelector;
     private final StatsZoneProvider statsZoneProvider;
-    private final int dailyRecommendedCount;
+    private final RuntimeSettings settings;
 
     public ScriptService(
             ScriptRepository scriptRepository,
             LearningStepRepository learningStepRepository,
             RecommendedScriptSelector recommendedScriptSelector,
             StatsZoneProvider statsZoneProvider,
-            AppProperties appProperties) {
+            RuntimeSettings settings) {
         this.scriptRepository = scriptRepository;
         this.learningStepRepository = learningStepRepository;
         this.recommendedScriptSelector = recommendedScriptSelector;
         this.statsZoneProvider = statsZoneProvider;
-        this.dailyRecommendedCount = appProperties.gamification().dailyRecommended();
+        this.settings = settings;
     }
 
     public ScriptDetailResponse getScript(Long scriptId) {
@@ -54,7 +54,7 @@ public class ScriptService {
         List<Script> presets = scriptRepository.findByPresetTrueOrderByIdAsc();
         LocalDate today = LocalDate.now(statsZoneProvider.zone());
         List<Script> picked = recommendedScriptSelector.select(
-                userId, today, presets, dailyRecommendedCount);
+                userId, today, presets, settings.dailyRecommended());
         return picked.stream()
                 .map(ScriptSummaryResponse::from)
                 .toList();

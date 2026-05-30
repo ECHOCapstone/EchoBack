@@ -2,7 +2,7 @@ package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
-import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -10,48 +10,41 @@ import org.springframework.stereotype.Component;
 
 // 어떤 LLM provider 가 활성화되어 있든 항상 사용 가능한 규칙 기반 폴백.
 // LlmClient 구현체는 외부 호출이 실패했을 때 이 컴포넌트의 결과로 떨어지면 된다.
-// 모든 외부화 문구 / 단어 / 점수 임계값은 AppProperties 에서 주입한다.
+// 외부화 문구 / 단어 / 점수 임계값은 RuntimeSettings 에서 호출 시점에 읽는다 (어드민 편집 즉시 반영).
 @Component
 public class RuleBasedLlmFallback {
 
-    private final String recordingGuidance;
-    private final String feedbackGuidance;
-    private final String retryGuidance;
-    private final String defaultPracticeWord;
-    private final double passThreshold;
+    private final RuntimeSettings settings;
 
-    public RuleBasedLlmFallback(AppProperties appProperties) {
-        AppProperties.Messages m = appProperties.messages();
-        this.recordingGuidance = safeMessage(m.recordingGuidanceFallback());
-        this.feedbackGuidance = safeMessage(m.feedbackGuidanceFallback());
-        this.retryGuidance = safeMessage(m.retryGuidanceFallback());
-        AppProperties.Gamification g = appProperties.gamification();
-        this.defaultPracticeWord = g.defaultPracticeWord();
-        this.passThreshold = g.passThreshold();
+    public RuleBasedLlmFallback(RuntimeSettings settings) {
+        this.settings = settings;
     }
 
     public LlmStepFeedback stepFeedback(LlmStepContext context) {
         int score = roundScore(context.currentScore());
-        boolean retry = score < passThreshold;
+        boolean retry = score < settings.passThreshold();
         List<WrongWord> wrongs = resolveWrongWords(
                 context.targetText(), context.errors(), context.g2pWords());
         return new LlmStepFeedback(
-                score, retry, recordingGuidance, PronunciationGuide.empty(),
+                score, retry, safeMessage(settings.recordingGuidanceFallback()), PronunciationGuide.empty(),
                 List.of(), List.of(), wrongs, List.of());
     }
 
     public LlmRetryFeedback retryFeedback(LlmRetryContext context) {
         int score = roundScore(context.currentScore());
-        boolean correct = score >= passThreshold && context.errors().isEmpty();
+        boolean correct = score >= settings.passThreshold() && context.errors().isEmpty();
         boolean retry = !correct;
-        return new LlmRetryFeedback(score, correct, retry, retryGuidance, PronunciationGuide.empty(), List.of());
+        return new LlmRetryFeedback(
+                score, correct, retry, safeMessage(settings.retryGuidanceFallback()),
+                PronunciationGuide.empty(), List.of());
     }
 
     public LlmComprehensiveFeedback comprehensiveFeedback(LlmComprehensiveContext context) {
         int score = roundScore(context.overallAccuracy());
         List<PracticeItem> next = List.of(
-                new PracticeItem(defaultPracticeWord, PracticeItem.Kind.WORD, ""));
-        return new LlmComprehensiveFeedback(score, feedbackGuidance, List.of(), List.of(), next);
+                new PracticeItem(settings.defaultPracticeWord(), PracticeItem.Kind.WORD, ""));
+        return new LlmComprehensiveFeedback(
+                score, safeMessage(settings.feedbackGuidanceFallback()), List.of(), List.of(), next);
     }
 
     // canonical phoneme 인덱스를 단어 경계로 환원해 약점 단어 목록을 만든다.

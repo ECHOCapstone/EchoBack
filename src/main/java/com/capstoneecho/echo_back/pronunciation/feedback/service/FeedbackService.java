@@ -13,7 +13,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
@@ -67,10 +67,7 @@ public class FeedbackService {
     private final MemberService memberService;
     private final WavHeaderValidator wavHeaderValidator;
     private final ObjectMapper objectMapper;
-    private final int completionExp;
-    private final double passThreshold;
-    private final int priorAttemptsCap;
-    private final String defaultPracticeWord;
+    private final RuntimeSettings settings;
 
     public FeedbackService(
             UserRepository userRepository,
@@ -87,7 +84,7 @@ public class FeedbackService {
             MemberService memberService,
             WavHeaderValidator wavHeaderValidator,
             ObjectMapper objectMapper,
-            AppProperties appProperties) {
+            RuntimeSettings settings) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.sessionRepository = sessionRepository;
@@ -102,11 +99,12 @@ public class FeedbackService {
         this.memberService = memberService;
         this.wavHeaderValidator = wavHeaderValidator;
         this.objectMapper = objectMapper;
-        AppProperties.Gamification g = appProperties.gamification();
-        this.completionExp = g.completionExp();
-        this.passThreshold = g.passThreshold();
-        this.priorAttemptsCap = Math.max(1, g.priorAttemptsCap());
-        this.defaultPracticeWord = g.defaultPracticeWord();
+        this.settings = settings;
+    }
+
+    // priorAttempts 상한은 최소 1 로 보정한다 (잘못된 설정 방어).
+    private int priorAttemptsCap() {
+        return Math.max(1, settings.priorAttemptsCap());
     }
 
     // 챕터 종합 피드백 생성:
@@ -203,7 +201,7 @@ public class FeedbackService {
         List<String> canonicalPhonemes = analyze.canonicalOrEmpty();
         double score = scoringPolicy.singleWordScore(analyze);
 
-        Pageable cap = PageRequest.of(0, priorAttemptsCap);
+        Pageable cap = PageRequest.of(0, priorAttemptsCap());
         List<RetryAttempt> recent = retryAttemptRepository
                 .findByFeedback_IdOrderByCreatedAtDesc(feedback.getId(), cap);
 
@@ -216,7 +214,7 @@ public class FeedbackService {
                 score,
                 priorAttemptAssembler.fromRetries(recent));
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
-        boolean passed = score >= passThreshold && !llm.retryRecommended();
+        boolean passed = score >= settings.passThreshold() && !llm.retryRecommended();
 
         persistRetryAttempt(feedback, word, perceived, canonicalPhonemes, analyze, score, llm);
 
@@ -239,7 +237,7 @@ public class FeedbackService {
         }
         String word = feedback.getPracticeWord();
         if (word == null || word.isBlank()) {
-            return defaultPracticeWord;
+            return settings.defaultPracticeWord();
         }
         return word;
     }
@@ -283,7 +281,7 @@ public class FeedbackService {
         Instant now = Instant.now();
         int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
         if (affected == 1) {
-            return memberService.awardCompletionRewards(userId, completionExp);
+            return memberService.awardCompletionRewards(userId, settings.completionExp());
         }
         PronunciationFeedback existing = feedbackRepository
                 .findByIdAndUser_Id(feedbackId, userId)
@@ -367,7 +365,7 @@ public class FeedbackService {
                 return item.text();
             }
         }
-        return defaultPracticeWord;
+        return settings.defaultPracticeWord();
     }
 
     // 챕터의 모든 시도에서 모인 음소 오류를 PhonemeError 자식으로 저장한다.
