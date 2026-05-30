@@ -41,6 +41,35 @@ class OAuth2AuthorizationEndpointTest extends AbstractControllerIntegrationTest 
         assertSnippetCreated("auth/get-oauth2-authorize-google");
     }
 
+    @Test
+    @DisplayName("GET /api/auth/oauth2/kakao/authorization → 302 redirect to Kakao authorize endpoint + REST Docs 스니펫")
+    void authorizeRedirectsToKakao() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/auth/oauth2/kakao/authorization"))
+                .andExpect(status().is3xxRedirection())
+                .andDo(document("auth/get-oauth2-authorize-kakao"))
+                .andReturn();
+
+        String location = result.getResponse().getHeader("Location");
+        assertThat(location).as("redirect Location header").isNotNull();
+        assertThat(location).startsWith("https://kauth.kakao.com/oauth/authorize");
+        assertThat(location).contains("client_id=test-kakao-client-id");
+        assertThat(location).contains("response_type=code");
+        // openid scope 가 포함된 OIDC 요청이므로 nonce 가 자동 첨부돼야 한다.
+        assertThat(location).contains("nonce=");
+        assertThat(location).contains("state=");
+        // scope 의 공백 인코딩은 %20 / + 둘 다 허용. 카카오 1차 동의 항목 3 개가 모두 들어가야 한다.
+        assertThat(location).contains("scope=");
+        assertThat(location).contains("openid");
+        assertThat(location).contains("profile_nickname");
+        assertThat(location).contains("account_email");
+        // redirect_uri 가 새 콜백 경로 (/api/auth/oauth2/kakao/callback) 로 빌드됐는지 확인.
+        assertThat(location).matches(s ->
+                s.contains("redirect_uri=http%3A%2F%2Flocalhost%2Fapi%2Fauth%2Foauth2%2Fkakao%2Fcallback")
+                        || s.contains("redirect_uri=http://localhost/api/auth/oauth2/kakao/callback"));
+
+        assertSnippetCreated("auth/get-oauth2-authorize-kakao");
+    }
+
     private static void assertSnippetCreated(String snippetId) {
         File dir = new File("build/generated-snippets/" + snippetId);
         assertThat(dir).as("REST Docs snippet dir must exist: %s", dir).exists();

@@ -11,26 +11,28 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-// Google userinfo 응답을 우리 User / SocialAccount 모델로 upsert 하는 단일 진입점.
-// Spring OAuth2 internals 와 분리되어 있어 단위 테스트 4 분기를 모두 직접 검증한다.
+// 카카오 OIDC userinfo 응답을 우리 User / SocialAccount 모델로 upsert 하는 단일 진입점.
+// Google mapper 와 4 분기 구조는 동일하나 attribute key 는 카카오 OIDC 스펙에 맞춰
+//   sub      → providerUid (pairwise — 같은 카카오 계정이라도 다른 앱이면 다른 sub)
+//   email    → account_email 동의 시에만 non-null. 누락이면 invalid_email 거부 (Google 정책 일관성)
+//   nickname → profile_nickname 동의 시 표시명. 누락이면 email local-part 로 fallback
 //
 // 분기:
-//   A) (GOOGLE, sub) 로 SocialAccount 존재 → access_token / provider_email 갱신, 기존 User 반환
+//   A) (KAKAO, sub) 로 SocialAccount 존재 → access_token / provider_email 갱신, 기존 User 반환
 //   B) email 로 기존 User 존재, SocialAccount 없음 → 기존 User 에 새 SocialAccount 연결
-//      (CLAUDE.md "로그인 방식 확장" 요구사항 충족)
 //   C) 둘 다 없음 → User.fromOAuth2 신규 + SocialAccount 신규
-//   D) attributes 에 email 또는 sub 누락 → OAuth2AuthenticationException
+//   D) sub / email 누락 → OAuth2AuthenticationException (각각 invalid_user_info / invalid_email)
 @Component
-public class GoogleOAuth2UserMapper implements OAuth2UserMapper {
+public class KakaoOAuth2UserMapper implements OAuth2UserMapper {
 
     private static final String ATTR_SUB = "sub";
     private static final String ATTR_EMAIL = "email";
-    private static final String ATTR_NAME = "name";
+    private static final String ATTR_NICKNAME = "nickname";
 
     private final UserRepository userRepository;
     private final SocialAccountRepository socialAccountRepository;
 
-    public GoogleOAuth2UserMapper(
+    public KakaoOAuth2UserMapper(
             UserRepository userRepository,
             SocialAccountRepository socialAccountRepository
     ) {
@@ -43,39 +45,39 @@ public class GoogleOAuth2UserMapper implements OAuth2UserMapper {
     public User upsert(Map<String, Object> attributes, String accessToken) {
         String sub = asString(attributes.get(ATTR_SUB));
         String email = asString(attributes.get(ATTR_EMAIL));
-        String name = asString(attributes.get(ATTR_NAME));
+        String nickname = asString(attributes.get(ATTR_NICKNAME));
 
         if (sub == null || sub.isBlank()) {
-            throw oauth2Error("invalid_user_info", "Google userinfo 응답에 sub 가 없습니다.");
+            throw oauth2Error("invalid_user_info", "카카오 userinfo 응답에 sub 가 없습니다.");
         }
         if (email == null || email.isBlank()) {
-            throw oauth2Error("invalid_email", "Google scope 동의 거부 등으로 email 을 받지 못했습니다.");
+            throw oauth2Error("invalid_email", "카카오 account_email 동의를 받지 못했습니다.");
         }
 
-        return socialAccountRepository.findByProviderAndProviderUid(Provider.GOOGLE, sub)
+        return socialAccountRepository.findByProviderAndProviderUid(Provider.KAKAO, sub)
                 .map(existing -> {
-                    // Case A — 이미 같은 Google 계정으로 로그인한 사용자.
+                    // Case A — 이미 같은 카카오 계정으로 로그인한 사용자.
                     existing.updateAccessToken(accessToken);
                     existing.updateProviderEmail(email);
                     return existing.getUser();
                 })
                 .orElseGet(() -> userRepository.findByEmail(email)
                         .map(existingUser -> {
-                            // Case B — 같은 이메일로 표준 가입한 사용자. SocialAccount 만 추가.
+                            // Case B — 같은 이메일로 표준 가입(또는 Google) 한 사용자. SocialAccount 만 추가.
                             socialAccountRepository.save(
                                     SocialAccount.create(
-                                            existingUser, Provider.GOOGLE, sub, email, accessToken));
+                                            existingUser, Provider.KAKAO, sub, email, accessToken));
                             return existingUser;
                         })
                         .orElseGet(() -> {
                             // Case C — 신규 사용자. User + SocialAccount 동시 생성.
-                            String nickname = (name == null || name.isBlank())
+                            String resolvedNickname = (nickname == null || nickname.isBlank())
                                     ? localPartOf(email)
-                                    : name;
-                            User newUser = userRepository.save(User.fromOAuth2(email, nickname));
+                                    : nickname;
+                            User newUser = userRepository.save(User.fromOAuth2(email, resolvedNickname));
                             socialAccountRepository.save(
                                     SocialAccount.create(
-                                            newUser, Provider.GOOGLE, sub, email, accessToken));
+                                            newUser, Provider.KAKAO, sub, email, accessToken));
                             return newUser;
                         }));
     }

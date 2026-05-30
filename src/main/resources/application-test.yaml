@@ -22,6 +22,26 @@ spring:
               - openid
               - email
               - profile
+          kakao:
+            client-id: "test-kakao-client-id"
+            client-secret: "test-kakao-client-secret"
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/api/auth/oauth2/{registrationId}/callback"
+            scope:
+              - openid
+              - profile_nickname
+              - account_email
+            client-name: Kakao
+        provider:
+          # 테스트 부팅 시 카카오 OIDC discovery 네트워크 호출을 피하기 위해 issuer-uri 대신 명시 URI 를 둔다.
+          # 실제 호출은 어차피 테스트 흐름에서 발생하지 않으므로 host 자체는 prod 값을 그대로 둬도 무해.
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v1/oidc/userinfo
+            user-name-attribute: sub
+            jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
 
 app:
   jwt:
