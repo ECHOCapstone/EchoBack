@@ -49,8 +49,11 @@ public class AdminScriptService {
     public ScriptDetailResponse create(ScriptCreateRequest request) {
         Track track = trackRepository.findById(request.trackId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRACK_NOT_FOUND));
+        // 마지막 챕터 뒤에 붙인다 (1-based). 챕터 순서는 어드민이 손대지 않고 추가 순서를 따른다.
+        int nextOrder = Math.toIntExact(
+                scriptRepository.countByTrack_IdAndChapterOrderIsNotNull(track.getId())) + 1;
         Script script = scriptRepository.save(Script.createChapter(
-                track, request.chapterOrder(), request.title(), request.content(),
+                track, nextOrder, request.title(), request.content(),
                 request.difficulty(), request.practiceWord(), request.masteryBadgeName()));
         List<LearningStep> steps = replaceSteps(script, request.steps());
         return ScriptDetailResponse.of(script, steps);
@@ -60,7 +63,7 @@ public class AdminScriptService {
         Script script = scriptRepository.findById(scriptId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
         script.update(request.title(), request.content(), request.difficulty(),
-                request.chapterOrder(), request.practiceWord(), request.masteryBadgeName());
+                request.practiceWord(), request.masteryBadgeName());
         List<LearningStep> steps = replaceSteps(script, request.steps());
         return ScriptDetailResponse.of(script, steps);
     }
