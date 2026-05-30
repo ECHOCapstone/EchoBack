@@ -23,15 +23,11 @@ public record LlmRetryFeedback(
             @JsonProperty("guidanceKr") String guidanceKr,
             @JsonProperty("pronunciationGuide") PronunciationGuide pronunciationGuide,
             @JsonProperty("phonemeTips") List<PhonemeTip> phonemeTips) {
-        this.score = clamp(score);
+        this.score = LlmScores.clampScore(score);
         this.correct = correct;
         this.retryRecommended = retryRecommended;
         this.guidanceKr = guidanceKr == null ? "" : guidanceKr;
         this.pronunciationGuide = pronunciationGuide == null ? PronunciationGuide.empty() : pronunciationGuide;
         this.phonemeTips = phonemeTips == null ? List.of() : List.copyOf(phonemeTips);
-    }
-
-    private static int clamp(int v) {
-        return v < 0 ? 0 : (v > 100 ? 100 : v);
     }
 }

@@ -41,11 +41,7 @@ public class RankingService {
         this.demoRankingEntryRepository = demoRankingEntryRepository;
         this.userRepository = userRepository;
         this.statsZoneProvider = statsZoneProvider;
-        AppProperties.Gamification gamification = appProperties.gamification();
-        this.defaultUnitTitle =
-                (gamification == null || gamification.defaultRankingUnitTitle() == null)
-                        ? ""
-                        : gamification.defaultRankingUnitTitle();
+        this.defaultUnitTitle = appProperties.gamification().defaultRankingUnitTitle();
     }
 
     public RankingResponse today(Long userId) {

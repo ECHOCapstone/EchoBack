@@ -87,8 +87,8 @@ public class RecordingService {
         this.scoringPolicy = scoringPolicy;
         this.priorAttemptAssembler = priorAttemptAssembler;
         AppProperties.Gamification g = appProperties.gamification();
-        this.passThreshold = g == null ? 80.0 : g.passThreshold();
-        this.priorAttemptsCap = g == null ? 10 : Math.max(1, g.priorAttemptsCap());
+        this.passThreshold = g.passThreshold();
+        this.priorAttemptsCap = Math.max(1, g.priorAttemptsCap());
     }
 
     // 녹음 1건 업로드 흐름:

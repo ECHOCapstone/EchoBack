@@ -18,18 +18,17 @@ class DemoRankingEntryDataJpaTest {
     private DemoRankingEntryRepository repository;
 
     @Test
-    @DisplayName("findAllByOrderByAccuracyDesc 는 accuracy 내림차순으로 정렬된 시드 데이터를 반환")
-    void findAllOrderedByAccuracyDesc() {
-        List<DemoRankingEntry> entries = repository.findAllByOrderByAccuracyDesc();
+    @DisplayName("findAll 은 시드된 데모 랭킹 행을 유효한 값으로 반환한다")
+    void findAllReturnsSeededEntries() {
+        List<DemoRankingEntry> entries = repository.findAll();
 
         assertThat(entries).hasSizeBetween(5, 10);
-        assertThat(entries)
-                .extracting(DemoRankingEntry::getAccuracy)
-                .isSortedAccordingTo((a, b) -> Integer.compare(b, a));
         assertThat(entries).allSatisfy(entry -> {
             assertThat(entry.getNickname()).isNotBlank();
             assertThat(entry.getAccuracy()).isBetween(0, 100);
         });
-        assertThat(entries.get(0).getAccuracy()).isEqualTo(95);
+        assertThat(entries)
+                .extracting(DemoRankingEntry::getAccuracy)
+                .anyMatch(accuracy -> accuracy == 95);
     }
 }

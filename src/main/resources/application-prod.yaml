@@ -55,7 +55,3 @@ app:
     base-url: ${MODEL_SERVER_BASE_URL}
   storage:
     local-root: ${APP_STORAGE_LOCAL_ROOT:/var/echo/storage}
-  auth:
-    demo-google:
-      email: ${APP_AUTH_DEMO_GOOGLE_EMAIL}
-      nickname: ${APP_AUTH_DEMO_GOOGLE_NICKNAME}

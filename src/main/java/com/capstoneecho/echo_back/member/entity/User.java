@@ -27,7 +27,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
-    // 닉네임 컬럼 길이 (DB) 와 일치한다. 잘림 정책은 자르기 (truncate) 로 통일.
+    // DB 컬럼 길이의 단일 출처. 입력이 길면 자르기 (truncate) 로 통일한다.
+    private static final int USERNAME_MAX = 50;
+    private static final int EMAIL_MAX = 100;
     private static final int NICKNAME_MAX = 30;
 
     // Spring Security BCryptPasswordEncoder 결과 ($2a / $2b / $2y prefix, 53 chars suffix).
@@ -38,16 +40,16 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "username", nullable = false, length = 50)
+    @Column(name = "username", nullable = false, length = USERNAME_MAX)
     private String username;
 
-    @Column(name = "email", nullable = false, length = 100)
+    @Column(name = "email", nullable = false, length = EMAIL_MAX)
     private String email;
 
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
 
-    @Column(name = "nickname", nullable = false, length = 30)
+    @Column(name = "nickname", nullable = false, length = NICKNAME_MAX)
     private String nickname;
 
     @Column(name = "streak", nullable = false)
@@ -82,21 +84,23 @@ public class User {
         if (passwordHashBCrypt == null || !BCRYPT_PATTERN.matcher(passwordHashBCrypt).matches()) {
             throw new IllegalArgumentException("password must be a BCrypt hash");
         }
-        return new User(username, email, passwordHashBCrypt, truncateNickname(nickname));
+        return new User(username, email, passwordHashBCrypt, truncate(nickname, NICKNAME_MAX));
     }
 
     // OAuth2 경로. 비밀번호 해시는 null 로 남겨 BCrypt 검증을 우회한다 (소셜 로그인 전용).
+    // username 은 표준 로그인에 쓰지 않으므로 email 을 재사용하되 컬럼 길이에 맞춰 자른다.
     public static User fromOAuth2(String email, String nickname) {
         requireNonBlank(email, "email");
         requireNonBlank(nickname, "nickname");
-        return new User(email, email, null, truncateNickname(nickname));
+        return new User(
+                truncate(email, USERNAME_MAX), email, null, truncate(nickname, NICKNAME_MAX));
     }
 
     public void updateNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
             return;
         }
-        this.nickname = truncateNickname(nickname);
+        this.nickname = truncate(nickname, NICKNAME_MAX);
     }
 
     // 학습 완료 보상. 같은 KST 일자면 streak 유지, 어제면 +1 (상한 적용), 그 외엔 1 로 재시작.
@@ -137,7 +141,7 @@ public class User {
         }
     }
 
-    private static String truncateNickname(String s) {
-        return s.length() > NICKNAME_MAX ? s.substring(0, NICKNAME_MAX) : s;
+    private static String truncate(String s, int max) {
+        return s.length() > max ? s.substring(0, max) : s;
     }
 }

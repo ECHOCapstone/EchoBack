@@ -3,12 +3,10 @@ package com.capstoneecho.echo_back.member.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
@@ -27,13 +25,6 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private AppProperties appProperties;
-
-    private String demoEmail() {
-        return appProperties.auth().demoGoogle().email();
-    }
 
     @Test
     @DisplayName("POST /api/auth/signup → 201 + AuthTokenResponse 봉투 + REST Docs 스니펫")
@@ -193,27 +184,6 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                 .andDo(document("auth/post-check-email"));
 
         assertSnippetCreated("auth/post-check-email");
-    }
-
-    @Test
-    @DisplayName("GET /api/auth/oauth2/google/demo → 200 + AuthTokenResponse, 멱등 + REST Docs 스니펫")
-    void oauth2GoogleDemoIsIdempotent() throws Exception {
-        mockMvc.perform(get("/api/auth/oauth2/google/demo"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.data.expiresInSec").isNumber())
-                .andExpect(jsonPath("$.data.user.email").value(demoEmail()))
-                .andDo(document("auth/get-oauth2-google-demo"));
-
-        mockMvc.perform(get("/api/auth/oauth2/google/demo"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.user.email").value(demoEmail()));
-
-        assertSnippetCreated("auth/get-oauth2-google-demo");
-        assertThat(userRepository.findByEmail(demoEmail()))
-                .as("demo google account exists exactly once").isPresent();
     }
 
     private static void assertSnippetCreated(String snippetId) {

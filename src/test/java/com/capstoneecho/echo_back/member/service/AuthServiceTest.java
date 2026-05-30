@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
-import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.member.dto.AuthTokenResponse;
 import com.capstoneecho.echo_back.member.dto.AvailabilityResponse;
 import com.capstoneecho.echo_back.member.dto.LoginRequest;
@@ -33,17 +32,6 @@ class AuthServiceTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private AppProperties appProperties;
-
-    private String demoEmail() {
-        return appProperties.auth().demoGoogle().email();
-    }
-
-    private String demoNickname() {
-        return appProperties.auth().demoGoogle().nickname();
-    }
 
     @Test
     @DisplayName("signup 은 JWT 를 발급하고 비밀번호를 BCrypt 해시로만 저장한다")
@@ -177,51 +165,5 @@ class AuthServiceTest {
 
         assertThat(taken.available()).isFalse();
         assertThat(free.available()).isTrue();
-    }
-
-    @Test
-    @DisplayName("loginWithGoogleDemo 는 신규 데모 이메일이면 사용자를 한 번만 생성하고 JWT 를 발급한다")
-    void loginWithGoogleDemoCreatesUserOnce() {
-        AuthTokenResponse first = authService.loginWithGoogleDemo();
-        AuthTokenResponse second = authService.loginWithGoogleDemo();
-
-        assertThat(first.accessToken()).isNotBlank();
-        assertThat(second.accessToken()).isNotBlank();
-        assertThat(first.tokenType()).isEqualTo("Bearer");
-        assertThat(first.user().email()).isEqualTo(demoEmail());
-        assertThat(second.user().email()).isEqualTo(demoEmail());
-        assertThat(first.user().id()).isEqualTo(second.user().id());
-
-        long demoRowCount = userRepository.findAll().stream()
-                .filter(u -> demoEmail().equals(u.getEmail()))
-                .count();
-        assertThat(demoRowCount).isEqualTo(1L);
-
-        User saved = userRepository.findByEmail(demoEmail()).orElseThrow();
-        assertThat(saved.getPasswordHash()).isNull();
-        assertThat(saved.getNickname()).isEqualTo(demoNickname());
-    }
-
-    @Test
-    @DisplayName("loginWithGoogleDemo 는 동일 이메일의 기존 표준 가입자를 머지하고 동일 row 로 JWT 를 발급한다")
-    void loginWithGoogleDemoMergesExistingEmail() {
-        AuthTokenResponse standard = authService.signup(
-                new SignupRequest("existing", demoEmail(), "Password!1", "Existing"));
-        Long existingId = standard.user().id();
-
-        AuthTokenResponse demo = authService.loginWithGoogleDemo();
-
-        assertThat(demo.accessToken()).isNotBlank();
-        assertThat(demo.user().id()).isEqualTo(existingId);
-        assertThat(demo.user().email()).isEqualTo(demoEmail());
-
-        long demoRowCount = userRepository.findAll().stream()
-                .filter(u -> demoEmail().equals(u.getEmail()))
-                .count();
-        assertThat(demoRowCount).isEqualTo(1L);
-
-        User merged = userRepository.findById(existingId).orElseThrow();
-        assertThat(merged.getUsername()).isEqualTo("existing");
-        assertThat(merged.getPasswordHash()).isNotNull();
     }
 }

@@ -54,9 +54,6 @@ app:
     provider: local-stub
   storage:
     local-root: build/test-storage
-  auth:
-    demo-google:
-      email: "demo.google@echo.test"
   oauth2:
     frontend-redirect-uri: "http://localhost:3000/oauth/callback"
     frontend-error-uri: "http://localhost:3000/login"

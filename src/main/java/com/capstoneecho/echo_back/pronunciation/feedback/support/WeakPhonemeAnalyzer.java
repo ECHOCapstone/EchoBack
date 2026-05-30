@@ -7,10 +7,18 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
+// 여러 시도의 음소 오류를 모아 가장 자주 틀린 canonical 음소 하나를 고른다.
 @Component
 public class WeakPhonemeAnalyzer {
 
-    public String topOne(Collection<? extends Collection<AnalyzeError>> errorBatches) {
+    public String topOneFromErrors(List<AnalyzeError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        return topOne(List.of(errors));
+    }
+
+    private String topOne(Collection<? extends Collection<AnalyzeError>> errorBatches) {
         if (errorBatches == null || errorBatches.isEmpty()) {
             return null;
         }
@@ -36,12 +44,5 @@ public class WeakPhonemeAnalyzer {
             }
         }
         return top;
-    }
-
-    public String topOneFromErrors(List<AnalyzeError> errors) {
-        if (errors == null || errors.isEmpty()) {
-            return null;
-        }
-        return topOne(List.of(errors));
     }
 }

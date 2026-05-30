@@ -49,8 +49,8 @@ public class StatsService {
         this.badgePolicy = badgePolicy;
         this.statsZoneProvider = statsZoneProvider;
         AppProperties.Gamification g = appProperties.gamification();
-        this.weeklyTopN = g == null ? 5 : g.weeklyTopN();
-        this.weeklyWindowDays = g == null ? 7 : g.weeklyWindowDays();
+        this.weeklyTopN = g.weeklyTopN();
+        this.weeklyWindowDays = g.weeklyWindowDays();
     }
 
     public StatsResponse getMyStats(Long userId, Integer year, Integer month) {

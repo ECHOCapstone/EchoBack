@@ -21,14 +21,10 @@ public record LlmComprehensiveFeedback(
             @JsonProperty("strengths") List<String> strengths,
             @JsonProperty("weaknesses") List<String> weaknesses,
             @JsonProperty("nextPracticeItems") List<PracticeItem> nextPracticeItems) {
-        this.overallScore = clamp(overallScore);
+        this.overallScore = LlmScores.clampScore(overallScore);
         this.summaryKr = summaryKr == null ? "" : summaryKr;
         this.strengths = strengths == null ? List.of() : List.copyOf(strengths);
         this.weaknesses = weaknesses == null ? List.of() : List.copyOf(weaknesses);
         this.nextPracticeItems = nextPracticeItems == null ? List.of() : List.copyOf(nextPracticeItems);
-    }
-
-    private static int clamp(int v) {
-        return v < 0 ? 0 : (v > 100 ? 100 : v);
     }
 }

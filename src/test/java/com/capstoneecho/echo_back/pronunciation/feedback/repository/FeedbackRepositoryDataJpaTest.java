@@ -102,29 +102,4 @@ class FeedbackRepositoryDataJpaTest {
         assertThat(found.get().getTitle()).isEqualTo("T3");
         assertThat(denied).isEmpty();
     }
-
-    @Test
-    @DisplayName("findAllByUser_IdOrderByCompletedAtDesc 는 completedAt DESC 순으로 정렬된다")
-    void findAllByUserOrderedByCompletedAtDesc() {
-        User user = persistUser("u@example.com");
-        Script script = persistScript("S4");
-
-        PronunciationFeedback older = feedbackRepository.saveAndFlush(
-                PronunciationFeedback.forScript(user, script, "Older", 80.0, null, null, null));
-        PronunciationFeedback newer = feedbackRepository.saveAndFlush(
-                PronunciationFeedback.forScript(user, script, "Newer", 85.0, null, null, null));
-
-        feedbackRepository.markCompletedAtomically(
-                older.getId(), user.getId(), Instant.parse("2026-05-10T00:00:00Z"));
-        feedbackRepository.markCompletedAtomically(
-                newer.getId(), user.getId(), Instant.parse("2026-05-11T00:00:00Z"));
-        em.flush();
-        em.clear();
-
-        List<PronunciationFeedback> rows =
-                feedbackRepository.findAllByUser_IdOrderByCompletedAtDesc(user.getId());
-
-        assertThat(rows).extracting(PronunciationFeedback::getId)
-                .containsExactly(newer.getId(), older.getId());
-    }
 }

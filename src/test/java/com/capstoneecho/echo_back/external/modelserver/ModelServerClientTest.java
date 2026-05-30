@@ -67,7 +67,6 @@ class ModelServerClientTest {
                 null,
                 null,
                 null,
-                null,
                 null
         );
         return new ModelServerClient(restClient, props);

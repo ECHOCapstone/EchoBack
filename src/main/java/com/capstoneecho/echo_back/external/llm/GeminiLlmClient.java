@@ -138,10 +138,9 @@ public class GeminiLlmClient implements LlmClient {
             }
             return objectMapper.readValue(json, type);
         } catch (RuntimeException ex) {
-            log.warn("Gemini call failed: {}", ex.getMessage());
-            return null;
-        } catch (Exception ex) {
-            log.warn("Gemini JSON parse failed: {}", ex.getMessage());
+            // HTTP 호출 실패와 JSON 파싱 실패 모두 unchecked 라 한곳에서 잡는다.
+            // 호출 측은 null 을 받아 규칙 기반 폴백으로 떨어진다. 원인 추적을 위해 throwable 을 함께 남긴다.
+            log.warn("Gemini 호출/파싱 실패 — 규칙 기반 폴백 사용", ex);
             return null;
         }
     }

@@ -36,8 +36,7 @@ public class ScriptService {
         this.learningStepRepository = learningStepRepository;
         this.recommendedScriptSelector = recommendedScriptSelector;
         this.statsZoneProvider = statsZoneProvider;
-        AppProperties.Gamification g = appProperties.gamification();
-        this.dailyRecommendedCount = g == null ? 3 : g.dailyRecommended();
+        this.dailyRecommendedCount = appProperties.gamification().dailyRecommended();
     }
 
     public ScriptDetailResponse getScript(Long scriptId) {
