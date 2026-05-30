@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.pronunciation.recording.service;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
+import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
@@ -125,10 +126,10 @@ public class RecordingService {
 
         Recording recording = buildRecording(mode, parents, audioPath, targetText);
         recording.applyAnalysisSnapshot(
-                joinTokens(analyze.perceived()),
-                joinTokens(analyze.canonicalOrEmpty()),
-                joinDoubles(analyze.peakSoftmax()));
-        recording.applyErrorsJson(serializeErrors(analyze.errors()));
+                AnalysisSnapshotFormat.joinTokens(analyze.perceived()),
+                AnalysisSnapshotFormat.joinTokens(analyze.canonicalOrEmpty()),
+                AnalysisSnapshotFormat.joinSoftmax(analyze.peakSoftmax()));
+        recording.applyErrorsJson(priorAttemptAssembler.toErrorsJson(analyze.errors()));
         recording.applyWrongWordsJson(serializeWrongWords(feedback));
         recording.applyStepScore(stepScore);
         recording.applyGuidanceKr(feedback.guidanceKr());
@@ -201,44 +202,12 @@ public class RecordingService {
         return null;
     }
 
+    // wrongWords 직렬화 실패는 데이터 손상을 뜻하므로 삼키지 않고 그대로 전파한다.
     private String serializeWrongWords(LlmStepFeedback feedback) {
         if (feedback.wrongWords().isEmpty()) {
             return null;
         }
-        try {
-            return objectMapper.writeValueAsString(feedback.wrongWords());
-        } catch (RuntimeException ex) {
-            log.warn("Failed to serialize wrongWords; persisting NULL", ex);
-            return null;
-        }
-    }
-
-    private String serializeErrors(List<AnalyzeError> errors) {
-        if (errors == null || errors.isEmpty()) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(errors);
-        } catch (RuntimeException ex) {
-            log.warn("Failed to serialize analyze errors; persisting NULL", ex);
-            return null;
-        }
-    }
-
-    private static String joinTokens(List<String> tokens) {
-        if (tokens == null || tokens.isEmpty()) return null;
-        return String.join(" ", tokens);
-    }
-
-    private static String joinDoubles(List<Double> values) {
-        if (values == null || values.isEmpty()) return null;
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) sb.append(' ');
-            Double v = values.get(i);
-            sb.append(v == null ? "0" : v.toString());
-        }
-        return sb.toString();
+        return objectMapper.writeValueAsString(feedback.wrongWords());
     }
 
     // 트랜잭션이 롤백되면 방금 저장한 오디오 파일이 orphan 으로 남는 것을 막는다.

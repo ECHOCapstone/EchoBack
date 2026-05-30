@@ -6,6 +6,7 @@ import com.capstoneecho.echo_back.external.llm.LlmComprehensiveFeedback;
 import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
 import com.capstoneecho.echo_back.external.llm.PracticeItem;
+import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
@@ -42,8 +43,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -53,8 +52,6 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @Transactional
 public class FeedbackService {
-
-    private static final Logger log = LoggerFactory.getLogger(FeedbackService.class);
 
     private final UserRepository userRepository;
     private final ScriptRepository scriptRepository;
@@ -255,34 +252,16 @@ public class FeedbackService {
             AnalyzeResult analyze,
             double score,
             LlmRetryFeedback llm) {
-        String errorsJson = serializeErrors(analyze.errors());
         RetryAttempt attempt = RetryAttempt.create(
                 feedback,
                 word,
-                joinTokens(perceived),
-                joinTokens(canonical),
-                errorsJson,
+                AnalysisSnapshotFormat.joinTokens(perceived),
+                AnalysisSnapshotFormat.joinTokens(canonical),
+                priorAttemptAssembler.toErrorsJson(analyze.errors()),
                 score,
                 llm.guidanceKr(),
                 llm.correct());
         retryAttemptRepository.save(attempt);
-    }
-
-    private String serializeErrors(List<AnalyzeError> errors) {
-        if (errors == null || errors.isEmpty()) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(errors);
-        } catch (RuntimeException ex) {
-            log.warn("Failed to serialize retry errors; storing NULL", ex);
-            return null;
-        }
-    }
-
-    private static String joinTokens(List<String> tokens) {
-        if (tokens == null || tokens.isEmpty()) return null;
-        return String.join(" ", tokens);
     }
 
     @Transactional(readOnly = true)
@@ -361,16 +340,13 @@ public class FeedbackService {
         return llmClient.comprehensiveFeedback(context);
     }
 
+    // 직렬화 실패는 데이터 손상을 뜻하므로 삼키지 않고 전파해 생성 트랜잭션을 실패시킨다.
     private void applyComprehensive(PronunciationFeedback feedback, LlmComprehensiveFeedback llm) {
-        try {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("strengths", llm.strengths());
-            payload.put("weaknesses", llm.weaknesses());
-            payload.put("nextPracticeItems", llm.nextPracticeItems());
-            feedback.applyComprehensiveJson(objectMapper.writeValueAsString(payload));
-        } catch (RuntimeException ex) {
-            log.warn("Failed to serialize comprehensive feedback; storing NULL", ex);
-        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("strengths", llm.strengths());
+        payload.put("weaknesses", llm.weaknesses());
+        payload.put("nextPracticeItems", llm.nextPracticeItems());
+        feedback.applyComprehensiveJson(objectMapper.writeValueAsString(payload));
     }
 
     // 챕터에 미리 박힌 단어 → LLM 추천 첫 항목 → 외부화된 폴백 단어 순.

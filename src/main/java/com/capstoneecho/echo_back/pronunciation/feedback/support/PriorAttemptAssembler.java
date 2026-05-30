@@ -66,4 +66,13 @@ public class PriorAttemptAssembler {
             return List.of();
         }
     }
+
+    // AnalyzeError 목록을 errors_json 컬럼 문자열로 직렬화한다. 비어 있으면 컬럼을 비우도록 null 을 돌린다.
+    // 직렬화 실패는 데이터 손상을 뜻하므로 삼키지 않고 그대로 전파해 호출 트랜잭션을 실패시킨다.
+    public String toErrorsJson(List<AnalyzeError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        return objectMapper.writeValueAsString(errors);
+    }
 }

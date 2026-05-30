@@ -56,15 +56,15 @@ public class RankingService {
 
         List<PronunciationFeedback> todays = feedbackRepository.findCompletedInRange(start, end);
 
-        Map<Long, BestForUser> bestByUser = new HashMap<>();
+        Map<Long, Ranked> bestByUser = new HashMap<>();
         String unitTitle = defaultUnitTitle;
         Instant latestForUnit = null;
         for (PronunciationFeedback f : todays) {
             Long fbUserId = f.getUser().getId();
             double acc = f.getAccuracy();
-            BestForUser existing = bestByUser.get(fbUserId);
+            Ranked existing = bestByUser.get(fbUserId);
             if (existing == null || acc > existing.accuracy()) {
-                bestByUser.put(fbUserId, new BestForUser(
+                bestByUser.put(fbUserId, new Ranked(
                         f.getUser().getNickname(), acc, fbUserId.equals(userId)));
             }
             if (latestForUnit == null
@@ -77,21 +77,18 @@ public class RankingService {
             }
         }
 
-        List<RankingRow> rows = new ArrayList<>();
-        for (BestForUser b : bestByUser.values()) {
-            rows.add(new RankingRow(b.nickname(), b.accuracy(), b.isMe()));
-        }
+        List<Ranked> rows = new ArrayList<>(bestByUser.values());
         for (DemoRankingEntry seed : demoRankingEntryRepository.findAll()) {
-            rows.add(new RankingRow(seed.getNickname(), (double) seed.getAccuracy(), false));
+            rows.add(new Ranked(seed.getNickname(), seed.getAccuracy(), false));
         }
 
-        rows.sort(Comparator.comparingDouble(RankingRow::accuracy).reversed());
+        rows.sort(Comparator.comparingDouble(Ranked::accuracy).reversed());
 
         List<RankingResponse.Entry> entries = new ArrayList<>(rows.size());
         int myRank = 0;
         double myAccuracy = 0.0;
         for (int i = 0; i < rows.size(); i++) {
-            RankingRow r = rows.get(i);
+            Ranked r = rows.get(i);
             int rank = i + 1;
             entries.add(new RankingResponse.Entry(rank, r.nickname(), r.accuracy(), r.isMe()));
             if (r.isMe()) {
@@ -116,7 +113,6 @@ public class RankingService {
         return null;
     }
 
-    private record BestForUser(String nickname, double accuracy, boolean isMe) {}
-
-    private record RankingRow(String nickname, double accuracy, boolean isMe) {}
+    // 랭킹 한 줄 — 사용자 최고 정확도 또는 데모 시드 한 건. isMe 로 요청자 본인을 표시한다.
+    private record Ranked(String nickname, double accuracy, boolean isMe) {}
 }
