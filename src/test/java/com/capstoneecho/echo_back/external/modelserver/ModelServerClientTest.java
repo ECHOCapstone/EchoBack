@@ -2,13 +2,17 @@ package com.capstoneecho.echo_back.external.modelserver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.SettingsService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -30,6 +34,7 @@ class ModelServerClientTest {
 
     private HttpServer server;
     private String baseUrl;
+    private SettingsService settings;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -37,6 +42,9 @@ class ModelServerClientTest {
         server.start();
         int port = server.getAddress().getPort();
         baseUrl = "http://127.0.0.1:" + port;
+        // 기본: 선택된 모델 없음 → analyze 가 model 파라미터를 붙이지 않는다.
+        settings = mock(SettingsService.class);
+        when(settings.getOrDefault(ModelServerSettingKeys.MODEL, "")).thenReturn("");
     }
 
     @AfterEach
@@ -70,7 +78,7 @@ class ModelServerClientTest {
                 null,
                 null
         );
-        return new ModelServerClient(restClient, props);
+        return new ModelServerClient(restClient, props, settings);
     }
 
     private static void respondJson(HttpExchange exchange, int status, String json) throws IOException {
@@ -169,9 +177,47 @@ class ModelServerClientTest {
 
         assertThat(capturedBody.get()).contains("name=\"audio\"");
         assertThat(capturedBody.get()).doesNotContain("name=\"canonical\"");
+        assertThat(capturedBody.get()).doesNotContain("name=\"model\"");
         assertThat(result.canonical()).isNull();
         assertThat(result.per()).isNull();
         assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("analyze sends selected model id as a 'model' form part")
+    void analyzeSendsSelectedModel() {
+        when(settings.getOrDefault(ModelServerSettingKeys.MODEL, "")).thenReturn("echo-wav2vec2-film");
+        AtomicReference<String> capturedBody = new AtomicReference<>();
+        server.createContext("/analyze", exchange -> {
+            capturedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            respondJson(exchange, 200,
+                    "{\"perceived\":[\"HH\"],\"canonical\":null,\"peakSoftmax\":[],"
+                            + "\"alignment\":[],\"errors\":[],\"per\":null,\"durationSec\":0.5}");
+        });
+
+        ModelServerClient client = newClient(5000);
+        client.analyze(new byte[]{1, 2}, "");
+
+        assertThat(capturedBody.get()).contains("name=\"model\"");
+        assertThat(capturedBody.get()).contains("echo-wav2vec2-film");
+    }
+
+    @Test
+    @DisplayName("models maps /models JSON to ModelCatalog")
+    void modelsMapsCatalog() {
+        server.createContext("/models", exchange ->
+                respondJson(exchange, 200,
+                        "{\"active\":\"echo-baseline\",\"models\":["
+                                + "{\"id\":\"echo-baseline\",\"label\":\"ECHO\",\"type\":\"echo\"},"
+                                + "{\"id\":\"slplab\",\"label\":\"slplab\",\"type\":\"slplab\"}]}"));
+
+        ModelServerClient client = newClient(5000);
+        ModelCatalog catalog = client.models();
+
+        assertThat(catalog.active()).isEqualTo("echo-baseline");
+        assertThat(catalog.safeModels()).hasSize(2);
+        assertThat(catalog.safeModels().get(0).id()).isEqualTo("echo-baseline");
+        assertThat(catalog.safeModels().get(1).type()).isEqualTo("slplab");
     }
 
     @Test
