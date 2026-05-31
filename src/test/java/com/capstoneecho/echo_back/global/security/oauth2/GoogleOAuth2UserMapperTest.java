@@ -14,6 +14,7 @@ import com.capstoneecho.echo_back.member.entity.SocialAccount;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.member.service.AdminBootstrap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,11 +35,14 @@ class GoogleOAuth2UserMapperTest {
     @Mock
     private SocialAccountRepository socialAccountRepository;
 
+    @Mock
+    private AdminBootstrap adminBootstrap;
+
     private GoogleOAuth2UserMapper mapper;
 
     @BeforeEach
     void setUp() {
-        mapper = new GoogleOAuth2UserMapper(userRepository, socialAccountRepository);
+        mapper = new GoogleOAuth2UserMapper(userRepository, socialAccountRepository, adminBootstrap);
     }
 
     private static Map<String, Object> googleAttrs(String sub, String email, String name) {
