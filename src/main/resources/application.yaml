@@ -88,6 +88,11 @@ app:
         - gemini-2.0-flash
   storage:
     local-root: build/local-storage
+  content:
+    # 어드민이 편집하는 콘텐츠(프롬프트 편집본)가 저장되는 쓰기 가능 디렉터리.
+    # classpath:content/ 는 git 으로 관리되는 공장 기본값이고, 편집본은 여기에 파일로 쌓여
+    # 재시작 후에도 유지된다. reset 은 이 파일을 지워 기본값으로 되돌린다.
+    dir: ${APP_CONTENT_DIR:data/content}
   tts:
     # local-stub (외부 호출 없음, 더미 mp3) | model-server (gTTS 진짜 음성을 모델 서버에서 합성)
     provider: ${APP_TTS_PROVIDER:model-server}

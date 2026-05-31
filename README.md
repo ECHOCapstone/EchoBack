@@ -32,7 +32,10 @@ SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
 SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
 
-기본 포트 **8080**. 부팅 시 시드 데이터(`tracks.json` 등)가 비어 있으면 자동 주입된다.
+기본 포트 **8080**. 사람이 만지는 콘텐츠는 `src/main/resources/content/` 한 곳에 모았다
+(`tracks.yaml` 시드 + `prompts/*.md`). 부팅 시 tracks 테이블이 비어 있으면 `tracks.yaml` 이 자동 주입된다.
+어드민에서 프롬프트를 편집하면 `app.content.dir`(기본 `data/`) 아래에 편집본 파일이 쌓여 재시작 후에도 유지되고,
+초기화(reset) 하면 그 파일을 지워 classpath 기본값으로 돌아간다.
 
 ## 환경 변수
 

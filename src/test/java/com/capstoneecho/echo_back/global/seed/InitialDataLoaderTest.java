@@ -54,12 +54,12 @@ class InitialDataLoaderTest {
                 scriptRepository,
                 learningStepRepository,
                 objectMapper,
-                new ClassPathResource("seed/test-tracks.json")
+                new ClassPathResource("content/test-tracks.yaml")
         );
     }
 
     @Test
-    @DisplayName("비어 있는 DB 에서 실행하면 tracks.json 의 3개 트랙이 모두 시드된다")
+    @DisplayName("비어 있는 DB 에서 실행하면 tracks.yaml 의 3개 트랙이 모두 시드된다")
     void run_emptyDb_seedsAllTracks() {
         loader.run(null);
 
@@ -97,7 +97,7 @@ class InitialDataLoaderTest {
     }
 
     @Test
-    @DisplayName("스텝은 JSON 의 orderIndex 순서로 저장되고 INTRO/RECORD 가 올바르게 매핑된다")
+    @DisplayName("스텝은 yaml 의 orderIndex 순서로 저장되고 INTRO/RECORD 가 올바르게 매핑된다")
     void run_steps_orderedAndMappedByKind() {
         loader.run(null);
 

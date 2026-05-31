@@ -43,3 +43,6 @@ CLAUDE.local.md
 .env
 .env.local
 *.env.local
+
+### 런타임 편집 데이터 (app.content.dir — 어드민 프롬프트 편집본) ###
+/data/

@@ -19,9 +19,10 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.yaml.snakeyaml.Yaml;
 import tools.jackson.databind.ObjectMapper;
 
-// 부팅 시 tracks 테이블이 비어 있으면 classpath:seed/tracks.json 을 읽어
+// 부팅 시 tracks 테이블이 비어 있으면 classpath:content/tracks.yaml 을 읽어
 // Track → Script(chapter) → LearningStep 순으로 한 번만 채워 넣는다.
 // 이미 데이터가 있으면 그대로 둔다 (멱등).
 @Component
@@ -39,7 +40,7 @@ public class InitialDataLoader implements ApplicationRunner {
             ScriptRepository scriptRepository,
             LearningStepRepository learningStepRepository,
             ObjectMapper objectMapper,
-            @Value("classpath:seed/tracks.json") Resource tracksResource
+            @Value("classpath:content/tracks.yaml") Resource tracksResource
     ) {
         this.trackRepository = trackRepository;
         this.scriptRepository = scriptRepository;
@@ -59,7 +60,7 @@ public class InitialDataLoader implements ApplicationRunner {
         if (trackRepository.count() > 0) {
             return;
         }
-        SeedData.TracksFile file = readJson(tracksResource, SeedData.TracksFile.class);
+        SeedData.TracksFile file = readYaml(tracksResource, SeedData.TracksFile.class);
         for (SeedData.Track trackData : file.tracks()) {
             persistTrack(trackData);
         }
@@ -83,7 +84,7 @@ public class InitialDataLoader implements ApplicationRunner {
                     chapterData.masteryBadgeName()
             ));
             // LearningStep 엔티티에는 orderIndex 컬럼이 없으므로,
-            // JSON 의 orderIndex 로 정렬한 뒤 삽입 순서대로 저장한다.
+            // yaml 의 orderIndex 로 정렬한 뒤 삽입 순서대로 저장한다.
             // findByScript_IdOrderByIdAsc 가 id 순으로 읽어가므로 의도한 순서가 유지된다.
             List<SeedData.Step> sortedSteps = new ArrayList<>(chapterData.steps());
             sortedSteps.sort(Comparator.comparingInt(SeedData.Step::orderIndex));
@@ -103,10 +104,13 @@ public class InitialDataLoader implements ApplicationRunner {
         };
     }
 
+    // SnakeYAML 로 yaml 을 Map 트리로 읽은 뒤 ObjectMapper 로 레코드에 매핑한다.
+    // (Spring 이 이미 의존하는 SnakeYAML 을 재사용 — 별도 jackson-yaml 의존성 불필요.)
     // 시드 파일이 없거나 파싱 실패면 잘못된 상태로 띄우는 것보다 부팅을 막는 편이 안전하다.
-    private <T> T readJson(Resource resource, Class<T> type) {
+    private <T> T readYaml(Resource resource, Class<T> type) {
         try (var in = resource.getInputStream()) {
-            return objectMapper.readValue(in, type);
+            Object tree = new Yaml().load(in);
+            return objectMapper.convertValue(tree, type);
         } catch (IOException e) {
             throw new IllegalStateException(
                     "시드 파일을 읽을 수 없습니다: " + resource.getDescription(), e);
