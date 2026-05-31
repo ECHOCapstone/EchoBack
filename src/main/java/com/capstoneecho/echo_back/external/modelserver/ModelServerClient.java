@@ -3,10 +3,12 @@ package com.capstoneecho.echo_back.external.modelserver;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
+import com.capstoneecho.echo_back.global.settings.SettingsService;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
@@ -27,10 +29,13 @@ public class ModelServerClient {
 
     private final RestClient restClient;
     private final AppProperties appProperties;
+    private final SettingsService settings;
 
-    public ModelServerClient(RestClient restClient, AppProperties appProperties) {
+    public ModelServerClient(
+            RestClient restClient, AppProperties appProperties, SettingsService settings) {
         this.restClient = restClient;
         this.appProperties = appProperties;
+        this.settings = settings;
     }
 
     public G2pResult g2p(String text) {
@@ -45,8 +50,25 @@ public class ModelServerClient {
         if (canonicalArpabetSpaceSep != null && !canonicalArpabetSpaceSep.isBlank()) {
             body.add("canonical", textPart("canonical", canonicalArpabetSpaceSep));
         }
+        // 어드민이 고른 음소인식 모델 id 를 함께 보낸다. 비어 있으면 모델 서버 기본 모델을 쓴다.
+        String model = settings.getOrDefault(ModelServerSettingKeys.MODEL, "");
+        if (!model.isBlank()) {
+            body.add("model", textPart("model", model));
+        }
         AnalyzeWire wire = execute("/analyze", body, AnalyzeWire.class);
         return toResult(wire);
+    }
+
+    // 선택 가능한 음소인식 모델 후보 + 활성 모델 (모델 서버 /models).
+    public ModelCatalog models() {
+        String url = appProperties.modelServer().baseUrl() + "/models";
+        try {
+            return restClient.get().uri(url).retrieve().body(ModelCatalog.class);
+        } catch (ResourceAccessException ex) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+        } catch (RestClientResponseException ex) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+        }
     }
 
     private static HttpEntity<String> textPart(String name, String value) {
