@@ -112,6 +112,16 @@ public class User {
                 truncate(email, USERNAME_MAX), email, null, truncate(nickname, NICKNAME_MAX));
     }
 
+    // OAuth2 가입 폼 완료 — 사용자가 직접 입력한 username / nickname 으로 생성한다.
+    // 이메일은 provider 가 검증한 값을 그대로 신뢰하고, 비밀번호는 없다 (소셜 로그인 전용).
+    public static User fromOAuth2Signup(String username, String email, String nickname) {
+        requireNonBlank(username, "username");
+        requireNonBlank(email, "email");
+        requireNonBlank(nickname, "nickname");
+        return new User(
+                truncate(username, USERNAME_MAX), email, null, truncate(nickname, NICKNAME_MAX));
+    }
+
     public void updateNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
             return;

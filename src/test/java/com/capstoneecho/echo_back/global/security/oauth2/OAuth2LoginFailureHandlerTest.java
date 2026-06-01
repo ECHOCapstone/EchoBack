@@ -21,11 +21,16 @@ class OAuth2LoginFailureHandlerTest {
     @BeforeEach
     void setUp() {
         AppProperties props = new AppProperties(
-                null, null, null, null, null, null, null, null, null,
-                new AppProperties.OAuth2("http://localhost:3000/oauth/callback", ERROR_URI),
+                new AppProperties.Jwt("test-secret-secret-secret-secret-secret", 3_600_000L),
+                null, null, null, null, null, null, null, null,
+                new AppProperties.OAuth2(
+                        "http://localhost:3000/oauth/callback",
+                        ERROR_URI,
+                        "http://localhost:3000/signup"),
                 null
         );
-        handler = new OAuth2LoginFailureHandler(props);
+        PendingOAuthTokenService pendingTokenService = new PendingOAuthTokenService(props);
+        handler = new OAuth2LoginFailureHandler(props, pendingTokenService);
     }
 
     @Test

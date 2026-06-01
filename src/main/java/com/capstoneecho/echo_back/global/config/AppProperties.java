@@ -70,9 +70,15 @@ public record AppProperties(
         public record Badge(String id, String name, String condition, int threshold) {}
     }
 
-    // 실제 Google OAuth2 로그인 성공 / 실패 후 브라우저를 보낼 프론트엔드 URL.
-    // 토큰은 frontendRedirectUri 뒤에 URL fragment (#token=...&expiresIn=...) 로 붙는다.
-    public record OAuth2(String frontendRedirectUri, String frontendErrorUri) {}
+    // 실제 OAuth2 로그인 결과에 따라 브라우저를 보낼 프론트엔드 URL 들.
+    //   frontendRedirectUri: 정식 로그인 성공 시 — fragment (#token=...&expiresIn=...) 로 JWT 전달
+    //   frontendErrorUri:    실패 시 — ?oauthError=<code> 쿼리 부착
+    //   frontendSignupUri:   신규 사용자 가입 폼으로 안내할 때 — fragment 에 pendingToken + email + nicknameHint + provider 부착
+    public record OAuth2(
+            String frontendRedirectUri,
+            String frontendErrorUri,
+            String frontendSignupUri
+    ) {}
 
     // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우, 통과 점수 등).
     // passThreshold 는 step 통과 여부를 판정하는 0~100 점수 임계. 기본 80.

@@ -112,6 +112,8 @@ app:
     frontend-redirect-uri: ${APP_OAUTH2_FRONTEND_REDIRECT_URI:http://localhost:3000/oauth/callback}
     # 실패 시 프론트엔드 로그인 페이지로 redirect. ?oauthError=<code> 쿼리가 붙는다.
     frontend-error-uri: ${APP_OAUTH2_FRONTEND_ERROR_URI:http://localhost:3000/login}
+    # 신규 사용자를 가입 폼으로 안내할 URL. fragment 로 #pendingToken=...&email=...&nicknameHint=...&provider=... 가 붙는다.
+    frontend-signup-uri: ${APP_OAUTH2_FRONTEND_SIGNUP_URI:http://localhost:5173/signup}
   gamification:
     completion-exp: 10
     streak-cap: 7
