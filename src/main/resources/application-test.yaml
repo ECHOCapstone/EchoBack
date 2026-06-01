@@ -63,3 +63,4 @@ app:
   oauth2:
     frontend-redirect-uri: "http://localhost:3000/oauth/callback"
     frontend-error-uri: "http://localhost:3000/login"
+    frontend-signup-uri: "http://localhost:3000/signup"

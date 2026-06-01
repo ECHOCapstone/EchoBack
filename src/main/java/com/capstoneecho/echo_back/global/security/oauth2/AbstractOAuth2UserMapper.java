@@ -15,7 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 // 하위 클래스는 provider 식별자와 표시명 attribute 추출만 제공한다.
 //   A) (provider, sub) SocialAccount 존재 → access_token / provider_email 갱신 후 기존 User 반환
 //   B) email 로 기존 User 존재 → 새 SocialAccount 연결 (표준 로그인 + 소셜 로그인 방식 확장)
-//   C) 둘 다 없음 → User.fromOAuth2 + SocialAccount 신규 생성
+//   C) 둘 다 없음 → PendingSignupException — 사용자가 가입 폼에서 아이디·약관을 직접 채우게 안내한다.
+//                    이메일 / nicknameHint / providerUid 를 예외에 담아 FailureHandler 가 pending 토큰으로 묶는다.
 //   D) sub / email 누락 → OAuth2AuthenticationException
 public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
 
@@ -69,14 +70,9 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
                                     existingUser, provider(), sub, email, accessToken));
                             return existingUser;
                         })
-                        .orElseGet(() -> {
-                            // Case C — 신규 사용자. User + SocialAccount 동시 생성.
-                            User newUser = userRepository.save(
-                                    User.fromOAuth2(email, resolveNickname(attributes, email)));
-                            socialAccountRepository.save(SocialAccount.create(
-                                    newUser, provider(), sub, email, accessToken));
-                            return newUser;
-                        }));
+                        .orElseThrow(() -> new PendingSignupException(
+                                // Case C — 신규 사용자. 자동 가입을 막고 가입 폼으로 안내한다.
+                                provider(), sub, email, extractDisplayName(attributes))));
 
         // 부트스트랩 관리자 계정이면 이 트랜잭션 안에서 승격한다. 인메모리 DB 처럼 부팅 시점에
         // 계정이 없던 경우, 자동 회원가입이 일어나는 로그인 시점에 바로 ADMIN 권한이 반영된다.

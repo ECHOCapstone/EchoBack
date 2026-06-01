@@ -93,39 +93,39 @@ class GoogleOAuth2UserMapperTest {
     }
 
     @Test
-    @DisplayName("Case C — User 도 SocialAccount 도 없으면 User.fromOAuth2 와 SocialAccount 를 모두 새로 만든다")
-    void caseCBrandNewUserCreatesBoth() {
+    @DisplayName("Case C — User/SocialAccount 둘 다 없으면 자동 가입하지 않고 PendingSignupException 을 던진다")
+    void caseCBrandNewUserThrowsPendingSignup() {
         when(socialAccountRepository.findByProviderAndProviderUid(Provider.GOOGLE, "sub-x"))
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail("new@gmail.com"))
                 .thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        User result = mapper.upsert(
-                googleAttrs("sub-x", "new@gmail.com", "Newbie"), "tok-c");
+        assertThatThrownBy(() -> mapper.upsert(
+                googleAttrs("sub-x", "new@gmail.com", "Newbie"), "tok-c"))
+                .isInstanceOf(PendingSignupException.class)
+                .satisfies(ex -> {
+                    PendingSignupException pending = (PendingSignupException) ex;
+                    assertThat(pending.provider()).isEqualTo(Provider.GOOGLE);
+                    assertThat(pending.providerUid()).isEqualTo("sub-x");
+                    assertThat(pending.email()).isEqualTo("new@gmail.com");
+                    assertThat(pending.nicknameHint()).isEqualTo("Newbie");
+                });
 
-        assertThat(result).isNotNull();
-        assertThat(result.getEmail()).isEqualTo("new@gmail.com");
-        assertThat(result.getNickname()).isEqualTo("Newbie");
-        assertThat(result.getPasswordHash()).isNull();
-        verify(userRepository, times(1)).save(any(User.class));
-        verify(socialAccountRepository, times(1)).save(any(SocialAccount.class));
+        verify(userRepository, never()).save(any(User.class));
+        verify(socialAccountRepository, never()).save(any(SocialAccount.class));
     }
 
     @Test
-    @DisplayName("Case C — name 이 비어 있으면 이메일 local-part 를 nickname 으로 사용한다")
-    void caseCFallsBackToEmailLocalPartWhenNameMissing() {
+    @DisplayName("Case C — name 이 비어 있으면 nicknameHint 도 null 로 두고 가입 폼에서 사용자가 직접 정한다")
+    void caseCPendingSignupKeepsNicknameHintNullWhenNameMissing() {
         when(socialAccountRepository.findByProviderAndProviderUid(eq(Provider.GOOGLE), any()))
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail(any())).thenReturn(Optional.empty());
-        when(userRepository.save(any(User.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        User result = mapper.upsert(
-                Map.of("sub", "sub-noname", "email", "lonely@gmail.com"), "tok");
-
-        assertThat(result.getNickname()).isEqualTo("lonely");
+        assertThatThrownBy(() -> mapper.upsert(
+                Map.of("sub", "sub-noname", "email", "lonely@gmail.com"), "tok"))
+                .isInstanceOf(PendingSignupException.class)
+                .satisfies(ex -> assertThat(((PendingSignupException) ex).nicknameHint()).isNull());
     }
 
     @Test
