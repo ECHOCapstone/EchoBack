@@ -34,6 +34,35 @@ class ActuatorAccessTest {
                 () -> "org.hibernate.dialect.H2Dialect");
         // H2 부트 검증용이므로 MySQL 마이그레이션(Flyway) 은 끄고 Hibernate 가 스키마를 만든다.
         registry.add("spring.flyway.enabled", () -> "false");
+
+        // OAuth2 client registration 스텁 — prod 프로파일은 GOOGLE_CLIENT_ID/KAKAO_REST_API_KEY 등
+        // env 가 없으면 client-id 가 빈 문자열이라 컨텍스트 부트업이 실패한다. test 프로파일과
+        // 동일한 더미 자격증명으로 채운다.
+        registry.add("spring.security.oauth2.client.registration.google.client-id",
+                () -> "test-google-client-id");
+        registry.add("spring.security.oauth2.client.registration.google.client-secret",
+                () -> "test-google-client-secret");
+        registry.add("spring.security.oauth2.client.registration.kakao.client-id",
+                () -> "test-kakao-client-id");
+        registry.add("spring.security.oauth2.client.registration.kakao.client-secret",
+                () -> "test-kakao-client-secret");
+        // kakao registration 을 issuer-uri 없는 stub provider 로 재지정한다.
+        // base application.yaml 의 provider.kakao.issuer-uri(https://kauth.kakao.com)는
+        // DynamicPropertySource 로 제거할 수 없고, 빈 문자열로 덮으면 "issuer cannot be empty"
+        // 가 난다(Spring 은 빈 issuer 도 discovery 시도). registration 이 다른 provider 를
+        // 가리키게 하면 base issuer-uri 가 무시돼 OIDC discovery 네트워크 호출 없이 부트업한다.
+        registry.add("spring.security.oauth2.client.registration.kakao.provider",
+                () -> "kakao-stub");
+        registry.add("spring.security.oauth2.client.provider.kakao-stub.authorization-uri",
+                () -> "https://kauth.kakao.com/oauth/authorize");
+        registry.add("spring.security.oauth2.client.provider.kakao-stub.token-uri",
+                () -> "https://kauth.kakao.com/oauth/token");
+        registry.add("spring.security.oauth2.client.provider.kakao-stub.user-info-uri",
+                () -> "https://kapi.kakao.com/v1/oidc/userinfo");
+        registry.add("spring.security.oauth2.client.provider.kakao-stub.user-name-attribute",
+                () -> "sub");
+        registry.add("spring.security.oauth2.client.provider.kakao-stub.jwk-set-uri",
+                () -> "https://kauth.kakao.com/.well-known/jwks.json");
     }
 
     @Autowired
