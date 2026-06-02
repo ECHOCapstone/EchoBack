@@ -33,10 +33,14 @@ class OAuth2AuthorizationEndpointTest extends AbstractControllerIntegrationTest 
         assertThat(location).matches(s -> s.contains("scope=openid") && s.contains("email"));
         assertThat(location).contains("state=");
         // redirect_uri 가 새 콜백 경로 (/api/auth/oauth2/google/callback) 로 빌드됐는지 확인.
-        // URL-encoded 두 변형 모두 허용.
+        // MockMvc 요청은 포트(:8080 등)를 포함하므로 redirect_uri 에 포트가 붙을 수 있다.
+        // 포트 유무와 무관하게 host(localhost) 와 새 콜백 경로만 검증한다. (encoded / unencoded 모두 허용)
         assertThat(location).matches(s ->
-                s.contains("redirect_uri=http%3A%2F%2Flocalhost%2Fapi%2Fauth%2Foauth2%2Fgoogle%2Fcallback")
-                        || s.contains("redirect_uri=http://localhost/api/auth/oauth2/google/callback"));
+                s.contains("redirect_uri=http://localhost")
+                        || s.contains("redirect_uri=http%3A%2F%2Flocalhost"));
+        assertThat(location).matches(s ->
+                s.contains("/api/auth/oauth2/google/callback")
+                        || s.contains("%2Fapi%2Fauth%2Foauth2%2Fgoogle%2Fcallback"));
 
         assertSnippetCreated("auth/get-oauth2-authorize-google");
     }
@@ -63,9 +67,14 @@ class OAuth2AuthorizationEndpointTest extends AbstractControllerIntegrationTest 
         assertThat(location).contains("profile_nickname");
         assertThat(location).contains("account_email");
         // redirect_uri 가 새 콜백 경로 (/api/auth/oauth2/kakao/callback) 로 빌드됐는지 확인.
+        // MockMvc 요청은 포트(:8080 등)를 포함하므로 redirect_uri 에 포트가 붙을 수 있다.
+        // 포트 유무와 무관하게 host(localhost) 와 새 콜백 경로만 검증한다. (encoded / unencoded 모두 허용)
         assertThat(location).matches(s ->
-                s.contains("redirect_uri=http%3A%2F%2Flocalhost%2Fapi%2Fauth%2Foauth2%2Fkakao%2Fcallback")
-                        || s.contains("redirect_uri=http://localhost/api/auth/oauth2/kakao/callback"));
+                s.contains("redirect_uri=http://localhost")
+                        || s.contains("redirect_uri=http%3A%2F%2Flocalhost"));
+        assertThat(location).matches(s ->
+                s.contains("/api/auth/oauth2/kakao/callback")
+                        || s.contains("%2Fapi%2Fauth%2Foauth2%2Fkakao%2Fcallback"));
 
         assertSnippetCreated("auth/get-oauth2-authorize-kakao");
     }
