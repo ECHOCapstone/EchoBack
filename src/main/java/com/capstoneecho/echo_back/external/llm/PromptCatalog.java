@@ -2,6 +2,9 @@ package com.capstoneecho.echo_back.external.llm;
 
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
+import com.capstoneecho.echo_back.global.content.PersistableContentStore;
+import com.capstoneecho.echo_back.global.content.SeedFileLocations;
+import com.capstoneecho.echo_back.global.content.SeedFileStatus;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -33,13 +36,19 @@ public class PromptCatalog {
 
     // 편집본 파일이 놓이는 쓰기 가능 디렉터리. 없으면 첫 쓰기 때 생성한다.
     private final Path overrideDir;
+    // 어드민 시드 상태(파일 존재 / 마지막 수정 시각) 노출용. 다른 도메인과 같은 출처를 쓴다.
+    private final PersistableContentStore contentStore;
     // classpath 공장 기본 본문 (불변). reset 의 기준이자 "재정의됨" 판정의 비교 대상.
     private final Map<String, String> defaults;
     // 실제 사용 본문 = 기본값 + 파일 오버라이드. 편집 시 write-through 한다.
     private final Map<String, String> effective;
 
-    public PromptCatalog(@Value("${app.content.dir}") String contentDir) {
+    public PromptCatalog(
+            @Value("${app.content.dir}") String contentDir,
+            PersistableContentStore contentStore
+    ) {
         this.overrideDir = Path.of(contentDir, "prompts");
+        this.contentStore = contentStore;
         this.defaults = Map.copyOf(loadDefaults());
         this.effective = new ConcurrentHashMap<>(this.defaults);
         applyFileOverrides();
@@ -100,6 +109,21 @@ public class PromptCatalog {
         deleteFile(key);
         effective.put(key, defaults.get(key));
         return view(key);
+    }
+
+    // 모든 편집본 파일을 지우고 effective 본문을 한 번에 기본값으로 되돌린다.
+    // 잘못된 편집을 일괄 롤백할 때 사용한다.
+    public List<PromptView> resetAll() {
+        for (String key : defaults.keySet()) {
+            deleteFile(key);
+            effective.put(key, defaults.get(key));
+        }
+        return list();
+    }
+
+    // 편집본 디렉터리 자체의 상태. 다른 도메인의 SeedFileStatus 와 같은 형식으로 노출한다.
+    public SeedFileStatus seedStatus() {
+        return contentStore.statusOf(SeedFileLocations.PROMPTS_DIR);
     }
 
     private PromptView view(String key) {

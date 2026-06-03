@@ -4,11 +4,13 @@ import com.capstoneecho.echo_back.admin.dto.PromptResponse;
 import com.capstoneecho.echo_back.admin.dto.PromptUpdateRequest;
 import com.capstoneecho.echo_back.admin.service.PromptAdminService;
 import com.capstoneecho.echo_back.global.common.ApiResponse;
+import com.capstoneecho.echo_back.global.content.SeedFileStatus;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,5 +48,17 @@ public class PromptAdminController {
     @DeleteMapping("/{key}")
     public ApiResponse<PromptResponse> reset(@PathVariable String key) {
         return ApiResponse.success(promptAdminService.reset(key));
+    }
+
+    // 모든 재정의를 한 번에 초기화한다. 잘못된 일괄 편집을 복구할 때 사용한다.
+    @PostMapping("/reset")
+    public ApiResponse<List<PromptResponse>> resetAll() {
+        return ApiResponse.success(promptAdminService.resetAll());
+    }
+
+    // 편집본 디렉터리의 상태. 다른 도메인과 같은 SeedFileStatus 형식.
+    @GetMapping("/seed-info")
+    public ApiResponse<SeedFileStatus> seedInfo() {
+        return ApiResponse.success(promptAdminService.seedStatus());
     }
 }

@@ -2,6 +2,7 @@ package com.capstoneecho.echo_back.admin.service;
 
 import com.capstoneecho.echo_back.admin.dto.PromptResponse;
 import com.capstoneecho.echo_back.external.llm.PromptCatalog;
+import com.capstoneecho.echo_back.global.content.SeedFileStatus;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -29,5 +30,13 @@ public class PromptAdminService {
 
     public PromptResponse reset(String key) {
         return PromptResponse.from(promptCatalog.reset(key));
+    }
+
+    public List<PromptResponse> resetAll() {
+        return promptCatalog.resetAll().stream().map(PromptResponse::from).toList();
+    }
+
+    public SeedFileStatus seedStatus() {
+        return promptCatalog.seedStatus();
     }
 }

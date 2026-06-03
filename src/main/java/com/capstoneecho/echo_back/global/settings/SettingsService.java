@@ -79,4 +79,16 @@ public class SettingsService {
         repository.deleteById(key);
         cache.remove(key);
     }
+
+    // 모든 오버라이드를 지운다. 시드 재적용 흐름에서 호출된다.
+    @Transactional
+    public void clearAll() {
+        repository.deleteAllInBatch();
+        cache.clear();
+    }
+
+    // 현재 캐시된 오버라이드의 키→값 스냅샷. 영구 저장(yaml 직렬화) 시 사용한다.
+    public java.util.Map<String, String> snapshotOverrides() {
+        return new java.util.LinkedHashMap<>(cache);
+    }
 }
