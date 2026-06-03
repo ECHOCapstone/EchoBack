@@ -33,6 +33,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-mysql'
+    // Spring Boot 4 부터 Flyway autoconfig 가 spring-boot-flyway 모듈로 분리됐다.
+    // 이게 없으면 spring.flyway.* 가 무시되고 마이그레이션이 실행되지 않는다.
+    implementation 'org.springframework.boot:spring-boot-flyway'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
