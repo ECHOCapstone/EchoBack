@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.external.llm;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.content.PersistableContentStore;
+import com.capstoneecho.echo_back.global.content.PersistableSeed;
 import com.capstoneecho.echo_back.global.content.SeedFileLocations;
 import com.capstoneecho.echo_back.global.content.SeedFileStatus;
 import java.io.IOException;
@@ -29,8 +30,9 @@ import org.springframework.util.FileCopyUtils;
 // 그 위에 덮어쓴다. 어드민 편집은 그 파일을 직접 쓰므로 재시작 후에도 유지되고, reset 은
 // 파일을 지워 기본값으로 되돌린다.
 @Component
-public class PromptCatalog {
+public class PromptCatalog implements PersistableSeed {
 
+    private static final String DOMAIN = "prompts";
     private static final String DEFAULTS_LOCATION = "classpath:content/prompts/*.md";
     private static final String EMPTY_PLACEHOLDER_REGEX = "\\{\\{[a-zA-Z0-9_]+}}";
 
@@ -124,6 +126,23 @@ public class PromptCatalog {
     // 편집본 디렉터리 자체의 상태. 다른 도메인의 SeedFileStatus 와 같은 형식으로 노출한다.
     public SeedFileStatus seedStatus() {
         return contentStore.statusOf(SeedFileLocations.PROMPTS_DIR);
+    }
+
+    // ----- PersistableSeed 표준 어댑터 -----
+
+    @Override
+    public String domain() {
+        return DOMAIN;
+    }
+
+    @Override
+    public SeedFileStatus fileStatus() {
+        return seedStatus();
+    }
+
+    @Override
+    public void resetToDefaults() {
+        resetAll();
     }
 
     private PromptView view(String key) {

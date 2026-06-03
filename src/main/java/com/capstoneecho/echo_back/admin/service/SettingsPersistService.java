@@ -37,6 +37,11 @@ public class SettingsPersistService implements PersistableSeed {
     }
 
     @Override
+    public boolean supportsExplicitPersist() {
+        return true;
+    }
+
+    @Override
     public void persistCurrentStateToFile() {
         Map<String, String> snapshot = settingsService.snapshotOverrides();
         contentStore.writeText(SeedFileLocations.SETTINGS_OVERRIDES, toYaml(snapshot));

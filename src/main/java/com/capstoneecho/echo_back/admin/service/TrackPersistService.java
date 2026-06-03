@@ -59,6 +59,11 @@ public class TrackPersistService implements PersistableSeed {
     }
 
     @Override
+    public boolean supportsExplicitPersist() {
+        return true;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public void persistCurrentStateToFile() {
         SeedData.TracksFile snapshot = buildSnapshot();
