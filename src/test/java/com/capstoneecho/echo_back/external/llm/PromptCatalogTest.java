@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.external.llm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.capstoneecho.echo_back.global.content.PersistableContentStore;
 import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +22,7 @@ class PromptCatalogTest {
 
     @BeforeEach
     void setUp() {
-        catalog = new PromptCatalog(contentDir.toString());
+        catalog = new PromptCatalog(contentDir.toString(), new PersistableContentStore(contentDir.toString()));
     }
 
     @Test
@@ -62,7 +63,7 @@ class PromptCatalogTest {
         assertThat(catalog.raw("system")).isEqualTo("재정의 본문");
 
         // 같은 디렉터리로 다시 만든 카탈로그가 편집본을 읽어온다 (재시작 후 유지).
-        PromptCatalog reloaded = new PromptCatalog(contentDir.toString());
+        PromptCatalog reloaded = new PromptCatalog(contentDir.toString(), new PersistableContentStore(contentDir.toString()));
         assertThat(reloaded.get("system").overridden()).isTrue();
         assertThat(reloaded.raw("system")).isEqualTo("재정의 본문");
 

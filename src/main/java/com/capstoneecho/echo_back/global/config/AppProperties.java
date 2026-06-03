@@ -20,8 +20,14 @@ public record AppProperties(
         Admin admin
 ) {
 
-    // 부팅 시 관리자로 승격할 계정. bootstrapUsername 이 비어 있으면 승격을 건너뛴다.
-    public record Admin(String bootstrapUsername) {}
+    // 부팅 시 적용되는 관리자 셋업.
+    //   bootstrapUsername : 이미 가입된 그 username 계정을 ROLE_ADMIN 으로 승격한다 (멱등).
+    //   seed              : 시연/평가용 시드 관리자 계정. 부팅 시 username 으로 DB 를 찾고
+    //                       없으면 BCrypt 해시 비밀번호와 함께 ROLE_ADMIN 으로 새로 만든다.
+    //                       모든 필드가 채워져 있어야 활성화되며, 어느 하나라도 비면 건너뛴다.
+    public record Admin(String bootstrapUsername, SeedAdmin seed) {
+        public record SeedAdmin(String username, String email, String password, String nickname) {}
+    }
 
     public record Jwt(String secret, long expirationMs) {}
 

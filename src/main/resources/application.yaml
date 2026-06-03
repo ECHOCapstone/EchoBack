@@ -78,6 +78,12 @@ app:
   # 부팅 시 이 username 계정을 관리자로 승격한다. 미설정 시 승격 없음.
   admin:
     bootstrap-username: ${APP_ADMIN_BOOTSTRAP_USERNAME:}
+    # 시드 관리자 계정 — 시연/평가용. 네 필드가 모두 채워지면 부팅 시 자동으로 만들어진다 (멱등).
+    seed:
+      username: ${APP_ADMIN_SEED_USERNAME:}
+      email: ${APP_ADMIN_SEED_EMAIL:}
+      password: ${APP_ADMIN_SEED_PASSWORD:}
+      nickname: ${APP_ADMIN_SEED_NICKNAME:관리자}
   jwt:
     expiration-ms: 86400000
   cors:

@@ -2,6 +2,7 @@ package com.capstoneecho.echo_back.global.seed;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.capstoneecho.echo_back.global.content.PersistableContentStore;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.entity.StepKind;
@@ -9,10 +10,12 @@ import com.capstoneecho.echo_back.learning.script.repository.LearningStepReposit
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
@@ -40,6 +43,11 @@ class InitialDataLoaderTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    // 빈 임시 디렉터리로 외부 시드 경로를 만든다 — 외부 영구 저장본이 없으므로
+    // 로더는 항상 classpath 의 test-tracks.yaml 만 읽는다.
+    @TempDir
+    Path emptyContentDir;
+
     private InitialDataLoader loader;
 
     @BeforeEach
@@ -54,7 +62,8 @@ class InitialDataLoaderTest {
                 scriptRepository,
                 learningStepRepository,
                 objectMapper,
-                new ClassPathResource("content/test-tracks.yaml")
+                new ClassPathResource("content/test-tracks.yaml"),
+                new PersistableContentStore(emptyContentDir.toString())
         );
     }
 
