@@ -3,21 +3,22 @@ package com.capstoneecho.echo_back.global.seed;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
+// 시드 yaml 의 record 구조. InitialDataLoader 와 어드민의 "영구 저장 / 시드 재적용" 양쪽에서 사용한다.
 @JsonIgnoreProperties(ignoreUnknown = true)
-final class SeedData {
+public final class SeedData {
 
     private SeedData() {}
 
-    record TracksFile(List<Track> tracks) {}
+    public record TracksFile(List<Track> tracks) {}
 
-    record Track(
+    public record Track(
             String title,
             String description,
             int displayOrder,
             List<Chapter> chapters
     ) {}
 
-    record Chapter(
+    public record Chapter(
             int chapterOrder,
             String title,
             String content,
@@ -27,7 +28,7 @@ final class SeedData {
             List<Step> steps
     ) {}
 
-    record Step(
+    public record Step(
             int orderIndex,
             String kind,
             String prompt,

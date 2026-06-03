@@ -6,9 +6,12 @@ import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.entity.StepKind;
 import com.capstoneecho.echo_back.learning.script.repository.LearningStepRepository;
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
+import com.capstoneecho.echo_back.global.content.PersistableContentStore;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -22,9 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.yaml.snakeyaml.Yaml;
 import tools.jackson.databind.ObjectMapper;
 
-// 부팅 시 tracks 테이블이 비어 있으면 classpath:content/tracks.yaml 을 읽어
-// Track → Script(chapter) → LearningStep 순으로 한 번만 채워 넣는다.
-// 이미 데이터가 있으면 그대로 둔다 (멱등).
+// 부팅 시 tracks 테이블이 비어 있으면 tracks.yaml 을 읽어 Track → Script(chapter) → LearningStep
+// 순으로 한 번만 채워 넣는다. 이미 데이터가 있으면 그대로 둔다 (멱등).
+//
+// 우선순위: 외부 ${app.content.dir}/tracks.yaml 이 있으면 그쪽 (어드민이 영구 저장한 버전),
+//          없으면 classpath:content/tracks.yaml (git 으로 관리되는 공장 기본값) 으로 폴백.
+// 어드민의 시드 재적용은 트랙을 전부 비우고 이 메서드를 다시 부른다.
 @Component
 @Profile("!test")
 public class InitialDataLoader implements ApplicationRunner {
@@ -33,20 +39,23 @@ public class InitialDataLoader implements ApplicationRunner {
     private final ScriptRepository scriptRepository;
     private final LearningStepRepository learningStepRepository;
     private final ObjectMapper objectMapper;
-    private final Resource tracksResource;
+    private final Resource defaultTracksResource;
+    private final PersistableContentStore contentStore;
 
     public InitialDataLoader(
             TrackRepository trackRepository,
             ScriptRepository scriptRepository,
             LearningStepRepository learningStepRepository,
             ObjectMapper objectMapper,
-            @Value("classpath:content/tracks.yaml") Resource tracksResource
+            @Value("classpath:content/tracks.yaml") Resource defaultTracksResource,
+            PersistableContentStore contentStore
     ) {
         this.trackRepository = trackRepository;
         this.scriptRepository = scriptRepository;
         this.learningStepRepository = learningStepRepository;
         this.objectMapper = objectMapper;
-        this.tracksResource = tracksResource;
+        this.defaultTracksResource = defaultTracksResource;
+        this.contentStore = contentStore;
     }
 
     @Override
@@ -60,10 +69,24 @@ public class InitialDataLoader implements ApplicationRunner {
         if (trackRepository.count() > 0) {
             return;
         }
-        SeedData.TracksFile file = readYaml(tracksResource, SeedData.TracksFile.class);
+        SeedData.TracksFile file = readEffectiveTracksFile();
         for (SeedData.Track trackData : file.tracks()) {
             persistTrack(trackData);
         }
+    }
+
+    // 외부 영구 저장본이 있으면 그쪽을 우선, 없으면 classpath 기본값을 읽는다.
+    private SeedData.TracksFile readEffectiveTracksFile() {
+        if (contentStore.exists("tracks.yaml")) {
+            try (InputStream in = Files.newInputStream(contentStore.resolve("tracks.yaml"))) {
+                Object tree = new Yaml().load(in);
+                return objectMapper.convertValue(tree, SeedData.TracksFile.class);
+            } catch (IOException e) {
+                throw new IllegalStateException(
+                        "외부 시드 파일을 읽을 수 없습니다: " + contentStore.resolve("tracks.yaml"), e);
+            }
+        }
+        return readYaml(defaultTracksResource, SeedData.TracksFile.class);
     }
 
     // 트랙을 먼저 저장해 ID 를 받은 뒤, 그 ID 를 참조하는 챕터/스텝을 차례로 저장한다.

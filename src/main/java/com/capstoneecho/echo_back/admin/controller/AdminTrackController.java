@@ -3,7 +3,9 @@ package com.capstoneecho.echo_back.admin.controller;
 import com.capstoneecho.echo_back.admin.dto.TrackCreateRequest;
 import com.capstoneecho.echo_back.admin.dto.TrackUpdateRequest;
 import com.capstoneecho.echo_back.admin.service.AdminTrackService;
+import com.capstoneecho.echo_back.admin.service.TrackPersistService;
 import com.capstoneecho.echo_back.global.common.ApiResponse;
+import com.capstoneecho.echo_back.global.content.SeedFileStatus;
 import com.capstoneecho.echo_back.learning.track.dto.TrackSummaryResponse;
 import com.capstoneecho.echo_back.learning.track.service.TrackService;
 import jakarta.validation.Valid;
@@ -24,10 +26,16 @@ public class AdminTrackController {
 
     private final TrackService trackService;
     private final AdminTrackService adminTrackService;
+    private final TrackPersistService trackPersistService;
 
-    public AdminTrackController(TrackService trackService, AdminTrackService adminTrackService) {
+    public AdminTrackController(
+            TrackService trackService,
+            AdminTrackService adminTrackService,
+            TrackPersistService trackPersistService
+    ) {
         this.trackService = trackService;
         this.adminTrackService = adminTrackService;
+        this.trackPersistService = trackPersistService;
     }
 
     @GetMapping
@@ -50,5 +58,22 @@ public class AdminTrackController {
     public ApiResponse<Void> delete(@PathVariable Long trackId) {
         adminTrackService.delete(trackId);
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/persist")
+    public ApiResponse<SeedFileStatus> persist() {
+        trackPersistService.persistCurrentStateToFile();
+        return ApiResponse.success(trackPersistService.fileStatus());
+    }
+
+    @PostMapping("/reset")
+    public ApiResponse<SeedFileStatus> reset() {
+        trackPersistService.resetToDefaults();
+        return ApiResponse.success(trackPersistService.fileStatus());
+    }
+
+    @GetMapping("/seed-info")
+    public ApiResponse<SeedFileStatus> seedInfo() {
+        return ApiResponse.success(trackPersistService.fileStatus());
     }
 }
