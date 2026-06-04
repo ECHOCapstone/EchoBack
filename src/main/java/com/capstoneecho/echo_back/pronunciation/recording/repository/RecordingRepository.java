@@ -21,4 +21,6 @@ public interface RecordingRepository extends JpaRepository<Recording, Long> {
 
     List<Recording> findAllByUser_IdAndSession_IdAndIdInOrderByCreatedAtAsc(
             Long userId, Long sessionId, Collection<Long> ids);
+
+    long countByUser_Id(Long userId);
 }
