@@ -66,11 +66,19 @@ public class SessionService {
         if (request.title() != null && !request.title().isBlank()) {
             session.rename(request.title());
         }
-        if (request.scriptText() != null) {
+        boolean scriptChanged = request.scriptText() != null;
+        if (scriptChanged) {
             session.updateScript(request.scriptText(), sentenceSplitter);
         }
         if (request.favorite() != null) {
             session.setFavorite(request.favorite());
+        }
+        // scriptText 갱신은 새 SessionSentence 들을 cascade 로 INSERT 한다.
+        // IDENTITY 키라 commit 전까지 id 가 채워지지 않으므로, 응답을 만들기 전에 명시적으로 flush 해
+        // 새 sentence 의 id 를 확보한다. 안 하면 응답의 sentences[].id 가 null 로 나가 클라이언트의
+        // sessionSentenceId 가 빠진 채 업로드돼 detectMode 가 INVALID_REQUEST 로 거절한다.
+        if (scriptChanged) {
+            sessionRepository.flush();
         }
         return SessionDetailResponse.from(session);
     }

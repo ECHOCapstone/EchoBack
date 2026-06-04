@@ -97,12 +97,16 @@ public class InitialDataLoader implements ApplicationRunner {
                 trackData.displayOrder()
         ));
         for (SeedData.Chapter chapterData : trackData.chapters()) {
+            // 영구 저장본의 difficulty 가 비었거나 (관리자 화면에서 비우고 저장한 경우) 알 수 없는 값이면
+            // 시드 로딩 전체를 중단시키는 NPE/IllegalArgumentException 대신 MEDIUM 으로 폴백한다.
+            // 한 챕터의 누락된 필드 때문에 전체 부팅이 막히는 것을 막는 안전망이다.
+            Difficulty difficulty = parseDifficulty(chapterData.difficulty());
             Script chapter = scriptRepository.save(Script.createChapter(
                     track,
                     chapterData.chapterOrder(),
                     chapterData.title(),
                     chapterData.content(),
-                    Difficulty.valueOf(chapterData.difficulty()),
+                    difficulty,
                     chapterData.practiceWord(),
                     chapterData.masteryBadgeName()
             ));
@@ -116,6 +120,17 @@ public class InitialDataLoader implements ApplicationRunner {
                 steps.add(toEntity(chapter, stepData));
             }
             learningStepRepository.saveAll(steps);
+        }
+    }
+
+    private static Difficulty parseDifficulty(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Difficulty.MEDIUM;
+        }
+        try {
+            return Difficulty.valueOf(raw);
+        } catch (IllegalArgumentException ex) {
+            return Difficulty.MEDIUM;
         }
     }
 

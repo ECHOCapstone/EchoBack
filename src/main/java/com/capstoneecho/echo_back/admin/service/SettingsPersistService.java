@@ -64,6 +64,9 @@ public class SettingsPersistService implements PersistableSeed {
         options.setIndent(2);
         options.setPrettyFlow(true);
         options.setSplitLines(false);
+        // 모든 scalar 를 double-quoted 로 출력 — "80" 처럼 숫자처럼 보이는 문자열이 unquoted 로 dump 되어
+        // 다음 부팅 때 reader 가 Integer 로 파싱하면서 ClassCast 가 나는 비대칭을 막는다.
+        options.setDefaultScalarStyle(DumperOptions.ScalarStyle.DOUBLE_QUOTED);
         return new Yaml(options).dump(snapshot);
     }
 }

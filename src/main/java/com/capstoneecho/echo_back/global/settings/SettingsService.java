@@ -9,11 +9,16 @@ import org.springframework.transaction.annotation.Transactional;
 // 런타임 설정의 단일 접근점. yaml 기본값 위에 DB 오버라이드를 얹어 노출한다.
 // 시작 시 전체를 메모리 캐시에 적재하고 쓰기 시 write-through 한다.
 // (단일 인스턴스 가정 — 다중 인스턴스로 확장하면 변경 전파 메커니즘이 필요하다.)
+//
+// 동시성: set / clear / clearAll 은 writeLock 으로 직렬화한다. 락이 없으면 admin A 의 clearAll() 과
+// admin B 의 set() 이 인터리브해서 DB 와 캐시가 어긋날 수 있다 (B 의 set 이 commit 된 뒤
+// A 의 cache.clear() 가 B 의 값을 메모리에서 지워, DB 와 캐시가 영구히 desync).
 @Service
 public class SettingsService {
 
     private final AppSettingRepository repository;
     private final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
+    private final Object writeLock = new Object();
 
     public SettingsService(AppSettingRepository repository) {
         this.repository = repository;
@@ -67,24 +72,30 @@ public class SettingsService {
 
     @Transactional
     public void set(String key, String value) {
-        repository.findById(key).ifPresentOrElse(
-                existing -> existing.updateValue(value),
-                () -> repository.save(AppSetting.of(key, value)));
-        cache.put(key, value);
+        synchronized (writeLock) {
+            repository.findById(key).ifPresentOrElse(
+                    existing -> existing.updateValue(value),
+                    () -> repository.save(AppSetting.of(key, value)));
+            cache.put(key, value);
+        }
     }
 
     // 오버라이드를 지운다. 이후 get* 는 호출자가 넘긴 기본값(yaml)을 돌려준다.
     @Transactional
     public void clear(String key) {
-        repository.deleteById(key);
-        cache.remove(key);
+        synchronized (writeLock) {
+            repository.deleteById(key);
+            cache.remove(key);
+        }
     }
 
     // 모든 오버라이드를 지운다. 시드 재적용 흐름에서 호출된다.
     @Transactional
     public void clearAll() {
-        repository.deleteAllInBatch();
-        cache.clear();
+        synchronized (writeLock) {
+            repository.deleteAllInBatch();
+            cache.clear();
+        }
     }
 
     // 현재 캐시된 오버라이드의 키→값 스냅샷. 영구 저장(yaml 직렬화) 시 사용한다.

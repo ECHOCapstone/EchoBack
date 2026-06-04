@@ -50,15 +50,22 @@ public class SettingsSeedingRunner implements ApplicationRunner {
         });
     }
 
-    @SuppressWarnings("unchecked")
+    // dumper 측이 모든 값을 quoted string 으로 출력하도록 보호되어 있지만, 손으로 yaml 을 편집한 경우
+    // SnakeYAML 이 80 같은 unquoted scalar 를 Integer 로 파싱한다. Map<String,String> 에 그대로 캐스팅하면
+    // forEach 에서 ClassCastException 이 나므로 키/값을 명시적으로 String.valueOf 로 변환한다.
     private Map<String, String> readYaml() {
         try (InputStream in = Files.newInputStream(
                 contentStore.resolve(SeedFileLocations.SETTINGS_OVERRIDES))) {
             Object tree = new Yaml().load(in);
-            if (tree instanceof Map<?, ?> map) {
-                return (Map<String, String>) map;
+            if (!(tree instanceof Map<?, ?> map)) {
+                return Map.of();
             }
-            return Map.of();
+            Map<String, String> result = new java.util.LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                if (e.getKey() == null || e.getValue() == null) continue;
+                result.put(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+            }
+            return result;
         } catch (IOException e) {
             throw new IllegalStateException(
                     "설정 영구 저장본을 읽을 수 없습니다: " + SeedFileLocations.SETTINGS_OVERRIDES, e);

@@ -123,8 +123,15 @@ public class PromptCatalog implements PersistableSeed {
         return list();
     }
 
-    // 편집본 디렉터리 자체의 상태. 다른 도메인의 SeedFileStatus 와 같은 형식으로 노출한다.
+    // 편집본 디렉터리의 영구 저장 상태. 디렉터리는 빈 상태로도 존재할 수 있으므로 단순 Files.exists 로
+    // 판정하면 한 번도 override 한 적 없는 인스턴스도 "영구 저장본 있음" 으로 잘못 보고된다.
+    // 실제 override 한 프롬프트가 하나라도 있을 때만 exists=true 로 표시한다.
     public SeedFileStatus seedStatus() {
+        boolean anyOverridden = defaults.keySet().stream()
+                .anyMatch(key -> !effective.get(key).equals(defaults.get(key)));
+        if (!anyOverridden) {
+            return new SeedFileStatus(false, null, overrideDir.toString());
+        }
         return contentStore.statusOf(SeedFileLocations.PROMPTS_DIR);
     }
 
@@ -159,21 +166,15 @@ public class PromptCatalog implements PersistableSeed {
     // 프롬프트 한 건의 현재 상태. overridden 이 true 면 기본값이 아닌 재정의 본문이다.
     public record PromptView(String key, String content, boolean overridden) {}
 
+    // 저장/삭제는 PersistableContentStore 를 통해 다른 도메인 (tracks / settings) 과 같은
+    // 안전망 (atomic rename + .bak 보존 + path 단위 lock) 을 받는다. 직접 Files.writeString 을
+    // 호출하면 전원이 끊긴 사이 반쪽 파일이 남거나, 잘못 override 했을 때 복구할 .bak 가 없다.
     private void writeFile(String key, String content) {
-        try {
-            Files.createDirectories(overrideDir);
-            Files.writeString(overrideDir.resolve(key + ".md"), content, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("프롬프트 편집본을 저장할 수 없습니다: " + key, e);
-        }
+        contentStore.writeText(SeedFileLocations.PROMPTS_DIR + "/" + key + ".md", content);
     }
 
     private void deleteFile(String key) {
-        try {
-            Files.deleteIfExists(overrideDir.resolve(key + ".md"));
-        } catch (IOException e) {
-            throw new UncheckedIOException("프롬프트 편집본을 삭제할 수 없습니다: " + key, e);
-        }
+        contentStore.delete(SeedFileLocations.PROMPTS_DIR + "/" + key + ".md");
     }
 
     private static String readFile(Path file) {

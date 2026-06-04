@@ -7,6 +7,9 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,8 +23,10 @@ import org.springframework.stereotype.Component;
 //      완전히 새 파일 둘 중 하나만 남는다 (부분 손상 X).
 //   2) .bak 보존 — 덮어쓰기 직전 옛 파일을 <name>.bak 로 보존. 잘못 영구 저장했을 때 손수 복구 가능.
 //
-// 단일 운영자 / 단일 인스턴스 가정 — 여러 인스턴스가 동시에 같은 디렉터리에 쓰는 락은 없다.
-// 캡스톤 / 학과 서버 단기 배포 시나리오에서는 충분.
+// 단일 인스턴스 가정 — 여러 인스턴스가 동시에 같은 디렉터리에 쓰는 락은 없다 (분산 락은 별도).
+// 다만 같은 인스턴스 안의 동시 admin 액션 (두 탭에서 동시 저장, 더블클릭) 은 path 별 ReentrantLock 으로
+// 직렬화한다. 락이 없으면 두 번째 호출의 backupIfPresent 가 첫 번째 호출이 막 쓴 새 본문을 .bak 로
+// 덮어 옛 상태 복구가 영영 불가해진다.
 @Component
 public class PersistableContentStore {
 
@@ -30,9 +35,15 @@ public class PersistableContentStore {
     private static final String TMP_SUFFIX = ".tmp";
 
     private final Path contentDir;
+    // 같은 relativePath 의 write/delete 는 직렬화. 다른 path 는 병렬 허용해 처리량을 유지한다.
+    private final ConcurrentMap<String, ReentrantLock> pathLocks = new ConcurrentHashMap<>();
 
     public PersistableContentStore(@Value("${app.content.dir}") String contentDir) {
         this.contentDir = Path.of(Objects.requireNonNull(contentDir, "contentDir"));
+    }
+
+    private ReentrantLock lockFor(String relativePath) {
+        return pathLocks.computeIfAbsent(relativePath, k -> new ReentrantLock());
     }
 
     public Path resolve(String relativePath) {
@@ -56,10 +67,12 @@ public class PersistableContentStore {
         }
     }
 
-    // 텍스트 본문을 atomic rename + bak 보존으로 영구 저장한다.
+    // 텍스트 본문을 atomic rename + bak 보존으로 영구 저장한다. path 단위 락으로 동시 호출 직렬화.
     public void writeText(String relativePath, String content) {
         Objects.requireNonNull(content, "content");
         Path target = resolve(relativePath);
+        ReentrantLock lock = lockFor(relativePath);
+        lock.lock();
         try {
             Files.createDirectories(target.getParent());
             backupIfPresent(target);
@@ -69,13 +82,17 @@ public class PersistableContentStore {
             log.info("Persisted content file: {} ({} bytes)", target, content.length());
         } catch (IOException e) {
             throw new ContentPersistException("failed to persist " + target, e);
+        } finally {
+            lock.unlock();
         }
     }
 
     // 영구 저장된 파일을 지워 공장 기본값(classpath:content/...) 으로 되돌린다.
-    // 미리 .bak 으로 보존하여 잘못 reset 했을 때 복구 가능하게 둔다.
+    // 미리 .bak 으로 보존하여 잘못 reset 했을 때 복구 가능하게 둔다. path 단위 락으로 직렬화.
     public boolean delete(String relativePath) {
         Path target = resolve(relativePath);
+        ReentrantLock lock = lockFor(relativePath);
+        lock.lock();
         try {
             if (!Files.exists(target)) {
                 return false;
@@ -86,6 +103,8 @@ public class PersistableContentStore {
             return true;
         } catch (IOException e) {
             throw new ContentPersistException("failed to delete " + target, e);
+        } finally {
+            lock.unlock();
         }
     }
 

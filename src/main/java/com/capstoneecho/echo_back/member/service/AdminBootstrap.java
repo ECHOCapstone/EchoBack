@@ -82,6 +82,11 @@ public class AdminBootstrap {
 
     // 부팅 시 시드 관리자 계정이 없으면 BCrypt 해시 비밀번호와 함께 새로 만든다.
     // 이미 같은 username 의 계정이 있으면 비밀번호를 덮어쓰지 않고 ROLE_ADMIN 승격만 보장한다.
+    //
+    // username 으로 조회한 뒤 새로 만들기 전에 email 중복도 검사한다 — 다른 사용자가 이미 그 email 로
+    // 가입돼 있으면 user_email_unique 제약 위반으로 DataIntegrityViolationException 이 떨어져
+    // ApplicationRunner 가 실패하고 부팅 자체가 안 끝난다. 시드 설정의 사소한 오타가 인스턴스 전체를
+    // 멈추는 일을 막기 위해, 그 경우엔 조용히 건너뛰고 WARN 으로만 알린다.
     @Transactional
     public void createSeedAdminIfMissing() {
         if (!seedConfigured()) {
@@ -96,6 +101,12 @@ public class AdminBootstrap {
                     }
                 },
                 () -> {
+                    if (userRepository.existsByEmail(seedAdmin.email())) {
+                        log.warn("시드 관리자 email '{}' 가 이미 다른 사용자에게 사용 중이라 생성을 건너뜁니다. "
+                                + "APP_ADMIN_SEED_EMAIL 을 바꾸거나 APP_ADMIN_BOOTSTRAP_USERNAME 으로 기존 계정을 승격하세요.",
+                                seedAdmin.email());
+                        return;
+                    }
                     String hash = passwordEncoder.encode(seedAdmin.password());
                     User created = User.signup(
                             seedAdmin.username(), seedAdmin.email(), hash, seedAdmin.nickname());

@@ -70,13 +70,16 @@ public class TrackPersistService implements PersistableSeed {
         contentStore.writeText(SeedFileLocations.TRACKS, toYaml(snapshot));
     }
 
+    // "시드 재적용" 의 의미는 DB 를 비우고 시드 출처(우선순위: 영구 저장본 → classpath 기본값)에서 다시 로드.
+    // 영구 저장본(.yaml) 은 절대 지우지 않는다 — 그걸 지우면 admin 이 영구 저장한 의도(부팅마다 자기 트리 복원)
+    // 와 정반대 동작이 되고, 의도치 않게 git 공장 기본값으로 롤백된다.
+    // 공장 기본값으로 진짜 되돌리고 싶으면 별도의 "공장 기본값 복원" 액션을 두는 것이 안전하다.
     @Override
     @Transactional
     public void resetToDefaults() {
         learningStepRepository.deleteAllInBatch();
         scriptRepository.deleteAllInBatch();
         trackRepository.deleteAllInBatch();
-        contentStore.delete(SeedFileLocations.TRACKS);
         initialDataLoader.seedTracksIfEmpty();
     }
 

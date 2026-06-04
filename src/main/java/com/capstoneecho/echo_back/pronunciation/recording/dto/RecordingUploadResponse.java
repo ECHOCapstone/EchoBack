@@ -42,6 +42,9 @@ public record RecordingUploadResponse(
         SpeechRate speechRate,
         // 단어별 canonical 음소 (g2p words). 프론트가 음소를 단어 경계로 잘라 보여줄 때 사용한다.
         List<G2pWord> canonicalWords,
+        // 합격선 점수 (게임화 설정. 어드민이 바꿀 수 있음). 프론트의 점수 게이지가 이 값으로 합격선
+        // 마커를 그려, FE 하드코딩과 BE 의 passed 판정이 어긋나는 일을 막는다.
+        Double passThreshold,
         Instant createdAt
 ) {
 
@@ -94,6 +97,8 @@ public record RecordingUploadResponse(
                 SpeechRate.NORMAL,
                 // 조회 응답은 단어별 음소를 보관하지 않으므로 빈 리스트.
                 List.of(),
+                // 조회 응답은 실시간 게임화 설정을 함께 싣지 않는다 (FE 가 fetch 안 함).
+                null,
                 recording.getCreatedAt());
     }
 
@@ -107,7 +112,8 @@ public record RecordingUploadResponse(
             LlmStepFeedback feedback,
             boolean passed,
             SpeechRate speechRate,
-            List<G2pWord> canonicalWords) {
+            List<G2pWord> canonicalWords,
+            double passThreshold) {
         Long scriptId = saved.getScript() == null ? null : saved.getScript().getId();
         Long stepId = saved.getStep() == null ? null : saved.getStep().getId();
         Long sessionId = saved.getSession() == null ? null : saved.getSession().getId();
@@ -135,6 +141,7 @@ public record RecordingUploadResponse(
                 feedback.phonemeTips(),
                 speechRate == null ? SpeechRate.NORMAL : speechRate,
                 canonicalWords == null ? List.of() : List.copyOf(canonicalWords),
+                passThreshold,
                 saved.getCreatedAt());
     }
 

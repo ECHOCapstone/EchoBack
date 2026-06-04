@@ -13,11 +13,15 @@ import java.util.Date;
 import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 // 어드민 대시보드용 시스템 상태 집계. 외부 의존성이 일시적으로 죽어 있어도 부분 결과를 돌려준다.
 @Service
 public class SystemStatusService {
+
+    private static final Logger log = LoggerFactory.getLogger(SystemStatusService.class);
 
     private final ModelServerClient modelServerClient;
     private final GeminiLlmClient gemini;
@@ -59,28 +63,42 @@ public class SystemStatusService {
     }
 
     // Flyway 가 적용한 모든 마이그레이션 중 success 인 마지막 항목을 추려 노출한다.
+    // Flyway 자체가 예외를 던지면 (DB 연결 끊김, history 테이블 손상 등) 시스템 상태 endpoint 전체가
+    // 죽지 않도록 빈 결과로 폴백한다 — 운영자는 modelServer / llm / 시드 상태는 여전히 볼 수 있어야
+    // 정확히 무엇이 망가졌는지 진단할 수 있다.
     private SystemStatusResponse.Database databaseStatus() {
-        MigrationInfo[] all = flyway.info().applied();
-        if (all == null || all.length == 0) {
+        try {
+            MigrationInfo[] all = flyway.info().applied();
+            if (all == null || all.length == 0) {
+                return new SystemStatusResponse.Database(null, null, 0);
+            }
+            MigrationInfo latest = java.util.Arrays.stream(all)
+                    .max(Comparator.comparingInt(m -> m.getInstalledRank() == null ? 0 : m.getInstalledRank()))
+                    .orElse(null);
+            String version = latest == null || latest.getVersion() == null
+                    ? null : latest.getVersion().getVersion();
+            Date installedOn = latest == null ? null : latest.getInstalledOn();
+            Instant appliedAt = installedOn == null ? null : installedOn.toInstant();
+            return new SystemStatusResponse.Database(version, appliedAt, all.length);
+        } catch (RuntimeException ex) {
+            log.warn("Flyway 상태 조회 실패 — DB 상태를 빈 결과로 폴백합니다.", ex);
             return new SystemStatusResponse.Database(null, null, 0);
         }
-        MigrationInfo latest = java.util.Arrays.stream(all)
-                .max(Comparator.comparingInt(m -> m.getInstalledRank() == null ? 0 : m.getInstalledRank()))
-                .orElse(null);
-        String version = latest == null || latest.getVersion() == null
-                ? null : latest.getVersion().getVersion();
-        Date installedOn = latest == null ? null : latest.getInstalledOn();
-        Instant appliedAt = installedOn == null ? null : installedOn.toInstant();
-        return new SystemStatusResponse.Database(version, appliedAt, all.length);
     }
 
     private List<SystemStatusResponse.SeedFileEntry> seedFileEntries() {
         List<SystemStatusResponse.SeedFileEntry> entries = new ArrayList<>(seedDomains.size());
         for (PersistableSeed seed : seedDomains) {
-            entries.add(new SystemStatusResponse.SeedFileEntry(
-                    seed.domain(), seed.supportsExplicitPersist(), seed.fileStatus()));
+            // 한 도메인의 fileStatus 가 IO 예외를 던져도 다른 도메인 상태는 보여줘야 한다.
+            try {
+                entries.add(new SystemStatusResponse.SeedFileEntry(
+                        seed.domain(), seed.supportsExplicitPersist(), seed.fileStatus()));
+            } catch (RuntimeException ex) {
+                log.warn("시드 도메인 '{}' 상태 조회 실패 — 빈 상태로 폴백합니다.", seed.domain(), ex);
+            }
         }
         entries.sort(Comparator.comparing(SystemStatusResponse.SeedFileEntry::domain));
         return entries;
     }
+
 }

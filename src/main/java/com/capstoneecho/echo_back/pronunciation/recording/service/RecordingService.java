@@ -137,7 +137,8 @@ public class RecordingService {
         recording.applyGuidanceKr(feedback.guidanceKr());
         Recording saved = recordingRepository.save(recording);
 
-        boolean passed = stepScore != null && stepScore >= settings.passThreshold() && !feedback.retryRecommended();
+        double passThreshold = settings.passThreshold();
+        boolean passed = stepScore != null && stepScore >= passThreshold && !feedback.retryRecommended();
         return RecordingUploadResponse.fromUpload(
                 saved,
                 analyze.perceived(),
@@ -147,7 +148,8 @@ public class RecordingService {
                 feedback,
                 passed,
                 analyze.speechRate(),
-                g2p.words());
+                g2p.words(),
+                passThreshold);
     }
 
     // 같은 부모 (script+step 또는 session+sentence) 의 이전 시도들을 오름차순으로 가져온 뒤,
