@@ -3,6 +3,7 @@ package com.capstoneecho.echo_back.pronunciation.recording.service;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
+import com.capstoneecho.echo_back.external.llm.PriorAttempt;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
@@ -23,6 +24,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.WeakPhonemeAnalyzer;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
@@ -33,9 +35,10 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -56,7 +59,11 @@ public class RecordingService {
     private final WavHeaderValidator wavHeaderValidator;
     private final ScoringPolicy scoringPolicy;
     private final PriorAttemptAssembler priorAttemptAssembler;
+    private final WeakPhonemeAnalyzer weakPhonemeAnalyzer;
     private final RuntimeSettings settings;
+    // 읽기/쓰기 트랜잭션을 명시적으로 분리해, 느린 모델 서버·LLM HTTP 호출 동안 DB 커넥션을 잡지 않게 한다.
+    private final TransactionTemplate readTx;
+    private final TransactionTemplate writeTx;
 
     public RecordingService(
             UserRepository userRepository,
@@ -72,7 +79,9 @@ public class RecordingService {
             WavHeaderValidator wavHeaderValidator,
             ScoringPolicy scoringPolicy,
             PriorAttemptAssembler priorAttemptAssembler,
-            RuntimeSettings settings) {
+            WeakPhonemeAnalyzer weakPhonemeAnalyzer,
+            RuntimeSettings settings,
+            PlatformTransactionManager txManager) {
         this.userRepository = userRepository;
         this.scriptRepository = scriptRepository;
         this.stepRepository = stepRepository;
@@ -86,42 +95,70 @@ public class RecordingService {
         this.wavHeaderValidator = wavHeaderValidator;
         this.scoringPolicy = scoringPolicy;
         this.priorAttemptAssembler = priorAttemptAssembler;
+        this.weakPhonemeAnalyzer = weakPhonemeAnalyzer;
         this.settings = settings;
+        this.readTx = new TransactionTemplate(txManager);
+        this.readTx.setReadOnly(true);
+        this.writeTx = new TransactionTemplate(txManager);
     }
 
-    // priorAttempts 상한은 최소 1 로 보정한다 (잘못된 설정 방어).
-    private int priorAttemptsCap() {
-        return Math.max(1, settings.priorAttemptsCap());
-    }
-
-    // 녹음 1건 업로드 흐름:
-    // (1) WAV 검증 → 부모 (script-step 또는 session-sentence) 매핑 → 목표 텍스트 추출
-    // (2) 모델 서버 g2p + analyze 호출
-    // (3) 같은 step / sentence 의 이전 시도들을 priorAttempts 로 묶어 LLM 호출 (구조화 출력)
-    // (4) 오디오 디스크 저장 + Recording 엔티티 저장 (errorsJson / wrongWordsJson / stepScore / guidanceKr 캐싱)
-    // (5) 점수 임계와 LLM 판정을 합쳐 passed / retryRecommended 를 응답에 포함
-    // 트랜잭션이 롤백되면 디스크에 쓴 오디오 파일도 같이 정리한다.
-    @Transactional
+    // 녹음 1건 업로드 흐름. 느린 외부 호출이 DB 커넥션을 잡지 않도록 세 단계로 분리한다:
+    //   (1) READ TX  — 부모 매핑/검증 + 목표 텍스트·이전 시도 등 LLM 입력 데이터를 트랜잭션 안에서 모두 추출
+    //   (2) HTTP     — 트랜잭션 밖에서 모델 서버 g2p/analyze + LLM 호출 (커넥션 미점유)
+    //   (3) WRITE TX — 오디오 디스크 저장 + Recording 영속화 (롤백 시 오디오도 정리)
     public RecordingUploadResponse upload(
             Long userId, RecordingUploadRequest request, byte[] audioBytes) {
         if (request == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         wavHeaderValidator.require(audioBytes);
-
         Mode mode = detectMode(request);
-        ResolvedParents parents = resolveParents(userId, request, mode);
-        String targetText = resolveTargetText(parents);
 
-        G2pResult g2p = modelServerClient.g2p(targetText);
+        // (1) 읽기 단계: 연관관계 초기화까지 트랜잭션 안에서 끝내고, 이후 단계가 쓸 순수 데이터만 들고 나온다.
+        PreparedInput prepared = readTx.execute(status -> {
+            ResolvedParents parents = resolveParents(userId, request, mode);
+            String targetText = resolveTargetText(parents);
+            String chapterTitle = parents.script() == null ? "" : parents.script().getTitle();
+            List<PriorAttempt> priorAttempts =
+                    priorAttemptAssembler.fromRecordings(findPriorAttempts(userId, parents));
+            return new PreparedInput(targetText, chapterTitle, priorAttempts);
+        });
+
+        // (2) 외부 호출 단계: DB 트랜잭션 밖에서 수행한다.
+        G2pResult g2p = modelServerClient.g2p(prepared.targetText());
         String canonical = g2p.phonemes() == null ? "" : g2p.phonemes();
         AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
-
         Double stepScore = analyze.per() == null ? null : scoringPolicy.perToScore(analyze.per());
-        List<Recording> priorRecordings = findPriorAttempts(userId, parents);
-        LlmStepContext context = buildStepContext(
-                parents, targetText, analyze, g2p, stepScore, priorRecordings);
+        LlmStepContext context = new LlmStepContext(
+                prepared.chapterTitle(),
+                prepared.targetText(),
+                analyze.perceived(),
+                analyze.canonicalOrEmpty(),
+                analyze.errors(),
+                g2p.words(),
+                weakPhonemeAnalyzer.firstCanonical(analyze.errors()),
+                stepScore,
+                prepared.priorAttempts());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
+
+        // (3) 쓰기 단계: 짧은 트랜잭션 안에서 오디오 저장 + Recording 영속화 + 응답 조립.
+        return writeTx.execute(status ->
+                persist(userId, request, mode, audioBytes, prepared.targetText(), g2p, analyze, stepScore, feedback));
+    }
+
+    // 오디오 디스크 저장 + Recording 영속화. 부모 엔티티는 이 트랜잭션에서 다시 조회해 관리 상태로 쓴다
+    // (Recording 팩토리가 step.getScript() 와 script 의 참조 동일성을 요구하므로 같은 영속성 컨텍스트여야 한다).
+    private RecordingUploadResponse persist(
+            Long userId,
+            RecordingUploadRequest request,
+            Mode mode,
+            byte[] audioBytes,
+            String targetText,
+            G2pResult g2p,
+            AnalyzeResult analyze,
+            Double stepScore,
+            LlmStepFeedback feedback) {
+        ResolvedParents parents = resolveParents(userId, request, mode);
 
         String audioPath = recordingStorage.save(userId, audioBytes);
         registerStorageCleanupOnNonCommit(audioPath);
@@ -152,11 +189,14 @@ public class RecordingService {
                 passThreshold);
     }
 
+    // READ TX 에서 추출해 이후 단계로 넘기는 순수 입력 데이터.
+    private record PreparedInput(String targetText, String chapterTitle, List<PriorAttempt> priorAttempts) {}
+
     // 같은 부모 (script+step 또는 session+sentence) 의 이전 시도들을 오름차순으로 가져온 뒤,
     // 가장 최근 priorAttemptsCap 개만 잘라 LLM 입력을 적정 토큰량으로 유지한다.
     private List<Recording> findPriorAttempts(Long userId, ResolvedParents parents) {
         List<Recording> all = loadAllPriorAttempts(userId, parents);
-        int cap = priorAttemptsCap();
+        int cap = settings.priorAttemptsCap();
         if (all.size() <= cap) {
             return all;
         }
@@ -174,37 +214,6 @@ public class RecordingService {
                             userId, parents.session().getId(), parents.sentence().getId());
         }
         return List.of();
-    }
-
-    // LLM 호출에 들어갈 컨텍스트. priorAttempts 가 채워지면 LLM 이 누적 학습 흐름을 인지한다.
-    private LlmStepContext buildStepContext(
-            ResolvedParents parents,
-            String targetText,
-            AnalyzeResult analyze,
-            G2pResult g2p,
-            Double stepScore,
-            List<Recording> priorRecordings) {
-        String chapterTitle = parents.script() == null ? "" : parents.script().getTitle();
-        return new LlmStepContext(
-                chapterTitle,
-                targetText,
-                analyze.perceived(),
-                analyze.canonicalOrEmpty(),
-                analyze.errors(),
-                g2p.words(),
-                pickWeakPhoneme(analyze.errors()),
-                stepScore,
-                priorAttemptAssembler.fromRecordings(priorRecordings));
-    }
-
-    private static String pickWeakPhoneme(List<AnalyzeError> errors) {
-        if (errors == null) return null;
-        for (AnalyzeError e : errors) {
-            if (e.canonical() != null && !e.canonical().isBlank()) {
-                return e.canonical();
-            }
-        }
-        return null;
     }
 
     // wrongWords 직렬화 실패는 데이터 손상을 뜻하므로 삼키지 않고 그대로 전파한다.

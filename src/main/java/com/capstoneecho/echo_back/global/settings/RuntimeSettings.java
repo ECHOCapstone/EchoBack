@@ -53,7 +53,8 @@ public class RuntimeSettings {
     }
 
     public int priorAttemptsCap() {
-        return settings.getInt(PRIOR_ATTEMPTS_CAP, gamification.priorAttemptsCap());
+        // 최소 1 보장: 어드민이 0/음수를 넣어도 직전 시도 한 건은 LLM 입력에 포함되도록 클램프한다.
+        return Math.max(1, settings.getInt(PRIOR_ATTEMPTS_CAP, gamification.priorAttemptsCap()));
     }
 
     public double scoreFallbackOnError() {

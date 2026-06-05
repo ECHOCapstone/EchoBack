@@ -2,6 +2,7 @@ package com.capstoneecho.echo_back.global.common;
 
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -55,8 +56,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        // 업로드 크기 초과는 의미상 413 Payload Too Large. 본문 코드는 클라이언트 메시지 매핑을 위해 유지한다.
         return ResponseEntity
-                .status(ErrorCode.INVALID_REQUEST.getStatus())
+                .status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(ApiResponse.failure(ErrorCode.INVALID_REQUEST, uploadTooLargeMessage()));
     }
 

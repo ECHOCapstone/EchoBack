@@ -16,9 +16,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +27,13 @@ import tools.jackson.databind.ObjectMapper;
 //
 // 우선순위: 외부 ${app.content.dir}/tracks.yaml 이 있으면 그쪽 (어드민이 영구 저장한 버전),
 //          없으면 classpath:content/tracks.yaml (git 으로 관리되는 공장 기본값) 으로 폴백.
-// 어드민의 시드 재적용은 트랙을 전부 비우고 이 메서드를 다시 부른다.
+// 어드민의 시드 재적용은 트랙을 전부 비우고 seedTracksIfEmpty() 를 다시 부른다.
+//
+// 시드 로직(빈)은 모든 프로파일에 등록한다 — TrackPersistService(시드 재적용) 가 이 빈을 주입받으므로
+// test 프로파일에서 빈을 제거하면 통합 테스트 컨텍스트 로딩이 실패한다. 부팅 시 자동 시드는 별도의
+// SeedBootstrapRunner(@Profile("!test")) 가 담당해, 테스트는 빈 DB 에서 시작하도록 분리한다.
 @Component
-@Profile("!test")
-public class InitialDataLoader implements ApplicationRunner {
+public class InitialDataLoader {
 
     private final TrackRepository trackRepository;
     private final ScriptRepository scriptRepository;
@@ -56,12 +56,6 @@ public class InitialDataLoader implements ApplicationRunner {
         this.objectMapper = objectMapper;
         this.defaultTracksResource = defaultTracksResource;
         this.contentStore = contentStore;
-    }
-
-    @Override
-    @Transactional
-    public void run(ApplicationArguments args) {
-        seedTracksIfEmpty();
     }
 
     @Transactional
