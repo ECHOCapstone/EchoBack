@@ -30,7 +30,8 @@ public class GeminiLlmClient implements LlmClient {
     private static final double TEMPERATURE = 0.4;
     private static final int MAX_OUTPUT_TOKENS = 1024;
 
-    private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+    // yaml(app.llm.gemini.base-url) 누락 시에만 쓰는 최후 폴백. 모델 기본값은 별도 literal 을 두지 않고
+    // 허용 모델 목록(app.llm.gemini.models)의 첫 항목에서 도출해 yaml 을 단일 출처로 유지한다.
     private static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 
     private final RestClient restClient;
@@ -62,7 +63,7 @@ public class GeminiLlmClient implements LlmClient {
 
         this.apiKey = key == null ? "" : key;
         this.defaultModel = (configuredModel == null || configuredModel.isBlank())
-                ? DEFAULT_MODEL : configuredModel;
+                ? firstAllowedModel(g) : configuredModel;
         // apiKey 가 있어야 호출 가능하다. 없으면 DispatchingLlmClient 가 규칙 기반으로 보낸다.
         this.available = !this.apiKey.isBlank();
 
@@ -77,6 +78,12 @@ public class GeminiLlmClient implements LlmClient {
                 .baseUrl((baseUrl == null || baseUrl.isBlank()) ? DEFAULT_BASE_URL : baseUrl)
                 .requestFactory(factory)
                 .build();
+    }
+
+    // 모델 기본값을 허용 모델 목록(app.llm.gemini.models)의 첫 항목에서 도출한다.
+    // yaml 의 models 목록을 단일 출처로 삼아, 코드에 별도 모델 literal 을 두지 않는다.
+    private static String firstAllowedModel(AppProperties.Llm.Gemini gemini) {
+        return gemini == null ? "" : gemini.safeModels().stream().findFirst().orElse("");
     }
 
     // apiKey 가 설정돼 호출 가능한 상태인지. DispatchingLlmClient 가 라우팅 판단에 쓴다.

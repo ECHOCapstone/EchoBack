@@ -19,7 +19,6 @@ public class LlmConfigService {
     private static final String PROVIDER_GEMINI = "gemini";
     private static final String PROVIDER_RULE_BASED = "rule-based";
     private static final List<String> PROVIDER_OPTIONS = List.of(PROVIDER_RULE_BASED, PROVIDER_GEMINI);
-    private static final String DEFAULT_MODEL = "gemini-2.5-flash";
 
     private final SettingsService settings;
     private final GeminiLlmClient gemini;
@@ -35,9 +34,11 @@ public class LlmConfigService {
         AppProperties.Llm.Gemini g = llm == null ? null : llm.gemini();
         this.defaultProvider = (llm == null || llm.provider() == null || llm.provider().isBlank())
                 ? PROVIDER_RULE_BASED : llm.provider();
-        this.defaultModel = (g == null || g.model() == null || g.model().isBlank())
-                ? DEFAULT_MODEL : g.model();
         this.modelOptions = g == null ? List.of() : g.safeModels();
+        // 모델 기본값: yaml 의 model 이 비면 허용 목록(models)의 첫 항목으로 폴백한다 — 코드에 모델 literal 을 두지 않는다.
+        this.defaultModel = (g == null || g.model() == null || g.model().isBlank())
+                ? modelOptions.stream().findFirst().orElse("")
+                : g.model();
     }
 
     public LlmConfigResponse current() {

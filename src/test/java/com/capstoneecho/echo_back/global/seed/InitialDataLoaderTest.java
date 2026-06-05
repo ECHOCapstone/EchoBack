@@ -70,7 +70,7 @@ class InitialDataLoaderTest {
     @Test
     @DisplayName("비어 있는 DB 에서 실행하면 tracks.yaml 의 3개 트랙이 모두 시드된다")
     void run_emptyDb_seedsAllTracks() {
-        loader.run(null);
+        loader.seedTracksIfEmpty();
 
         List<Track> tracks = trackRepository.findAllByOrderByDisplayOrderAsc();
         assertThat(tracks).hasSize(3);
@@ -98,7 +98,7 @@ class InitialDataLoaderTest {
         trackRepository.save(Track.create("기존 트랙", "이미 있음", 99));
         long before = trackRepository.count();
 
-        loader.run(null);
+        loader.seedTracksIfEmpty();
 
         assertThat(trackRepository.count()).isEqualTo(before);
         assertThat(scriptRepository.count()).isZero();
@@ -108,7 +108,7 @@ class InitialDataLoaderTest {
     @Test
     @DisplayName("스텝은 yaml 의 orderIndex 순서로 저장되고 INTRO/RECORD 가 올바르게 매핑된다")
     void run_steps_orderedAndMappedByKind() {
-        loader.run(null);
+        loader.seedTracksIfEmpty();
 
         // 두 번째 챕터(R vs L): INTRO, RECORD, RECORD, INTRO, RECORD, RECORD, INTRO, RECORD, RECORD
         Track basics = trackRepository.findAllByOrderByDisplayOrderAsc().get(0);

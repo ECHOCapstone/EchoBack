@@ -18,6 +18,19 @@ public class WeakPhonemeAnalyzer {
         return topOne(List.of(errors));
     }
 
+    // 빈도와 무관하게 가장 먼저 나오는 non-blank canonical 음소. 단일 시도의 대표 약점 음소로 쓴다.
+    public String firstCanonical(List<AnalyzeError> errors) {
+        if (errors == null) {
+            return null;
+        }
+        for (AnalyzeError error : errors) {
+            if (error.canonical() != null && !error.canonical().isBlank()) {
+                return error.canonical();
+            }
+        }
+        return null;
+    }
+
     private String topOne(Collection<? extends Collection<AnalyzeError>> errorBatches) {
         if (errorBatches == null || errorBatches.isEmpty()) {
             return null;

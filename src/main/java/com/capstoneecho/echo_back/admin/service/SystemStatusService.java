@@ -15,6 +15,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 // 어드민 대시보드용 시스템 상태 집계. 외부 의존성이 일시적으로 죽어 있어도 부분 결과를 돌려준다.
@@ -25,18 +26,20 @@ public class SystemStatusService {
 
     private final ModelServerClient modelServerClient;
     private final GeminiLlmClient gemini;
-    private final Flyway flyway;
+    // Flyway 는 prod/local 프로파일에만 존재한다(test/dev 는 H2 ddl-auto). 없을 때도 시스템 상태
+    // endpoint 가 동작하도록 Optional 로 주입받는다.
+    private final ObjectProvider<Flyway> flywayProvider;
     private final List<PersistableSeed> seedDomains;
 
     public SystemStatusService(
             ModelServerClient modelServerClient,
             GeminiLlmClient gemini,
-            Flyway flyway,
+            ObjectProvider<Flyway> flywayProvider,
             List<PersistableSeed> seedDomains
     ) {
         this.modelServerClient = modelServerClient;
         this.gemini = gemini;
-        this.flyway = flyway;
+        this.flywayProvider = flywayProvider;
         this.seedDomains = seedDomains;
     }
 
@@ -67,6 +70,11 @@ public class SystemStatusService {
     // 죽지 않도록 빈 결과로 폴백한다 — 운영자는 modelServer / llm / 시드 상태는 여전히 볼 수 있어야
     // 정확히 무엇이 망가졌는지 진단할 수 있다.
     private SystemStatusResponse.Database databaseStatus() {
+        Flyway flyway = flywayProvider.getIfAvailable();
+        if (flyway == null) {
+            // Flyway 가 없는 프로파일(test/dev): 마이그레이션 정보 없이 빈 상태로 노출한다.
+            return new SystemStatusResponse.Database(null, null, 0);
+        }
         try {
             MigrationInfo[] all = flyway.info().applied();
             if (all == null || all.length == 0) {

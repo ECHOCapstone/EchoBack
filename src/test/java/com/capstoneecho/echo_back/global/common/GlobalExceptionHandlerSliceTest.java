@@ -78,10 +78,10 @@ class GlobalExceptionHandlerSliceTest {
     }
 
     @Test
-    @DisplayName("MaxUploadSizeExceededException → 400 + INVALID_REQUEST")
-    void mapsMultipartLimitExceededToInvalidRequest() throws Exception {
+    @DisplayName("MaxUploadSizeExceededException → 413 + INVALID_REQUEST")
+    void mapsMultipartLimitExceededToPayloadTooLarge() throws Exception {
         mockMvc.perform(get("/__test/multipart-overflow"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isPayloadTooLarge())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_REQUEST.name()))
                 .andExpect(jsonPath("$.error.message").exists());
