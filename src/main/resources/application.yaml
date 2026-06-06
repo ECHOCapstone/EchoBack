@@ -1,3 +1,9 @@
+# Cloudflare Tunnel / 리버스 프록시 뒤에서도 OAuth redirect 와 Spring 의 {baseUrl} placeholder 가
+# 외부 도메인을 기준으로 합성되도록 X-Forwarded-* 헤더를 처리한다. 직접 백엔드에 들어오는 요청에는
+# X-Forwarded-* 가 없으므로 영향이 없다.
+server:
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: ECHO_back
@@ -52,7 +58,7 @@ spring:
             # 컨테이너 8080 포트를 호스트에 노출하지 못하는 dev 환경에서는 프론트 origin 으로
             # 강제 고정한다. vite proxy 가 /api/* 를 백엔드로 forward 하므로 동일 origin 으로
             # 흐름이 닫힌다. APP_OAUTH2_REDIRECT_URI 환경변수로 운영 시 override 가능.
-            redirect-uri: ${APP_OAUTH2_REDIRECT_URI:http://localhost:5173/api/auth/oauth2/{registrationId}/callback}
+            redirect-uri: ${APP_OAUTH2_REDIRECT_URI:{baseUrl}/api/auth/oauth2/{registrationId}/callback}
             scope:
               - openid
               - email
@@ -64,7 +70,7 @@ spring:
             # 으로 두면 토큰 교환이 invalid_client 로 실패한다.
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: ${APP_OAUTH2_REDIRECT_URI:http://localhost:5173/api/auth/oauth2/{registrationId}/callback}
+            redirect-uri: ${APP_OAUTH2_REDIRECT_URI:{baseUrl}/api/auth/oauth2/{registrationId}/callback}
             scope:
               # ID Token 발급 트리거. 콘솔의 "OpenID Connect 활성화" 토글이 ON 이어야 실제로 id_token 이 내려온다.
               - openid
@@ -90,8 +96,18 @@ app:
   jwt:
     expiration-ms: 86400000
   cors:
+    # 같은 origin (vite proxy + changeOrigin) 흐름에선 CORS 자체가 발생하지 않으므로 평시엔 빈 목록에 가깝다.
+    # 다른 origin 에서 직접 호출하는 데모 / 외부 클라이언트를 위해 자기 origin 과 흔한 dev 포트만 허용한다.
     allowed-origins:
       - "http://localhost:3000"
+      - "http://localhost:5173"
+    # 와일드카드 패턴 (Cloudflare Tunnel 임시 도메인 등). 와일드카드는 allowed-origins 가 아닌
+    # allowed-origin-patterns 에 두어야 Spring 이 정규식으로 매칭한다.
+    allowed-origin-patterns:
+      - "https://*.trycloudflare.com"
+      - "https://*.loca.lt"
+      - "https://*.ngrok-free.app"
+      - "https://*.ngrok.app"
     allowed-methods:
       - GET
       - POST
@@ -145,12 +161,12 @@ app:
         condition: USER_STREAK
         threshold: 7
   oauth2:
-    # Google 로그인 성공 후 프론트엔드로 보낼 URL. JWT 는 fragment (#token=...) 로 붙는다.
-    frontend-redirect-uri: ${APP_OAUTH2_FRONTEND_REDIRECT_URI:http://localhost:3000/oauth/callback}
-    # 실패 시 프론트엔드 로그인 페이지로 redirect. ?oauthError=<code> 쿼리가 붙는다.
-    frontend-error-uri: ${APP_OAUTH2_FRONTEND_ERROR_URI:http://localhost:3000/login}
-    # 신규 사용자를 가입 폼으로 안내할 URL. fragment 로 #pendingToken=...&email=...&nicknameHint=...&provider=... 가 붙는다.
-    frontend-signup-uri: ${APP_OAUTH2_FRONTEND_SIGNUP_URI:http://localhost:5173/signup}
+    # OAuth 성공/실패/가입 안내의 프론트엔드 redirect 경로. path-only 로 두면 백엔드가 incoming
+    # request 의 scheme + host (Cloudflare Tunnel / 리버스 프록시 등 어떤 도메인이든) 와 합성한다.
+    # 절대 URL 을 환경변수로 명시하면 그 host 는 무시되고 path/query 만 사용된다.
+    frontend-redirect-uri: ${APP_OAUTH2_FRONTEND_REDIRECT_URI:/oauth/callback}
+    frontend-error-uri: ${APP_OAUTH2_FRONTEND_ERROR_URI:/login}
+    frontend-signup-uri: ${APP_OAUTH2_FRONTEND_SIGNUP_URI:/signup}
   gamification:
     completion-exp: 10
     streak-cap: 7
@@ -162,6 +178,18 @@ app:
     prior-attempts-cap: 10
     default-ranking-unit-title: "오늘의 랭킹"
     default-practice-word: "the"
+  auth:
+    # 회원가입 시 적용되는 비밀번호 정책. 백엔드 검증과 프론트 안내가 같은 출처를 공유한다.
+    password-policy:
+      min-length: 8
+      max-length: 100
+      # 다음 문자 종류 중 require-categories 개수 이상을 만족해야 한다.
+      # categories: lowercase, uppercase, digit, symbol
+      require-categories: 2
+  legal:
+    # 현재 약관 본문 버전. 본문 파일은 classpath:content/terms/{kind}-{version}.md 로 둔다.
+    # 버전이 바뀌면 동의 기록과 비교해 재동의를 요구할 수 있다.
+    terms-version: "1"
   messages:
     recording-guidance-fallback: "발음을 더 또렷하게 따라 읽어 보세요."
     feedback-guidance-fallback: "꾸준한 연습이 발음 개선에 도움이 됩니다."
