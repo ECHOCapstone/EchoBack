@@ -2,6 +2,7 @@ package com.capstoneecho.echo_back.global.security;
 
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.global.security.oauth2.CustomOAuth2AuthorizationRequestResolver;
+import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.global.security.oauth2.CustomOAuth2UserService;
 import com.capstoneecho.echo_back.global.security.oauth2.CustomOidcUserService;
 import com.capstoneecho.echo_back.global.security.oauth2.OAuth2LoginFailureHandler;
@@ -27,8 +28,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtAuthFilter jwtAuthFilter(JwtProvider jwtProvider) {
-        return new JwtAuthFilter(jwtProvider);
+    public JwtAuthFilter jwtAuthFilter(JwtProvider jwtProvider, UserRepository userRepository) {
+        return new JwtAuthFilter(jwtProvider, userRepository);
     }
 
     @Bean
@@ -62,6 +63,7 @@ public class SecurityConfig {
                         // 모두 /api/auth/** permitAll 에 포함되므로 별도 추가 불필요.
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/legal/**",
                                 "/api/health",
                                 "/error",
                                 "/actuator/health",

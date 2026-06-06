@@ -55,7 +55,13 @@ public class SettingsAdminService {
                 new Definition(RuntimeSettings.MSG_UPLOAD_TOO_LARGE, Type.STRING,
                         runtime::uploadTooLarge),
                 new Definition(RuntimeSettings.MSG_TTS_TEXT_REQUIRED, Type.STRING,
-                        runtime::ttsTextRequired));
+                        runtime::ttsTextRequired),
+                new Definition(RuntimeSettings.AUTH_PASSWORD_MIN_LENGTH, Type.INT,
+                        () -> String.valueOf(runtime.passwordMinLength())),
+                new Definition(RuntimeSettings.AUTH_PASSWORD_MAX_LENGTH, Type.INT,
+                        () -> String.valueOf(runtime.passwordMaxLength())),
+                new Definition(RuntimeSettings.AUTH_PASSWORD_REQUIRE_CATEGORIES, Type.INT,
+                        () -> String.valueOf(runtime.passwordRequireCategories())));
     }
 
     public List<SettingResponse> list() {

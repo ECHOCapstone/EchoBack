@@ -4,10 +4,15 @@ import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.JwtPrincipal;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
+import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.member.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -15,18 +20,17 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.util.List;
-
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     public static final String ERROR_ATTRIBUTE = "jwtAuthError";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
-    public JwtAuthFilter(JwtProvider jwtProvider) {
+    public JwtAuthFilter(JwtProvider jwtProvider, UserRepository userRepository) {
         this.jwtProvider = jwtProvider;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -49,6 +53,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = header.substring(BEARER_PREFIX.length()).trim();
         try {
             JwtPrincipal principal = jwtProvider.parse(token);
+            // 탈퇴된 사용자의 미만료 토큰을 차단한다 — JWT 자체는 stateless 라 deleted 상태를 모르기 때문.
+            // 매 인증 요청마다 1 DB 호출이 추가되지만 정확성이 우선이다.
+            Optional<User> userOpt = userRepository.findById(principal.userId());
+            if (userOpt.isEmpty() || userOpt.get().isDeleted()) {
+                SecurityContextHolder.clearContext();
+                request.setAttribute(ERROR_ATTRIBUTE, ErrorCode.USER_NOT_FOUND);
+                chain.doFilter(request, response);
+                return;
+            }
             // role 클레임을 Spring Security 권한(ROLE_USER / ROLE_ADMIN)으로 변환해 hasRole 검사에 쓴다.
             var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + principal.role()));
             UsernamePasswordAuthenticationToken authentication =

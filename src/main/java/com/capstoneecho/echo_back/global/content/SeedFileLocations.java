@@ -8,6 +8,7 @@ public final class SeedFileLocations {
     public static final String SETTINGS_OVERRIDES = "settings-overrides.yaml";
     public static final String PROMPTS_DIR = "prompts";
     public static final String BADGES = "badges.yaml";
+    public static final String TERMS_DIR = "terms";
 
     private SeedFileLocations() {}
 
