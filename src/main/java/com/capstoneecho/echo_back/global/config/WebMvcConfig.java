@@ -28,6 +28,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         AppProperties.Cors cors = appProperties.cors();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(cors.allowedOrigins());
+        // 와일드카드 호스트 (Cloudflare Tunnel 등) 는 setAllowedOrigins 에 못 넣고 별도 패턴 API 로 받아야 한다.
+        config.setAllowedOriginPatterns(cors.safeAllowedOriginPatterns());
         config.setAllowedMethods(cors.allowedMethods());
         config.setAllowedHeaders(cors.allowedHeaders());
         config.setExposedHeaders(cors.exposedHeaders());

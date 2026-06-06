@@ -29,6 +29,7 @@ public class OAuth2SignupService {
     private final SocialAccountRepository socialAccountRepository;
     private final PendingOAuthTokenService pendingTokenService;
     private final JwtProvider jwtProvider;
+    private final AuthService authService;
     private final long jwtExpirationMs;
 
     public OAuth2SignupService(
@@ -36,12 +37,14 @@ public class OAuth2SignupService {
             SocialAccountRepository socialAccountRepository,
             PendingOAuthTokenService pendingTokenService,
             JwtProvider jwtProvider,
+            AuthService authService,
             AppProperties appProperties
     ) {
         this.userRepository = userRepository;
         this.socialAccountRepository = socialAccountRepository;
         this.pendingTokenService = pendingTokenService;
         this.jwtProvider = jwtProvider;
+        this.authService = authService;
         this.jwtExpirationMs = appProperties.jwt().expirationMs();
     }
 
@@ -68,8 +71,14 @@ public class OAuth2SignupService {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
 
-        User newUser = userRepository.save(
-                User.fromOAuth2Signup(request.username(), pending.email(), request.nickname()));
+        User newUser = User.fromOAuth2Signup(request.username(), pending.email(), request.nickname());
+        // 표준 가입과 동일한 동의 모델 — 시간을 한 번에 기록한다.
+        newUser.applyAgreements(authService.buildAgreementRecord(
+                request.agreedTerms(),
+                request.agreedPrivacy(),
+                request.agreedAgeOver14(),
+                Boolean.TRUE.equals(request.agreedMarketing())));
+        userRepository.save(newUser);
         socialAccountRepository.save(SocialAccount.create(
                 newUser, pending.provider(), pending.providerUid(), pending.email(), null));
 

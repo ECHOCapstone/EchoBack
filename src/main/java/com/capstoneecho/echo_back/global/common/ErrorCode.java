@@ -7,6 +7,10 @@ public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "잘못된 요청입니다."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값 검증에 실패했습니다."),
     AUDIO_DECODE_FAILED(HttpStatus.BAD_REQUEST, "오디오 디코딩에 실패했습니다."),
+    PASSWORD_TOO_WEAK(HttpStatus.BAD_REQUEST, "비밀번호가 정책을 충족하지 않습니다."),
+    TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "이용약관 동의가 필요합니다."),
+    PRIVACY_NOT_AGREED(HttpStatus.BAD_REQUEST, "개인정보처리방침 동의가 필요합니다."),
+    AGE_RESTRICTION_NOT_AGREED(HttpStatus.BAD_REQUEST, "만 14세 이상 확인이 필요합니다."),
 
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "토큰이 유효하지 않습니다."),

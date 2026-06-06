@@ -56,7 +56,10 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
                     pending.providerUid(),
                     pending.email(),
                     pending.nicknameHint());
-            String targetUrl = frontendSignupUri
+            // 설정값의 host 가 localhost 박힌 경우에도 외부 도메인 (Cloudflare Tunnel 등) 으로 콜백되도록
+                    // incoming request 의 scheme + host 와 합성한다.
+            String base = FrontendUrlResolver.resolve(request, frontendSignupUri);
+            String targetUrl = base
                     + "#pendingToken=" + encode(pendingToken)
                     + "&email=" + encode(pending.email())
                     + "&nicknameHint=" + encode(pending.nicknameHint() == null ? "" : pending.nicknameHint())
@@ -71,7 +74,8 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
                 && oae.getError().getErrorCode() != null) {
             errorCode = oae.getError().getErrorCode();
         }
-        String targetUrl = frontendErrorUri + "?oauthError=" + encode(errorCode);
+        String base = FrontendUrlResolver.resolve(request, frontendErrorUri);
+        String targetUrl = base + "?oauthError=" + encode(errorCode);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 

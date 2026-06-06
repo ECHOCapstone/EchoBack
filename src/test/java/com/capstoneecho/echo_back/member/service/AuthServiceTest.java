@@ -37,7 +37,7 @@ class AuthServiceTest {
     @DisplayName("signup 은 JWT 를 발급하고 비밀번호를 BCrypt 해시로만 저장한다")
     void signupIssuesJwtAndPersistsBCryptHash() {
         AuthTokenResponse response = authService.signup(
-                new SignupRequest("alice", "alice@example.com", "Password!1", "Alice"));
+                new SignupRequest("alice", "alice@example.com", "Password!1", "Alice", true, true, true, false));
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.tokenType()).isEqualTo("Bearer");
@@ -58,10 +58,10 @@ class AuthServiceTest {
     @DisplayName("signup 은 username 이 중복이면 USERNAME_DUPLICATED 를 던진다")
     void signupDuplicateUsernameThrowsUsernameDuplicated() {
         authService.signup(
-                new SignupRequest("bob", "bob@example.com", "Password!1", "Bob"));
+                new SignupRequest("bob", "bob@example.com", "Password!1", "Bob", true, true, true, false));
 
         assertThatThrownBy(() -> authService.signup(
-                new SignupRequest("bob", "bob2@example.com", "Password!1", "Bob2")))
+                new SignupRequest("bob", "bob2@example.com", "Password!1", "Bob2", true, true, true, false)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.USERNAME_DUPLICATED);
@@ -71,10 +71,10 @@ class AuthServiceTest {
     @DisplayName("signup 은 email 이 중복이면 EMAIL_DUPLICATED 를 던진다")
     void signupDuplicateEmailThrowsEmailDuplicated() {
         authService.signup(
-                new SignupRequest("carol", "shared@example.com", "Password!1", "Carol"));
+                new SignupRequest("carol", "shared@example.com", "Password!1", "Carol", true, true, true, false));
 
         assertThatThrownBy(() -> authService.signup(
-                new SignupRequest("carol2", "shared@example.com", "Password!1", "Carol2")))
+                new SignupRequest("carol2", "shared@example.com", "Password!1", "Carol2", true, true, true, false)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.EMAIL_DUPLICATED);
@@ -84,7 +84,7 @@ class AuthServiceTest {
     @DisplayName("login 은 username 으로 인증에 성공하면 JWT 를 반환한다")
     void loginByUsernameSucceeds() {
         authService.signup(
-                new SignupRequest("dan", "dan@example.com", "Password!1", "Dan"));
+                new SignupRequest("dan", "dan@example.com", "Password!1", "Dan", true, true, true, false));
 
         AuthTokenResponse response = authService.login(
                 new LoginRequest("dan", "Password!1"));
@@ -97,7 +97,7 @@ class AuthServiceTest {
     @DisplayName("login 은 email 로 로그인 시도하면 LOGIN_FAILED (spec: username only)")
     void loginByEmailFailsBecauseSpecIsUsernameOnly() {
         authService.signup(
-                new SignupRequest("eve", "eve@example.com", "Password!1", "Eve"));
+                new SignupRequest("eve", "eve@example.com", "Password!1", "Eve", true, true, true, false));
 
         assertThatThrownBy(() -> authService.login(
                 new LoginRequest("eve@example.com", "Password!1")))
@@ -110,7 +110,7 @@ class AuthServiceTest {
     @DisplayName("login 은 잘못된 비밀번호에 대해 LOGIN_FAILED 를 던진다")
     void loginWithWrongPasswordThrowsLoginFailed() {
         authService.signup(
-                new SignupRequest("frank", "frank@example.com", "Password!1", "Frank"));
+                new SignupRequest("frank", "frank@example.com", "Password!1", "Frank", true, true, true, false));
 
         assertThatThrownBy(() -> authService.login(
                 new LoginRequest("frank", "WrongPassword!9")))
@@ -145,7 +145,7 @@ class AuthServiceTest {
     @DisplayName("checkUsername 은 사용 가능 여부를 반환한다")
     void checkUsernameReturnsAvailability() {
         authService.signup(
-                new SignupRequest("hank", "hank@example.com", "Password!1", "Hank"));
+                new SignupRequest("hank", "hank@example.com", "Password!1", "Hank", true, true, true, false));
 
         AvailabilityResponse taken = authService.checkUsername("hank");
         AvailabilityResponse free = authService.checkUsername("newuser");
@@ -158,7 +158,7 @@ class AuthServiceTest {
     @DisplayName("checkEmail 은 사용 가능 여부를 반환한다")
     void checkEmailReturnsAvailability() {
         authService.signup(
-                new SignupRequest("ivy", "ivy@example.com", "Password!1", "Ivy"));
+                new SignupRequest("ivy", "ivy@example.com", "Password!1", "Ivy", true, true, true, false));
 
         AvailabilityResponse taken = authService.checkEmail("ivy@example.com");
         AvailabilityResponse free = authService.checkEmail("nobody@example.com");

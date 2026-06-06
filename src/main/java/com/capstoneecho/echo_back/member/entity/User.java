@@ -71,6 +71,27 @@ public class User {
             columnDefinition = "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
     private Instant createdAt;
 
+    // 동의한 약관 버전. AgreementRecord 가 한 묶음으로 기록되며, 추후 본문이 바뀌면 재동의 요구 판정의 기준이 된다.
+    @Column(name = "terms_version", length = 20)
+    private String termsVersion;
+
+    @Column(name = "agreed_terms_at")
+    private Instant agreedTermsAt;
+
+    @Column(name = "agreed_privacy_at")
+    private Instant agreedPrivacyAt;
+
+    @Column(name = "agreed_age_over14_at")
+    private Instant agreedAgeOver14At;
+
+    // 마케팅 동의는 선택. NULL 이면 미동의 상태.
+    @Column(name = "agreed_marketing_at")
+    private Instant agreedMarketingAt;
+
+    // 회원 탈퇴 시각. NULL 이면 활성 회원. 인증 단계에서 not-null 인 사용자는 거절된다.
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     private User(String username, String email, String passwordHash, String nickname) {
         this.username = username;
         this.email = email;
@@ -83,6 +104,30 @@ public class User {
         this.createdAt = Instant.now();
     }
 
+    // 가입 시점에 모은 동의 사실을 한 번에 적용한다. 필수 3종 시각이 빠지면 가입 흐름의 사전 검증이 누락된 것.
+    public void applyAgreements(AgreementRecord record) {
+        if (record == null) {
+            throw new IllegalArgumentException("agreement record is required");
+        }
+        if (record.termsAt() == null || record.privacyAt() == null || record.ageOver14At() == null) {
+            throw new IllegalArgumentException("required agreement timestamps must not be null");
+        }
+        this.termsVersion = record.version();
+        this.agreedTermsAt = record.termsAt();
+        this.agreedPrivacyAt = record.privacyAt();
+        this.agreedAgeOver14At = record.ageOver14At();
+        this.agreedMarketingAt = record.marketingAt();
+    }
+
+    // 동의 한 묶음. 필수 3종은 not-null, 마케팅은 nullable.
+    public record AgreementRecord(
+            String version,
+            Instant termsAt,
+            Instant privacyAt,
+            Instant ageOver14At,
+            Instant marketingAt
+    ) {}
+
     public boolean isAdmin() {
         return this.role == Role.ADMIN;
     }
@@ -90,6 +135,34 @@ public class User {
     // 부트스트랩/운영 도구가 특정 계정을 관리자로 승격할 때 사용한다.
     public void promoteToAdmin() {
         this.role = Role.ADMIN;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    // 회원 탈퇴 처리. 즉시 hard delete 하지 않고 시각을 기록해 30일 grace period 동안 보존한다.
+    // 별도 cleanup 작업이 grace period 가 지난 사용자를 hard delete 한다.
+    public void markDeleted(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("now is required");
+        }
+        this.deletedAt = now;
+    }
+
+    // 탈퇴 후 grace period 안에 같은 인증 정보로 다시 로그인한 경우 계정을 살린다.
+    // 학습 기록은 grace period 동안 보존되므로 그대로 복구된다.
+    public void restore() {
+        this.deletedAt = null;
+    }
+
+    // 새 BCrypt 해시로 비밀번호를 교체한다. OAuth 전용 계정 (해시 null) 은 호출자가 사전 검사해야 한다.
+    public void replacePasswordHash(String newPasswordHashBCrypt) {
+        if (newPasswordHashBCrypt == null
+                || !BCRYPT_PATTERN.matcher(newPasswordHashBCrypt).matches()) {
+            throw new IllegalArgumentException("password must be a BCrypt hash");
+        }
+        this.passwordHash = newPasswordHashBCrypt;
     }
 
     // 표준 회원가입 경로. passwordHash 는 반드시 BCrypt 결과여야 한다 (생패스워드 저장 방지 검증).

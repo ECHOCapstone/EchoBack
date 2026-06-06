@@ -27,7 +27,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
                     "해당 단어를 한 번 더 천천히 따라 읽어 보세요.",
                     "업로드 가능한 파일 크기를 초과했습니다.",
                     "text 는 비어 있을 수 없습니다."),
-            null, null);
+            null, null, null, null);
 
     // 오버라이드 없는 SettingsService → RuntimeSettings 가 FIXTURE 의 yaml 기본값을 그대로 돌려준다.
     private final RuntimeSettings runtimeSettings =

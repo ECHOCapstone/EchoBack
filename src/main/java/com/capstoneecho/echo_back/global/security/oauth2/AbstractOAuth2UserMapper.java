@@ -61,11 +61,20 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
                     // Case A — 이미 같은 provider 계정으로 로그인한 사용자.
                     existing.updateAccessToken(accessToken);
                     existing.updateProviderEmail(email);
-                    return existing.getUser();
+                    User linked = existing.getUser();
+                    // 탈퇴 grace period 안에 같은 소셜 계정으로 다시 로그인 — 자동 복구.
+                    if (linked.isDeleted()) {
+                        linked.restore();
+                    }
+                    return linked;
                 })
                 .orElseGet(() -> userRepository.findByEmail(email)
                         .map(existingUser -> {
                             // Case B — 같은 이메일의 기존 User 에 SocialAccount 만 추가.
+                            // 탈퇴된 계정도 같은 인증 정보로의 재진입이므로 복구한다.
+                            if (existingUser.isDeleted()) {
+                                existingUser.restore();
+                            }
                             socialAccountRepository.save(SocialAccount.create(
                                     existingUser, provider(), sub, email, accessToken));
                             return existingUser;

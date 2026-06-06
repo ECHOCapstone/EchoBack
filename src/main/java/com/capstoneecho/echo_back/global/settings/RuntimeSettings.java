@@ -26,14 +26,39 @@ public class RuntimeSettings {
     public static final String MSG_UPLOAD_TOO_LARGE = "messages.uploadTooLarge";
     public static final String MSG_TTS_TEXT_REQUIRED = "messages.ttsTextRequired";
 
+    // 비밀번호 정책. 어드민의 "설정" 탭에서 편집 가능. yaml 기본값 위에 덮어쓰는 표준 패턴.
+    public static final String AUTH_PASSWORD_MIN_LENGTH = "auth.passwordMinLength";
+    public static final String AUTH_PASSWORD_MAX_LENGTH = "auth.passwordMaxLength";
+    public static final String AUTH_PASSWORD_REQUIRE_CATEGORIES = "auth.passwordRequireCategories";
+
     private final SettingsService settings;
     private final AppProperties.Gamification gamification;
     private final AppProperties.Messages messages;
+    private final AppProperties.Auth.PasswordPolicy passwordPolicyDefaults;
 
     public RuntimeSettings(SettingsService settings, AppProperties appProperties) {
         this.settings = settings;
         this.gamification = appProperties.gamification();
         this.messages = appProperties.messages();
+        AppProperties.Auth auth = appProperties.auth();
+        this.passwordPolicyDefaults = auth == null ? null : auth.passwordPolicy();
+    }
+
+    public int passwordMinLength() {
+        int dflt = passwordPolicyDefaults == null ? 8 : passwordPolicyDefaults.minLength();
+        return Math.max(1, settings.getInt(AUTH_PASSWORD_MIN_LENGTH, dflt));
+    }
+
+    public int passwordMaxLength() {
+        int dflt = passwordPolicyDefaults == null ? 100 : passwordPolicyDefaults.maxLength();
+        return Math.max(passwordMinLength(), settings.getInt(AUTH_PASSWORD_MAX_LENGTH, dflt));
+    }
+
+    public int passwordRequireCategories() {
+        int dflt = passwordPolicyDefaults == null ? 2 : passwordPolicyDefaults.requireCategories();
+        int raw = settings.getInt(AUTH_PASSWORD_REQUIRE_CATEGORIES, dflt);
+        // 4 가지 카테고리만 존재하므로 1~4 로 클램프한다.
+        return Math.max(1, Math.min(4, raw));
     }
 
     public double passThreshold() {

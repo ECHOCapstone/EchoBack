@@ -17,8 +17,20 @@ public record AppProperties(
         Gamification gamification,
         Messages messages,
         OAuth2 oauth2,
-        Admin admin
+        Admin admin,
+        Auth auth,
+        Legal legal
 ) {
+
+    // 회원가입 시 강제되는 비밀번호 정책. 백엔드 validator 와 프론트 안내가 같은 출처를 공유한다.
+    //   minLength / maxLength    : 글자수 범위.
+    //   requireCategories        : lowercase / uppercase / digit / symbol 중 충족해야 하는 카테고리 개수.
+    public record Auth(PasswordPolicy passwordPolicy) {
+        public record PasswordPolicy(int minLength, int maxLength, int requireCategories) {}
+    }
+
+    // 약관/법적 고지 본문 버전. 본문 파일은 classpath:content/terms/{kind}-{version}.md 로 둔다.
+    public record Legal(String termsVersion) {}
 
     // 부팅 시 적용되는 관리자 셋업.
     //   bootstrapUsername : 이미 가입된 그 username 계정을 ROLE_ADMIN 으로 승격한다 (멱등).
@@ -33,12 +45,19 @@ public record AppProperties(
 
     public record Cors(
             List<String> allowedOrigins,
+            // 와일드카드 호스트 패턴. allowedOrigins 에는 와일드카드를 둘 수 없으므로 별도 필드로 받는다.
+            // 예: "https://*.trycloudflare.com"
+            List<String> allowedOriginPatterns,
             List<String> allowedMethods,
             List<String> allowedHeaders,
             List<String> exposedHeaders,
             boolean allowCredentials,
             long maxAgeSec
-    ) {}
+    ) {
+        public List<String> safeAllowedOriginPatterns() {
+            return allowedOriginPatterns == null ? List.of() : allowedOriginPatterns;
+        }
+    }
 
     public record ModelServer(String baseUrl, long timeoutMs) {}
 

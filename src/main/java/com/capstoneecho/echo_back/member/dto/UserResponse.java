@@ -11,10 +11,15 @@ public record UserResponse(
         int streak,
         int exp,
         String role,
+        // 비밀번호 해시가 채워진 계정인지 여부. OAuth 전용 가입자는 false 로 내려가, 프론트가
+        // 비밀번호 변경 / 탈퇴 시 본인 확인 칸을 숨기거나 안내한다.
+        boolean hasPassword,
         Instant createdAt
 ) {
 
     public static UserResponse from(User user) {
+        String hash = user.getPasswordHash();
+        boolean hasPassword = hash != null && !hash.isBlank();
         return new UserResponse(
                 user.getId(),
                 user.getUsername(),
@@ -23,6 +28,7 @@ public record UserResponse(
                 user.getStreak(),
                 user.getExp(),
                 user.getRole().name(),
+                hasPassword,
                 user.getCreatedAt()
         );
     }

@@ -30,7 +30,7 @@ class LlmConfigServiceTest {
                 new AppProperties.Llm("rule-based", new AppProperties.Llm.Gemini(
                         "", "gemini-3.1-flash-lite", "url", 10_000L,
                         List.of("gemini-3.1-flash-lite", "gemini-2.5-flash"))),
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
         return new LlmConfigService(settings, gemini, props);
     }
 

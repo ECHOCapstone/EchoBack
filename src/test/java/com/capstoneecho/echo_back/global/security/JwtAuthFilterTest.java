@@ -3,6 +3,10 @@ package com.capstoneecho.echo_back.global.security;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
+import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.member.repository.UserRepository;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,9 +20,10 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.core.context.SecurityContextHolder;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class JwtAuthFilterTest {
 
@@ -32,7 +37,14 @@ class JwtAuthFilterTest {
     @BeforeEach
     void setUp() {
         validProvider = providerWithExpiration(3_600_000L);
-        filter = new JwtAuthFilter(validProvider);
+        // 활성 사용자 mock — 필터의 isDeleted 검사가 항상 통과하도록 valid User 를 돌려준다.
+        UserRepository userRepository = mock(UserRepository.class);
+        User activeUser = User.signup(
+                "u", "u@test.com",
+                "$2a$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV12345",
+                "U");
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(activeUser));
+        filter = new JwtAuthFilter(validProvider, userRepository);
         entryPoint = new JwtAuthEntryPoint(JsonMapper.builder().build());
     }
 
@@ -146,8 +158,7 @@ class JwtAuthFilterTest {
     private JwtProvider providerWithExpiration(long expirationMs) {
         AppProperties props = new AppProperties(
                 new AppProperties.Jwt(SECRET, expirationMs),
-                null, null, null, null, null, null, null, null, null, null
-        );
+                null, null, null, null, null, null, null, null, null, null, null, null);
         return new JwtProvider(props);
     }
 }

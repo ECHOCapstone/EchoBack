@@ -62,7 +62,10 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         String token = jwtProvider.issue(userId, claims);
         long expiresInSec = Math.max(0L, jwtExpirationMs / 1000L);
 
-        String targetUrl = frontendRedirectUri
+        // 설정값의 path/query 만 떼어 와 incoming request 의 scheme+host 와 합성한다.
+        // 그래야 Cloudflare Tunnel / 리버스 프록시 뒤에서도 사용자가 접속한 도메인으로 콜백된다.
+        String base = FrontendUrlResolver.resolve(request, frontendRedirectUri);
+        String targetUrl = base
                 + "#token=" + token
                 + "&expiresIn=" + expiresInSec;
 
