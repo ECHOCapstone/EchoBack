@@ -42,6 +42,8 @@ public class SettingsAdminService {
                         () -> String.valueOf(runtime.weeklyTopN())),
                 new Definition(RuntimeSettings.WEEKLY_WINDOW_DAYS, Type.INT,
                         () -> String.valueOf(runtime.weeklyWindowDays())),
+                new Definition(RuntimeSettings.RANKING_MIN_ACTIVITY_COUNT, Type.INT,
+                        () -> String.valueOf(runtime.rankingMinActivityCount())),
                 new Definition(RuntimeSettings.DEFAULT_RANKING_UNIT_TITLE, Type.STRING,
                         runtime::defaultRankingUnitTitle),
                 new Definition(RuntimeSettings.DEFAULT_PRACTICE_WORD, Type.STRING,
@@ -61,7 +63,9 @@ public class SettingsAdminService {
                 new Definition(RuntimeSettings.AUTH_PASSWORD_MAX_LENGTH, Type.INT,
                         () -> String.valueOf(runtime.passwordMaxLength())),
                 new Definition(RuntimeSettings.AUTH_PASSWORD_REQUIRE_CATEGORIES, Type.INT,
-                        () -> String.valueOf(runtime.passwordRequireCategories())));
+                        () -> String.valueOf(runtime.passwordRequireCategories())),
+                new Definition(RuntimeSettings.SCORING_INSERTION_WEIGHT, Type.DOUBLE,
+                        () -> String.valueOf(runtime.scoringInsertionWeight())));
     }
 
     public List<SettingResponse> list() {

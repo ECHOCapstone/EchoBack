@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+// 주간 랭킹 단일 진입점. 최근 N 일 평균 정확도 기준으로 정렬된 Top N 과 본인 메타를 응답한다.
+// 윈도 일수 / Top 개수 / 임계 등 정책은 RankingService 가 RuntimeSettings 에서 읽는다.
 @RestController
 @RequestMapping("/api/ranking")
 public class RankingController {
@@ -19,8 +21,8 @@ public class RankingController {
         this.rankingService = rankingService;
     }
 
-    @GetMapping("/today")
-    public ApiResponse<RankingResponse> getToday(@CurrentUser JwtPrincipal principal) {
-        return ApiResponse.success(rankingService.today(principal.userId()));
+    @GetMapping("/weekly")
+    public ApiResponse<RankingResponse> getWeekly(@CurrentUser JwtPrincipal principal) {
+        return ApiResponse.success(rankingService.weekly(principal.userId()));
     }
 }

@@ -173,8 +173,13 @@ app:
     daily-recommended: 3
     weekly-top-n: 5
     weekly-window-days: 7
+    # 주간 랭킹에 노출되기 위한 최소 활동 횟수. 임계 통과한 사용자만 정렬 후보로 들어가
+    # 단 한 번 잘 발음한 사용자가 1등을 차지하는 운에 의한 상위 노출을 막는다.
+    ranking-min-activity-count: 3
     score-fallback-on-error: 70.0
-    pass-threshold: 80.0
+    # 단어 / 문장 통과 점수 임계. 학습자 부담을 낮추기 위해 다소 너그럽게 둔다 (75 이상이면 통과).
+    # 어드민이 런타임에 조정할 수 있다 (RuntimeSettings.passThreshold).
+    pass-threshold: 75.0
     prior-attempts-cap: 10
     default-ranking-unit-title: "오늘의 랭킹"
     default-practice-word: "the"

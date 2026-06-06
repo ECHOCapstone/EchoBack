@@ -12,6 +12,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -185,14 +186,29 @@ public class User {
                 truncate(email, USERNAME_MAX), email, null, truncate(nickname, NICKNAME_MAX));
     }
 
-    // OAuth2 가입 폼 완료 — 사용자가 직접 입력한 username / nickname 으로 생성한다.
+    // OAuth2 가입 폼 완료 — 사용자에게는 닉네임만 받고, 통합 회원 풀의 unique 제약을 충족할
+    // 내부 username 은 (provider, providerUid) 로부터 결정적으로 생성한다.
     // 이메일은 provider 가 검증한 값을 그대로 신뢰하고, 비밀번호는 없다 (소셜 로그인 전용).
-    public static User fromOAuth2Signup(String username, String email, String nickname) {
-        requireNonBlank(username, "username");
+    public static User fromOAuth2Signup(Provider provider, String providerUid, String email, String nickname) {
+        requireNonBlank(providerUid, "providerUid");
         requireNonBlank(email, "email");
         requireNonBlank(nickname, "nickname");
         return new User(
-                truncate(username, USERNAME_MAX), email, null, truncate(nickname, NICKNAME_MAX));
+                generateOAuthUsername(provider, providerUid),
+                email,
+                null,
+                truncate(nickname, NICKNAME_MAX));
+    }
+
+    // OAuth 가입자의 내부 username — 외부에 노출되지 않으며 통합 회원 풀의 unique 제약을 충족시키기
+    // 위한 식별자다. 형식 "{provider 소문자}_{providerUid}" 로 결정적이며, provider + sub 가 OAuth 측에서
+    // 유일성을 보장하므로 자체 충돌 위험이 없다. USERNAME_MAX 를 넘으면 컬럼 길이에 맞춰 자른다.
+    private static String generateOAuthUsername(Provider provider, String providerUid) {
+        if (provider == null) {
+            throw new IllegalArgumentException("provider is required");
+        }
+        String raw = provider.name().toLowerCase(Locale.ROOT) + "_" + providerUid;
+        return truncate(raw, USERNAME_MAX);
     }
 
     public void updateNickname(String nickname) {

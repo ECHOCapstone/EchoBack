@@ -108,12 +108,14 @@ public record AppProperties(
     // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우, 통과 점수 등).
     // passThreshold 는 step 통과 여부를 판정하는 0~100 점수 임계. 기본 80.
     // priorAttemptsCap 은 LLM 호출에 묶어 보내는 이전 시도 최대 개수 (가장 최근부터). 토큰 폭증 방지.
+    // rankingMinActivityCount 는 주간 랭킹에 노출되기 위해 필요한 최소 완료 피드백 건수.
     public record Gamification(
             int completionExp,
             int streakCap,
             int dailyRecommended,
             int weeklyTopN,
             int weeklyWindowDays,
+            int rankingMinActivityCount,
             double scoreFallbackOnError,
             double passThreshold,
             int priorAttemptsCap,

@@ -6,6 +6,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.member.service.AdminBootstrap;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -47,14 +48,17 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
     @Transactional
     public User upsert(Map<String, Object> attributes, String accessToken) {
         String sub = asString(attributes.get(ATTR_SUB));
-        String email = asString(attributes.get(ATTR_EMAIL));
+        String rawEmail = asString(attributes.get(ATTR_EMAIL));
 
         if (sub == null || sub.isBlank()) {
             throw oauth2Error("invalid_user_info", provider() + " userinfo 응답에 sub 가 없습니다.");
         }
-        if (email == null || email.isBlank()) {
+        if (rawEmail == null || rawEmail.isBlank()) {
             throw oauth2Error("invalid_email", provider() + " 응답에서 email 을 받지 못했습니다.");
         }
+        // 표준 회원 풀과 같은 규칙으로 정규화 (case-insensitive + trim) — 같은 provider 이메일이
+        // 대소문자만 다르게 들어와도 같은 사용자로 매핑되도록 한다.
+        String email = rawEmail.trim().toLowerCase(Locale.ROOT);
 
         User user = socialAccountRepository.findByProviderAndProviderUid(provider(), sub)
                 .map(existing -> {

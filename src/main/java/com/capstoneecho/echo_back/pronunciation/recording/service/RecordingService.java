@@ -128,7 +128,12 @@ public class RecordingService {
         G2pResult g2p = modelServerClient.g2p(prepared.targetText());
         String canonical = g2p.phonemes() == null ? "" : g2p.phonemes();
         AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
-        Double stepScore = analyze.per() == null ? null : scoringPolicy.perToScore(analyze.per());
+        // op 별 가중 채점 — substitution/deletion 은 1.0, insertion 은 0.5 (기본).
+        // 분모는 max(N_canonical, N_perceived) 로 정규화되어 per 가 항상 [0,1] 범위.
+        Double stepScore = analyze.per() == null ? null : scoringPolicy.scoreFromAnalyze(analyze);
+        // 임시 디버그 — 채점 메트릭 추적. 원인 확인 후 제거 예정.
+        log.info("SCORE_DEBUG target='{}' canonical={} perceived={} per={} stepScore={}",
+                prepared.targetText(), canonical, analyze.perceived(), analyze.per(), stepScore);
         LlmStepContext context = new LlmStepContext(
                 prepared.chapterTitle(),
                 prepared.targetText(),
@@ -175,7 +180,11 @@ public class RecordingService {
         Recording saved = recordingRepository.save(recording);
 
         double passThreshold = settings.passThreshold();
-        boolean passed = stepScore != null && stepScore >= passThreshold && !feedback.retryRecommended();
+        // 통과 판정은 점수 임계만 본다 — 점수 임계 (RuntimeSettings.passThreshold) 가 SSOT.
+        // LLM 의 retryRecommended 는 별도 신호로 응답에 그대로 실어 보내, FE 가 약점 안내 등에 활용할 수 있게 한다.
+        // 두 신호를 AND 로 묶으면 점수가 충분히 높아도 LLM 정성 판정 한 번으로 미통과가 되어
+        // "75점이면 통과" 라는 학습자 기대와 어긋난다.
+        boolean passed = stepScore != null && stepScore >= passThreshold;
         return RecordingUploadResponse.fromUpload(
                 saved,
                 analyze.perceived(),

@@ -11,7 +11,12 @@ import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.support.SentenceSplitter;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.translation.dto.TranslationResponse;
+import com.capstoneecho.echo_back.translation.service.TranslationService;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,16 +28,19 @@ public class SessionService {
     private final UserRepository userRepository;
     private final SentenceSplitter sentenceSplitter;
     private final RequestValidator requestValidator;
+    private final TranslationService translationService;
 
     public SessionService(
             SessionRepository sessionRepository,
             UserRepository userRepository,
             SentenceSplitter sentenceSplitter,
-            RequestValidator requestValidator) {
+            RequestValidator requestValidator,
+            TranslationService translationService) {
         this.sessionRepository = sessionRepository;
         this.userRepository = userRepository;
         this.sentenceSplitter = sentenceSplitter;
         this.requestValidator = requestValidator;
+        this.translationService = translationService;
     }
 
     public List<SessionDetailResponse> list(Long userId) {
@@ -51,15 +59,21 @@ public class SessionService {
         return SessionDetailResponse.from(saved);
     }
 
+    // 학습 시작 시 호출되는 단일 조회. 한국어 자막을 함께 실어 응답해 FE 가 별도 호출 없이 즉시 노출한다.
+    // 클래스 기본은 readOnly 이지만 TranslationService 의 캐시 저장 (쓰기) 을 호출하므로 메서드 단위로 해제한다.
+    @Transactional
     public SessionDetailResponse get(Long userId, Long sessionId) {
-        return SessionDetailResponse.from(loadOwnedSession(userId, sessionId));
+        Session session = loadOwnedSession(userId, sessionId);
+        return SessionDetailResponse.from(session, resolveTranslations(session));
     }
 
     // PATCH 는 부분 갱신이다: 본문이 null 이면 현재 상태를 그대로 돌려준다.
+    // 응답에 한국어 자막도 함께 실어 보내, 스크립트를 새로 입력하자마자 학습에 들어가도 자막이 즉시 보이게 한다.
     @Transactional
     public SessionDetailResponse patch(Long userId, Long sessionId, SessionPatchRequest request) {
         if (request == null) {
-            return SessionDetailResponse.from(loadOwnedSession(userId, sessionId));
+            Session existing = loadOwnedSession(userId, sessionId);
+            return SessionDetailResponse.from(existing, resolveTranslations(existing));
         }
         requestValidator.validate(request);
         Session session = loadOwnedSession(userId, sessionId);
@@ -80,7 +94,30 @@ public class SessionService {
         if (scriptChanged) {
             sessionRepository.flush();
         }
-        return SessionDetailResponse.from(session);
+        return SessionDetailResponse.from(session, resolveTranslations(session));
+    }
+
+    // 세션의 sentence 들의 영문 text 를 모아 한 번에 번역을 받아 매핑으로 돌려준다.
+    // 외부 호출이 실패하거나 noop 폴백이면 빈 맵 → 응답에 자막 없이 진행한다.
+    private Map<String, String> resolveTranslations(Session session) {
+        List<String> texts = new ArrayList<>();
+        for (var sentence : session.getSentences()) {
+            String text = sentence.getText();
+            if (text != null && !text.isBlank() && !texts.contains(text)) {
+                texts.add(text);
+            }
+        }
+        if (texts.isEmpty()) {
+            return Map.of();
+        }
+        TranslationResponse translated = translationService.translate(texts);
+        Map<String, String> out = new HashMap<>();
+        for (TranslationResponse.Item item : translated.items()) {
+            if (item.target() != null && !item.target().isBlank()) {
+                out.put(item.source(), item.target());
+            }
+        }
+        return out;
     }
 
     @Transactional
