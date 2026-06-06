@@ -93,19 +93,8 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
         return user;
     }
 
-    // 표시명이 없으면 이메일 local-part 를 nickname 으로 쓴다.
-    private String resolveNickname(Map<String, Object> attributes, String email) {
-        String displayName = extractDisplayName(attributes);
-        return (displayName == null || displayName.isBlank()) ? localPartOf(email) : displayName;
-    }
-
     private static String asString(Object value) {
         return value == null ? null : value.toString();
-    }
-
-    private static String localPartOf(String email) {
-        int at = email.indexOf('@');
-        return at < 0 ? email : email.substring(0, at);
     }
 
     private static OAuth2AuthenticationException oauth2Error(String code, String description) {

@@ -61,6 +61,14 @@ public class ScoringPolicy {
         if (analyze == null) {
             return PERFECT_SCORE;
         }
+        List<AnalyzeError> errors = analyze.errors();
+        // errors 가 비어 있으면 per 기반으로 폴백한다. 두 케이스를 같이 처리한다:
+        //   1) 모든 음소가 일치한 정상 케이스 (per=0 → 100점).
+        //   2) 외부 응답이 per 만 보내고 op 별 errors 는 비운 시나리오 (모델 / 테스트 호환).
+        // errors 가 있으면 그 안의 op-weighted 합산이 더 정확한 출처이므로 그쪽을 우선한다.
+        if (errors == null || errors.isEmpty()) {
+            return analyze.per() == null ? PERFECT_SCORE : perToScore(analyze.per());
+        }
         int canonicalLen = analyze.canonicalOrEmpty().size();
         int perceivedLen = analyze.perceived() == null ? 0 : analyze.perceived().size();
         int denominator = Math.max(canonicalLen, perceivedLen);
@@ -69,16 +77,13 @@ public class ScoringPolicy {
         }
         double weightedErrors = 0.0;
         double insertionWeight = settings.scoringInsertionWeight();
-        List<AnalyzeError> errors = analyze.errors();
-        if (errors != null) {
-            for (AnalyzeError e : errors) {
-                String op = e.op();
-                if (op == null) continue;
-                if ("insertion".equals(op)) {
-                    weightedErrors += insertionWeight;
-                } else if ("substitution".equals(op) || "deletion".equals(op)) {
-                    weightedErrors += 1.0;
-                }
+        for (AnalyzeError e : errors) {
+            String op = e.op();
+            if (op == null) continue;
+            if ("insertion".equals(op)) {
+                weightedErrors += insertionWeight;
+            } else if ("substitution".equals(op) || "deletion".equals(op)) {
+                weightedErrors += 1.0;
             }
         }
         double adjustedPer = Math.min(1.0, weightedErrors / denominator);
