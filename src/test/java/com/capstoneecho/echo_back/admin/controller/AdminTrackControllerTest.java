@@ -8,29 +8,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
-import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
-import java.util.Map;
+import com.capstoneecho.echo_back.support.AbstractAdminControllerIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
-class AdminTrackControllerTest extends AbstractControllerIntegrationTest {
-
-    @Autowired
-    private JwtProvider jwtProvider;
+class AdminTrackControllerTest extends AbstractAdminControllerIntegrationTest {
 
     @Autowired
     private TrackRepository trackRepository;
-
-    private String adminToken() {
-        return jwtProvider.issue(1L,
-                Map.of("username", "admin", "email", "admin@test.com", "role", "ADMIN"));
-    }
 
     @Test
     @DisplayName("POST /api/admin/tracks ADMIN → 201 의미의 200 + 생성된 트랙")
@@ -90,10 +80,7 @@ class AdminTrackControllerTest extends AbstractControllerIntegrationTest {
     @Test
     @DisplayName("GET /api/admin/tracks USER 권한 → 403")
     void userForbidden() throws Exception {
-        String userToken = jwtProvider.issue(2L,
-                Map.of("username", "u", "email", "u@test.com", "role", "USER"));
-
-        mockMvc.perform(get("/api/admin/tracks").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/admin/tracks").header("Authorization", "Bearer " + userToken()))
                 .andExpect(status().isForbidden());
     }
 }
