@@ -1,5 +1,7 @@
 package com.capstoneecho.echo_back.learning.progress.entity;
 
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.member.entity.User;
 import jakarta.persistence.Column;
@@ -69,9 +71,11 @@ public class ChapterProgress {
 
     // 새 step 완료를 반영. 과거 인덱스는 무시하고 더 큰 값일 때만 갱신한다 — 사용자가 중간 step 으로
     // 되돌아가도 진행률은 뒤로 가지 않는다.
+    // 음수 인덱스는 FE 측 버그 / 변조의 신호 — 도메인 위반으로 BusinessException(INVALID_REQUEST) 로 알려
+    // GlobalExceptionHandler 가 400 으로 매핑하게 한다.
     public void advanceTo(int stepIndex) {
         if (stepIndex < 0) {
-            throw new IllegalArgumentException("stepIndex must be non-negative");
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "stepIndex must be non-negative");
         }
         if (stepIndex > this.lastCompletedStepIndex) {
             this.lastCompletedStepIndex = stepIndex;

@@ -13,6 +13,7 @@ import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,11 +52,22 @@ public class ProgressService {
     }
 
     // step 완료를 반영한다. 진행 상태 행이 없으면 새로 만들고, 있으면 더 큰 인덱스로만 갱신한다.
+    // 두 트랜잭션이 같은 사용자의 같은 챕터에서 동시에 INSERT 를 시도하면 unique 제약 위반이 한쪽에서 발생할 수
+    // 있는데 (DataIntegrityViolationException), 그 시점에 다른 쪽이 이미 행을 만들었으므로 재조회 후 갱신하면 안전하다.
     public ProgressResponse advanceChapter(Long userId, Long scriptId, int stepIndex) {
         ChapterProgress progress = chapterRepository.findByUser_IdAndScript_Id(userId, scriptId)
-                .orElseGet(() -> chapterRepository.save(ChapterProgress.start(loadUser(userId), loadScript(scriptId))));
+                .orElseGet(() -> insertChapterProgressOrLoad(userId, scriptId));
         progress.advanceTo(stepIndex);
         return ProgressResponse.of(progress.getLastCompletedStepIndex());
+    }
+
+    private ChapterProgress insertChapterProgressOrLoad(Long userId, Long scriptId) {
+        try {
+            return chapterRepository.save(ChapterProgress.start(loadUser(userId), loadScript(scriptId)));
+        } catch (DataIntegrityViolationException race) {
+            return chapterRepository.findByUser_IdAndScript_Id(userId, scriptId)
+                    .orElseThrow(() -> race);
+        }
     }
 
     // "처음부터" 또는 챕터 완료 후 진행 상태 정리. 행이 없어도 안전 (idempotent).
@@ -72,9 +84,18 @@ public class ProgressService {
 
     public ProgressResponse advanceSession(Long userId, Long sessionId, int sentenceIndex) {
         SessionProgress progress = sessionRepository.findByUser_IdAndSession_Id(userId, sessionId)
-                .orElseGet(() -> sessionRepository.save(SessionProgress.start(loadUser(userId), loadSession(userId, sessionId))));
+                .orElseGet(() -> insertSessionProgressOrLoad(userId, sessionId));
         progress.advanceTo(sentenceIndex);
         return ProgressResponse.of(progress.getLastCompletedSentenceIndex());
+    }
+
+    private SessionProgress insertSessionProgressOrLoad(Long userId, Long sessionId) {
+        try {
+            return sessionRepository.save(SessionProgress.start(loadUser(userId), loadSession(userId, sessionId)));
+        } catch (DataIntegrityViolationException race) {
+            return sessionRepository.findByUser_IdAndSession_Id(userId, sessionId)
+                    .orElseThrow(() -> race);
+        }
     }
 
     public void resetSession(Long userId, Long sessionId) {

@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,6 +23,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     public static final String ERROR_ATTRIBUTE = "jwtAuthError";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -71,6 +75,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
             request.setAttribute(ERROR_ATTRIBUTE, ex.getCode());
         } catch (RuntimeException ex) {
+            // 예상 못 한 런타임 예외를 INVALID_TOKEN 으로 묻으면 운영 중 원인 추적이 어렵다.
+            // 한 줄 WARN 으로 원인은 남기고 사용자 응답은 표준 401 로 유지한다.
+            log.warn("JwtAuthFilter unexpected exception", ex);
             SecurityContextHolder.clearContext();
             request.setAttribute(ERROR_ATTRIBUTE, ErrorCode.INVALID_TOKEN);
         }

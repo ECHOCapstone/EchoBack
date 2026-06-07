@@ -34,8 +34,9 @@ public class GeminiTranslationClient implements TranslationClient {
 
     private static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 
-    // 응답 한 줄에서 "N. 본문" 형태를 분리한다. 번호 구분자는 . / ) / : 중 어느 것이든 받는다.
-    private static final Pattern LINE_PATTERN = Pattern.compile("^(\\d+)\\s*[.):\\-]\\s*(.+)$");
+    // 응답 한 줄에서 "N. 본문" 형태를 분리한다. 번호 구분자는 . / ) / : / - 중 어느 것이든 받고,
+    // Gemini 가 굵게 마커 (`**1.**` 또는 `**1**.`) 로 응답해도 통과하도록 선행 `**` 를 허용한다.
+    private static final Pattern LINE_PATTERN = Pattern.compile("^\\**\\s*(\\d+)\\**\\s*[.):\\-]\\s*\\**(.+?)\\**\\s*$");
 
     private final RestClient restClient;
     private final SettingsService settings;
@@ -141,8 +142,9 @@ public class GeminiTranslationClient implements TranslationClient {
             GeminiResponse response = restClient.post()
                     .uri(uri -> uri
                             .path("/v1beta/models/{model}:generateContent")
-                            .queryParam("key", apiKey)
                             .build(model))
+                    // API 키는 헤더로 전달 — 쿼리 파라미터는 로그 / 프록시에 평문 노출 위험.
+                    .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()

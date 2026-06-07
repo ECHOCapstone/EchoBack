@@ -22,6 +22,9 @@ import org.springframework.stereotype.Service;
 public class PendingOAuthTokenService {
 
     private static final String SUBJECT = "pending_oauth_signup";
+    // 정식 access JWT 와 같은 secret 을 쓰지만 audience 를 분리해 cross-confusion 을 표준적으로 차단한다.
+    // verify 단계에서 같은 값을 반드시 요구하므로 access token 을 pending 으로 쓸 수 없고 그 역도 성립한다.
+    private static final String AUDIENCE = "echo.pending-signup";
     private static final long PENDING_EXPIRATION_MS = 5 * 60 * 1000L;
     private static final String CLAIM_PROVIDER = "provider";
     private static final String CLAIM_PROVIDER_UID = "providerUid";
@@ -52,6 +55,7 @@ public class PendingOAuthTokenService {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(SUBJECT)
+                .audience().add(AUDIENCE).and()
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(PENDING_EXPIRATION_MS)))
                 .claim(CLAIM_PROVIDER, provider.name())
@@ -69,6 +73,7 @@ public class PendingOAuthTokenService {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(signingKey)
+                    .requireAudience(AUDIENCE)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();

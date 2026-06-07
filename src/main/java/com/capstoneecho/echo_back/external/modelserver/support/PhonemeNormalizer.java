@@ -21,7 +21,11 @@ public class PhonemeNormalizer {
 
     public NormalizedPhonemes normalize(List<String> phonemes, List<Double> peakSoftmax) {
         if (phonemes == null || phonemes.isEmpty()) {
-            return new NormalizedPhonemes(List.of(), peakSoftmax == null ? List.of() : List.copyOf(peakSoftmax));
+            // List.copyOf 는 null 원소가 있으면 NPE. peakSoftmax 는 외부 응답이라 신뢰하지 않고
+            // 일반 ArrayList 로 안전 복사한다 — null 원소가 섞여 있어도 무해히 통과한다.
+            return new NormalizedPhonemes(
+                    List.of(),
+                    peakSoftmax == null ? List.of() : new ArrayList<>(peakSoftmax));
         }
         boolean hasSoftmax = peakSoftmax != null && !peakSoftmax.isEmpty();
         List<String> outPhonemes = new ArrayList<>(phonemes.size());

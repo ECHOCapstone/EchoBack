@@ -143,8 +143,10 @@ public class GeminiLlmClient implements LlmClient {
             GeminiResponse response = restClient.post()
                     .uri(uri -> uri
                             .path("/v1beta/models/{model}:generateContent")
-                            .queryParam("key", apiKey)
                             .build(model))
+                    // API 키는 헤더 (x-goog-api-key) 로 전달한다. 쿼리 파라미터로 보내면 액세스 로그 /
+                    // 에러 응답 본문 / 외부 프록시 로그에 평문 노출될 수 있어 표준 안전 흐름과 어긋난다.
+                    .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
