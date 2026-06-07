@@ -1,5 +1,7 @@
 package com.capstoneecho.echo_back.learning.progress.entity;
 
+import com.capstoneecho.echo_back.global.common.BusinessException;
+import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.member.entity.User;
 import jakarta.persistence.Column;
@@ -64,9 +66,10 @@ public class SessionProgress {
         return new SessionProgress(user, session);
     }
 
+    // 음수 인덱스는 도메인 위반 — BusinessException(INVALID_REQUEST) 로 알려 400 매핑되게 한다.
     public void advanceTo(int sentenceIndex) {
         if (sentenceIndex < 0) {
-            throw new IllegalArgumentException("sentenceIndex must be non-negative");
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "sentenceIndex must be non-negative");
         }
         if (sentenceIndex > this.lastCompletedSentenceIndex) {
             this.lastCompletedSentenceIndex = sentenceIndex;

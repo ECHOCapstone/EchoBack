@@ -72,8 +72,9 @@ public class SessionService {
     @Transactional
     public SessionDetailResponse patch(Long userId, Long sessionId, SessionPatchRequest request) {
         if (request == null) {
-            Session existing = loadOwnedSession(userId, sessionId);
-            return SessionDetailResponse.from(existing, resolveTranslations(existing));
+            // 본문 없는 PATCH 는 사실상 단순 read — 번역 외부 호출 없이 현재 상태만 돌려준다.
+            // 자막이 필요한 학습 진입은 GET /api/sessions/{id} 로 분리돼 있어 UX 손상이 없다.
+            return SessionDetailResponse.from(loadOwnedSession(userId, sessionId));
         }
         requestValidator.validate(request);
         Session session = loadOwnedSession(userId, sessionId);

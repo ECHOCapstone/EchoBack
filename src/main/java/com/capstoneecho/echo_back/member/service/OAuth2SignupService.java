@@ -67,10 +67,11 @@ public class OAuth2SignupService {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
         // 동일 provider 의 sub 가 이미 등록돼 있으면 Case A 였어야 함 — 안전망.
+        // 이메일 중복과 의미가 다르므로 별도 ErrorCode 로 알려 FE 가 정확한 안내를 띄울 수 있게 한다.
         if (socialAccountRepository
                 .findByProviderAndProviderUid(pending.provider(), pending.providerUid())
                 .isPresent()) {
-            throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+            throw new BusinessException(ErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED);
         }
 
         User newUser = User.fromOAuth2Signup(

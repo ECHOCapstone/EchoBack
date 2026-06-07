@@ -21,10 +21,11 @@ public class ScoringPolicy {
         this.settings = settings;
     }
 
-    // 여러 녹음 점수의 평균. 점수가 한 건도 없으면 만점으로 본다.
+    // 여러 녹음 점수의 평균. 점수가 한 건도 없으면 0 점으로 본다 — 모델 서버 장애 등으로 단 한 건도
+    // 채점되지 않은 상태에서 만점을 돌려주면 학습자가 거짓 "완벽" 으로 인식하는 회귀가 생긴다.
     public double aggregate(Collection<Recording> recordings) {
         if (recordings == null || recordings.isEmpty()) {
-            return PERFECT_SCORE;
+            return ZERO_SCORE;
         }
         double sum = 0.0;
         int count = 0;
@@ -36,19 +37,16 @@ public class ScoringPolicy {
             }
         }
         if (count == 0) {
-            return PERFECT_SCORE;
+            return ZERO_SCORE;
         }
         return sum / count;
     }
 
-    // 단어 단위 점수: AnalyzeResult 가 있으면 op 별 가중 채점, 없으면 fallback.
+    // 단어 단위 점수: AnalyzeResult 가 있으면 op 별 가중 채점, 분석 신호가 비면 fallback 점수를 사용한다.
+    // analyze 가 null 이거나 per 가 비어 있을 때 만점을 돌려주면 분석 장애가 통과로 위장된다.
     public double singleWordScore(AnalyzeResult analyze) {
-        if (analyze == null) {
-            return PERFECT_SCORE;
-        }
-        if (analyze.per() == null) {
-            List<AnalyzeError> errors = analyze.errors();
-            return (errors == null || errors.isEmpty()) ? PERFECT_SCORE : settings.scoreFallbackOnError();
+        if (analyze == null || analyze.per() == null) {
+            return settings.scoreFallbackOnError();
         }
         return scoreFromAnalyze(analyze);
     }

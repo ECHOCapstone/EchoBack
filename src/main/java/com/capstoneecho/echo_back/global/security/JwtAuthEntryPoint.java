@@ -30,6 +30,9 @@ public class JwtAuthEntryPoint implements AuthenticationEntryPoint {
         ApiResponse<Void> body = ApiResponse.failure(code, code.getDefaultMessage());
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        // RFC 6750 § 3 — Bearer 인증 실패 시 challenge 헤더를 함께 내려보내 표준 클라이언트가 인증 흐름을
+        // 식별할 수 있게 한다. error 코드는 RFC 가 정한 invalid_token 으로 고정.
+        response.setHeader("WWW-Authenticate", "Bearer realm=\"echo\", error=\"invalid_token\"");
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(objectMapper.writeValueAsString(body));

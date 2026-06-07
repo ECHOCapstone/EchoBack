@@ -29,6 +29,7 @@ public enum ErrorCode {
 
     USERNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 사용자명입니다."),
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
+    OAUTH_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 연결된 소셜 계정입니다."),
     TRACK_HAS_SCRIPTS(HttpStatus.CONFLICT, "스크립트가 연결된 트랙은 삭제할 수 없습니다."),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
