@@ -6,14 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.capstoneecho.echo_back.member.entity.Provider;
 import com.capstoneecho.echo_back.member.entity.SocialAccount;
 import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.support.DataJpaMySqlTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
-@DataJpaTest
+@DataJpaMySqlTest
 class SocialAccountRepositoryDataJpaTest {
 
     @Autowired

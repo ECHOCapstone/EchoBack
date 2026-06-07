@@ -10,13 +10,13 @@ import com.capstoneecho.echo_back.learning.script.repository.LearningStepReposit
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
+import com.capstoneecho.echo_back.support.DataJpaMySqlTest;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
-@DataJpaTest
+@DataJpaMySqlTest
 class LearningCatalogDataJpaTest {
 
     @Autowired

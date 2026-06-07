@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.support.DataJpaMySqlTest;
 import jakarta.persistence.EntityManager;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -14,9 +15,8 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
-@DataJpaTest
+@DataJpaMySqlTest
 class SessionDataJpaTest {
 
     @Autowired
