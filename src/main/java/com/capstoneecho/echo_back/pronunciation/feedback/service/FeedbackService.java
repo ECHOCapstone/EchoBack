@@ -312,34 +312,43 @@ public class FeedbackService {
         return FeedbackDetailResponse.from(feedback, objectMapper);
     }
 
-    // 완료 토글: 동시에 두 요청이 들어와도 정확히 한 번만 EXP 가 지급되도록 원자 UPDATE 후 분기.
-    // 원자 UPDATE 와 보상 지급 + 학습 진행 상태 정리가 한 트랜잭션이어야 하므로 메서드 단위로 트랜잭션을 건다.
-    @Transactional
+    // 완료 토글:
+    // (1) atomic UPDATE + 진행도 reset 을 한 짧은 트랜잭션 (writeTx) 에 묶는다 — 같은 피드백 row 의
+    //     컨텍스트에 묶여 일관된다.
+    // (2) 같은 사용자에 대한 reward (User.exp / streak 갱신) 는 별도 트랜잭션 (MemberService 의
+    //     @Transactional) 에서 수행한다. User row 와 PronunciationFeedback row 를 한 트랜잭션이
+    //     같이 잠그면 동일 사용자의 동시 학습 흐름 사이에 데드락이 자주 생긴다.
     public UserResponse complete(Long userId, Long feedbackId) {
-        // 진행 상태 reset 에 쓸 script / session 식별자를 먼저 확보한다. 잘못된 소유자 / 미존재는 즉시 거절.
-        PronunciationFeedback feedback = feedbackRepository
-                .findByIdAndUser_Id(feedbackId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-        Long scriptId = feedback.getScript() == null ? null : feedback.getScript().getId();
-        Long sessionId = feedback.getSession() == null ? null : feedback.getSession().getId();
+        CompletionOutcome outcome = writeTx.execute(status -> {
+            PronunciationFeedback feedback = feedbackRepository
+                    .findByIdAndUser_Id(feedbackId, userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
+            Long scriptId = feedback.getScript() == null ? null : feedback.getScript().getId();
+            Long sessionId = feedback.getSession() == null ? null : feedback.getSession().getId();
 
-        Instant now = Instant.now();
-        int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
-        if (affected == 1) {
-            // 챕터 / 세션 완료가 확정됐을 때만 학습 진행 상태를 정리한다 — 같은 단위를 다시 학습할 때
-            // 처음부터 시작하도록.
-            // affected == 0 인 재요청(이미 완료된 피드백) 분기에서는 호출하지 않는다 — 사용자가 챕터를
-            // 끝낸 뒤 다시 시작해 일부 진행한 상태에서 complete 가 또 들어오면 그 진행이 사라지기 때문.
-            resetProgressForFeedback(userId, scriptId, sessionId);
+            Instant now = Instant.now();
+            int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
+            if (affected == 1) {
+                // 챕터 / 세션 완료가 확정됐을 때만 학습 진행 상태를 정리한다 — 같은 단위를 다시 학습할 때
+                // 처음부터 시작하도록. affected == 0 인 재요청에서는 호출하지 않는다.
+                resetProgressForFeedback(userId, scriptId, sessionId);
+                return new CompletionOutcome(true, null);
+            }
+            if (!feedback.isCompleted()) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+            }
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+            return new CompletionOutcome(false, UserResponse.from(user));
+        });
+
+        if (outcome.awarded()) {
             return memberService.awardCompletionRewards(userId, settings.completionExp());
         }
-        if (!feedback.isCompleted()) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
-        }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        return UserResponse.from(user);
+        return outcome.fallbackUserResponse();
     }
+
+    private record CompletionOutcome(boolean awarded, UserResponse fallbackUserResponse) {}
 
     // 피드백이 가진 단위 종류 (챕터 / 세션) 에 맞춰 진행 상태를 정리한다. 둘 다 null 이면 호출 자체가 noop.
     private void resetProgressForFeedback(Long userId, Long scriptId, Long sessionId) {

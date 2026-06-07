@@ -31,6 +31,8 @@ import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +66,9 @@ public class RecordingService {
     // 읽기/쓰기 트랜잭션을 명시적으로 분리해, 느린 모델 서버·LLM HTTP 호출 동안 DB 커넥션을 잡지 않게 한다.
     private final TransactionTemplate readTx;
     private final TransactionTemplate writeTx;
+    // persist 단계에서 부모 엔티티를 다시 조회하지 않고 프록시로 INSERT 하기 위한 EntityManager.
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public RecordingService(
             UserRepository userRepository,
@@ -114,14 +119,21 @@ public class RecordingService {
         wavHeaderValidator.require(audioBytes);
         Mode mode = detectMode(request);
 
-        // (1) 읽기 단계: 연관관계 초기화까지 트랜잭션 안에서 끝내고, 이후 단계가 쓸 순수 데이터만 들고 나온다.
+        // (1) 읽기 단계: 부모 엔티티 검증 + 입력 데이터 추출. 부모는 ID 만 들고 나가고, 쓰기 단계에서는
+        // EntityManager.getReference 로 프록시를 만들어 추가 SELECT 없이 INSERT 한다.
         PreparedInput prepared = readTx.execute(status -> {
             ResolvedParents parents = resolveParents(userId, request, mode);
             String targetText = resolveTargetText(parents);
             String chapterTitle = parents.script() == null ? "" : parents.script().getTitle();
             List<PriorAttempt> priorAttempts =
                     priorAttemptAssembler.fromRecordings(findPriorAttempts(userId, parents));
-            return new PreparedInput(targetText, chapterTitle, priorAttempts);
+            ParentIds ids = new ParentIds(
+                    userId,
+                    parents.script() == null ? null : parents.script().getId(),
+                    parents.step() == null ? null : parents.step().getId(),
+                    parents.session() == null ? null : parents.session().getId(),
+                    parents.sentence() == null ? null : parents.sentence().getId());
+            return new PreparedInput(targetText, chapterTitle, priorAttempts, ids);
         });
 
         // (2) 외부 호출 단계: DB 트랜잭션 밖에서 수행한다.
@@ -145,27 +157,25 @@ public class RecordingService {
 
         // (3) 쓰기 단계: 짧은 트랜잭션 안에서 오디오 저장 + Recording 영속화 + 응답 조립.
         return writeTx.execute(status ->
-                persist(userId, request, mode, audioBytes, prepared.targetText(), g2p, analyze, stepScore, feedback));
+                persist(mode, audioBytes, prepared, g2p, analyze, stepScore, feedback));
     }
 
-    // 오디오 디스크 저장 + Recording 영속화. 부모 엔티티는 이 트랜잭션에서 다시 조회해 관리 상태로 쓴다
-    // (Recording 팩토리가 step.getScript() 와 script 의 참조 동일성을 요구하므로 같은 영속성 컨텍스트여야 한다).
+    // 오디오 디스크 저장 + Recording 영속화. 부모 엔티티는 READ TX 가 검증한 ID 로부터 프록시를 만들어
+    // 추가 SELECT 없이 INSERT 만 수행한다.
     private RecordingUploadResponse persist(
-            Long userId,
-            RecordingUploadRequest request,
             Mode mode,
             byte[] audioBytes,
-            String targetText,
+            PreparedInput prepared,
             G2pResult g2p,
             AnalyzeResult analyze,
             Double stepScore,
             LlmStepFeedback feedback) {
-        ResolvedParents parents = resolveParents(userId, request, mode);
+        ParentIds ids = prepared.parentIds();
 
-        String audioPath = recordingStorage.save(userId, audioBytes);
+        String audioPath = recordingStorage.save(ids.userId(), audioBytes);
         registerStorageCleanupOnNonCommit(audioPath);
 
-        Recording recording = buildRecording(mode, parents, audioPath, targetText);
+        Recording recording = buildRecording(mode, ids, audioPath, prepared.targetText());
         recording.applyAnalysisSnapshot(
                 AnalysisSnapshotFormat.joinTokens(analyze.perceived()),
                 AnalysisSnapshotFormat.joinTokens(analyze.canonicalOrEmpty()),
@@ -196,7 +206,14 @@ public class RecordingService {
     }
 
     // READ TX 에서 추출해 이후 단계로 넘기는 순수 입력 데이터.
-    private record PreparedInput(String targetText, String chapterTitle, List<PriorAttempt> priorAttempts) {}
+    private record PreparedInput(
+            String targetText,
+            String chapterTitle,
+            List<PriorAttempt> priorAttempts,
+            ParentIds parentIds) {}
+
+    // persist 단계에서 EntityManager.getReference 의 입력으로 쓰는 부모 ID 묶음.
+    private record ParentIds(Long userId, Long scriptId, Long stepId, Long sessionId, Long sentenceId) {}
 
     // 같은 부모 (script+step 또는 session+sentence) 의 이전 시도들을 오름차순으로 가져온 뒤,
     // 가장 최근 priorAttemptsCap 개만 잘라 LLM 입력을 적정 토큰량으로 유지한다.
@@ -311,13 +328,22 @@ public class RecordingService {
         return "";
     }
 
+    // 부모 엔티티는 EntityManager.getReference 로 프록시만 만들어 추가 SELECT 없이 FK 만 세팅한다.
+    // 부모 관계 검증은 READ TX 에서 이미 수행됐으므로 unchecked 팩토리로 만든다.
     private Recording buildRecording(
-            Mode mode, ResolvedParents p, String audioPath, String targetText) {
+            Mode mode, ParentIds ids, String audioPath, String targetText) {
+        User user = entityManager.getReference(User.class, ids.userId());
         return switch (mode) {
-            case SCRIPT_FLOW -> Recording.forScriptStep(
-                    p.user(), p.script(), p.step(), audioPath, targetText);
-            case SESSION_SENTENCE -> Recording.forSessionSentence(
-                    p.user(), p.session(), p.sentence(), audioPath, targetText);
+            case SCRIPT_FLOW -> {
+                Script script = entityManager.getReference(Script.class, ids.scriptId());
+                LearningStep step = entityManager.getReference(LearningStep.class, ids.stepId());
+                yield Recording.forScriptStepUnchecked(user, script, step, audioPath, targetText);
+            }
+            case SESSION_SENTENCE -> {
+                Session session = entityManager.getReference(Session.class, ids.sessionId());
+                SessionSentence sentence = entityManager.getReference(SessionSentence.class, ids.sentenceId());
+                yield Recording.forSessionSentenceUnchecked(user, session, sentence, audioPath, targetText);
+            }
         };
     }
 

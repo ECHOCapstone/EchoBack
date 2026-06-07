@@ -11,6 +11,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 // OAuth2 인증 후처리 분기:
 //   1) PendingSignupException → 신규 사용자. 5분짜리 pending JWT 를 발급해 가입 폼으로 안내한다.
@@ -57,13 +58,17 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
                     pending.email(),
                     pending.nicknameHint());
             // 설정값의 host 가 localhost 박힌 경우에도 외부 도메인 (Cloudflare Tunnel 등) 으로 콜백되도록
-                    // incoming request 의 scheme + host 와 합성한다.
+            // incoming request 의 scheme + host 와 합성한다.
+            // base 에 이미 query 가 있을 수 있으므로 UriComponentsBuilder 로 fragment 만 안전하게 덧붙인다.
             String base = FrontendUrlResolver.resolve(request, frontendSignupUri);
-            String targetUrl = base
-                    + "#pendingToken=" + encode(pendingToken)
+            String fragment = "pendingToken=" + encode(pendingToken)
                     + "&email=" + encode(pending.email())
                     + "&nicknameHint=" + encode(pending.nicknameHint() == null ? "" : pending.nicknameHint())
                     + "&provider=" + encode(pending.provider().name().toLowerCase());
+            String targetUrl = UriComponentsBuilder.fromUriString(base)
+                    .fragment(fragment)
+                    .build(true)
+                    .toUriString();
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
             return;
         }
@@ -74,8 +79,12 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
                 && oae.getError().getErrorCode() != null) {
             errorCode = oae.getError().getErrorCode();
         }
+        // 설정값에 이미 query 가 있을 수 있으므로 UriComponentsBuilder 로 oauthError query 만 덧붙인다.
         String base = FrontendUrlResolver.resolve(request, frontendErrorUri);
-        String targetUrl = base + "?oauthError=" + encode(errorCode);
+        String targetUrl = UriComponentsBuilder.fromUriString(base)
+                .queryParam("oauthError", encode(errorCode))
+                .build(true)
+                .toUriString();
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 

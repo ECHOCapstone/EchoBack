@@ -21,7 +21,8 @@ public record AppProperties(
         OAuth2 oauth2,
         Admin admin,
         Auth auth,
-        Legal legal
+        Legal legal,
+        Member member
 ) {
 
     // 발음 채점 정책 — 약점 음소 가중치 및 PER → 점수 비선형 변환 파라미터.
@@ -47,6 +48,12 @@ public record AppProperties(
 
     // 약관/법적 고지 본문 버전. 본문 파일은 classpath:content/terms/{kind}-{version}.md 로 둔다.
     public record Legal(String termsVersion) {}
+
+    // 회원 관련 정책. retention 은 탈퇴 (soft delete) 후 hard delete 까지의 grace period 일수.
+    // graceDays 가 지난 deleted_at 사용자는 retention 스케줄러가 자식 데이터까지 정리한다.
+    public record Member(Retention retention) {
+        public record Retention(int graceDays) {}
+    }
 
     // 부팅 시 적용되는 관리자 셋업.
     //   bootstrapUsername : 이미 가입된 그 username 계정을 ROLE_ADMIN 으로 승격한다 (멱등).

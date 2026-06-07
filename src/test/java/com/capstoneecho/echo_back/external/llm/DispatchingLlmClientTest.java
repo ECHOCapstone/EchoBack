@@ -22,7 +22,7 @@ class DispatchingLlmClientTest {
                 null, null, null, null,
                 null,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         return new DispatchingLlmClient(ruleBased, gemini, settings, props);
     }
 

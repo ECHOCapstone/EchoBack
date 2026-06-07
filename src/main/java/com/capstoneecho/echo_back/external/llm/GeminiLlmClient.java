@@ -14,9 +14,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 
 // Gemini REST API 의 generateContent + 구조화 출력 (responseFormat.text.schema) 을 사용해
 // 세 종류의 피드백을 JSON 으로 받아 record 로 역직렬화한다.
@@ -171,9 +173,18 @@ public class GeminiLlmClient implements LlmClient {
                         status, http.getResponseBodyAsString());
             }
             return null;
+        } catch (ResourceAccessException network) {
+            // 네트워크 / 타임아웃 — 일시적 실패. 의도된 fallback 경로.
+            log.warn("Gemini 네트워크 오류 — 규칙 기반 폴백 사용: {}", network.getMessage());
+            return null;
+        } catch (JacksonException parse) {
+            // 구조화 출력 파싱 실패는 프롬프트 / 스키마 / 모델 응답 형식이 어긋난 신호 — 운영자가 추적할 수
+            // 있도록 ERROR 로 남긴다. 그래도 사용자 응답을 지키기 위해 폴백으로 떨어진다.
+            log.error("Gemini 구조화 출력 파싱 실패 — 프롬프트/스키마 점검 필요. 규칙 기반 폴백 사용", parse);
+            return null;
         } catch (RuntimeException ex) {
-            // 네트워크 / 타임아웃 / JSON 파싱 실패 등. unchecked 라 한곳에서 잡고 폴백으로 떨어진다.
-            log.warn("Gemini 호출/파싱 실패 — 규칙 기반 폴백 사용", ex);
+            // 그 외 예측 못한 RuntimeException — 동작 보존을 위해 폴백으로 떨어지되 ERROR 로그.
+            log.error("Gemini 호출 실패 (예측 못한 예외) — 규칙 기반 폴백 사용", ex);
             return null;
         }
     }

@@ -161,7 +161,7 @@ class JwtAuthFilterTest {
                 null, null, null, null, null, null, null,
                 null,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         return new JwtProvider(props);
     }
 }

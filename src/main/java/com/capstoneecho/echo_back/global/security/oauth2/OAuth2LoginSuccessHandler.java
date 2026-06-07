@@ -6,12 +6,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 // OAuth2 인증 성공 후 우리 JWT 를 발급하고, 프론트엔드 콜백 URL 의 fragment 로 실어 redirect 한다.
 // 형식: <frontendRedirectUri>#token=<JWT>&expiresIn=<sec>
@@ -64,10 +67,13 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         // 설정값의 path/query 만 떼어 와 incoming request 의 scheme+host 와 합성한다.
         // 그래야 Cloudflare Tunnel / 리버스 프록시 뒤에서도 사용자가 접속한 도메인으로 콜백된다.
+        // base 에 이미 query 가 있을 수 있으므로 UriComponentsBuilder 로 안전하게 합성한다.
         String base = FrontendUrlResolver.resolve(request, frontendRedirectUri);
-        String targetUrl = base
-                + "#token=" + token
-                + "&expiresIn=" + expiresInSec;
+        String fragment = "token=" + encode(token) + "&expiresIn=" + expiresInSec;
+        String targetUrl = UriComponentsBuilder.fromUriString(base)
+                .fragment(fragment)
+                .build(true)
+                .toUriString();
 
         clearAuthenticationAttributes(request);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
@@ -76,5 +82,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private static String stringAttribute(OAuth2User principal, String key) {
         Object value = principal.getAttribute(key);
         return value == null ? null : value.toString();
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

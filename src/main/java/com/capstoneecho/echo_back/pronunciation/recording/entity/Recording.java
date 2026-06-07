@@ -53,22 +53,22 @@ public class Recording {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "script_id")
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Script script;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "step_id")
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private LearningStep step;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Session session;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_sentence_id")
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private SessionSentence sessionSentence;
 
     @Column(name = "audio_path", nullable = false, length = 500)
@@ -133,7 +133,9 @@ public class Recording {
         requireNonNull(script, "script");
         requireNonNull(step, "step");
         requireNonBlank(audioPath, "audioPath");
-        if (step.getScript() != script) {
+        // 영속화 전 객체는 ID 가 모두 null 이므로 reference 동일성으로 검증한다.
+        // 영속 엔티티/프록시는 ID 비교로 검증해 EntityManager.getReference 로 받은 프록시도 통과한다.
+        if (!sameParent(step.getScript(), script)) {
             throw new IllegalArgumentException("step.script must equal the supplied script");
         }
         return new Recording(user, script, step, null, null, audioPath, targetTextSnapshot);
@@ -150,12 +152,62 @@ public class Recording {
         requireNonNull(session, "session");
         requireNonNull(sentence, "sentence");
         requireNonBlank(audioPath, "audioPath");
-        if (sentence.getSession() != session) {
+        if (!sameParent(sentence.getSession(), session)) {
             throw new IllegalArgumentException("sentence.session must equal the supplied session");
         }
-        if (session.getUser() != user) {
+        if (!sameParent(session.getUser(), user)) {
             throw new IllegalArgumentException("session.user must equal the supplied user");
         }
+        return new Recording(user, null, null, session, sentence, audioPath, targetTextSnapshot);
+    }
+
+    // reference 동일성 또는 영속 ID 동일성으로 부모를 비교한다.
+    private static boolean sameParent(Object linked, Object expected) {
+        if (linked == expected) {
+            return true;
+        }
+        if (linked == null || expected == null) {
+            return false;
+        }
+        Long a = identifierOf(linked);
+        Long b = identifierOf(expected);
+        return a != null && a.equals(b);
+    }
+
+    private static Long identifierOf(Object entity) {
+        if (entity instanceof User u) return u.getId();
+        if (entity instanceof Script s) return s.getId();
+        if (entity instanceof Session s) return s.getId();
+        return null;
+    }
+
+    // 호출 측이 READ TX 에서 부모 관계를 이미 검증한 경우의 가벼운 팩토리.
+    // 부모 엔티티는 EntityManager.getReference 로 받은 프록시여도 되며, 추가 로드를 일으키지 않는다.
+    public static Recording forScriptStepUnchecked(
+            User user,
+            Script script,
+            LearningStep step,
+            String audioPath,
+            String targetTextSnapshot
+    ) {
+        requireNonNull(user, "user");
+        requireNonNull(script, "script");
+        requireNonNull(step, "step");
+        requireNonBlank(audioPath, "audioPath");
+        return new Recording(user, script, step, null, null, audioPath, targetTextSnapshot);
+    }
+
+    public static Recording forSessionSentenceUnchecked(
+            User user,
+            Session session,
+            SessionSentence sentence,
+            String audioPath,
+            String targetTextSnapshot
+    ) {
+        requireNonNull(user, "user");
+        requireNonNull(session, "session");
+        requireNonNull(sentence, "sentence");
+        requireNonBlank(audioPath, "audioPath");
         return new Recording(user, null, null, session, sentence, audioPath, targetTextSnapshot);
     }
 

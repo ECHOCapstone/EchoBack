@@ -18,7 +18,7 @@ class WeakPhonemeAnalyzerTest {
                 null, null, null, null, null, null, null, null,
                 scoring,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         return new WeakPhonemeAnalyzer(props);
     }
 

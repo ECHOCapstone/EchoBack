@@ -57,6 +57,13 @@ app:
     allowed-origins:
       - ${APP_CORS_ALLOWED_ORIGIN:https://echo.example.com}
   model-server:
+    # 운영 환경에서는 default 없이 강제 — 미설정 시 부팅 자체가 실패해 잘못된 fallback 호출을 막는다.
     base-url: ${MODEL_SERVER_BASE_URL}
+    # 모델 서버 호출은 g2p + analyze + LLM 호출이 묶여 있어 운영 워밍업 직후엔 30s 도 짧다. 60s 로 둔다.
+    timeout-ms: ${MODEL_SERVER_TIMEOUT_MS:60000}
+  llm:
+    # 운영에서는 LLM 활성 여부와 무관하게 키 만 환경변수로 받는다 — Gemini 활성 시 누락하면 부팅 시점에 거절.
+    gemini:
+      api-key: ${GEMINI_API_KEY}
   storage:
     local-root: ${APP_STORAGE_LOCAL_ROOT:/var/echo/storage}

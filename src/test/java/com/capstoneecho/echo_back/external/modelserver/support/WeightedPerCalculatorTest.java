@@ -32,7 +32,7 @@ class WeightedPerCalculatorTest {
                 null, null, null, null, null, null, null, null,
                 scoring,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     private static AnalyzeError sub(String canonical, String perceived) {

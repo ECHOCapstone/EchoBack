@@ -95,7 +95,7 @@ class PhonemeAlignerTest {
                 null, null, null, null, null, null, null, null,
                 scoring,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         return new WeightedPerCalculator(props);
     }
 

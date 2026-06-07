@@ -54,12 +54,12 @@ public class PronunciationFeedback {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "script_id")
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Script script;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
-    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Session session;
 
     @Column(name = "title", nullable = false, length = 200)

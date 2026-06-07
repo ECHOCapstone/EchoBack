@@ -33,7 +33,7 @@ class LlmConfigServiceTest {
                 null, null, null, null,
                 null,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         return new LlmConfigService(settings, gemini, props);
     }
 

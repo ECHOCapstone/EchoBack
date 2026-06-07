@@ -9,12 +9,16 @@ import com.capstoneecho.echo_back.global.content.SeedFileStatus;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -36,6 +40,8 @@ public class PromptCatalog implements PersistableSeed {
     private static final String DEFAULTS_LOCATION = "classpath:content/prompts/*.md";
     private static final String EMPTY_PLACEHOLDER_REGEX = "\\{\\{[a-zA-Z0-9_]+}}";
 
+    private static final Logger log = LoggerFactory.getLogger(PromptCatalog.class);
+
     // 편집본 파일이 놓이는 쓰기 가능 디렉터리. 없으면 첫 쓰기 때 생성한다.
     private final Path overrideDir;
     // 어드민 시드 상태(파일 존재 / 마지막 수정 시각) 노출용. 다른 도메인과 같은 출처를 쓴다.
@@ -44,6 +50,9 @@ public class PromptCatalog implements PersistableSeed {
     private final Map<String, String> defaults;
     // 실제 사용 본문 = 기본값 + 파일 오버라이드. 편집 시 write-through 한다.
     private final Map<String, String> effective;
+    // 부팅 시 디스크에 발견됐으나 알려진 키가 아닌 .md 파일들. 어드민 응답에 노출해 운영자가
+    // 의도된 편집인지 확인할 수 있게 한다.
+    private final List<String> unknownOverrideKeys;
 
     public PromptCatalog(
             @Value("${app.content.dir}") String contentDir,
@@ -53,17 +62,40 @@ public class PromptCatalog implements PersistableSeed {
         this.contentStore = contentStore;
         this.defaults = Map.copyOf(loadDefaults());
         this.effective = new ConcurrentHashMap<>(this.defaults);
-        applyFileOverrides();
+        this.unknownOverrideKeys = List.copyOf(applyFileOverrides());
     }
 
-    // 시작 시 디스크의 편집본을 덧씌운다. 알 수 없는 키의 파일(삭제된 프롬프트 등)은 무시한다.
-    private void applyFileOverrides() {
-        for (String key : defaults.keySet()) {
-            Path file = overrideDir.resolve(key + ".md");
-            if (Files.isRegularFile(file)) {
-                effective.put(key, readFile(file));
-            }
+    // 시작 시 디스크의 편집본을 덧씌운다. 디렉터리에 알려지지 않은 키의 .md 파일이 있으면 WARN 으로 남기고
+    // 어드민 응답용 목록에 모은다 (apply 되지 않음을 운영자가 인지하도록).
+    private List<String> applyFileOverrides() {
+        List<String> unknown = new ArrayList<>();
+        if (!Files.isDirectory(overrideDir)) {
+            return unknown;
         }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(overrideDir, "*.md")) {
+            for (Path file : stream) {
+                if (!Files.isRegularFile(file)) {
+                    continue;
+                }
+                String name = file.getFileName().toString();
+                String key = name.substring(0, name.length() - 3);
+                if (defaults.containsKey(key)) {
+                    effective.put(key, readFile(file));
+                } else {
+                    log.warn("Unknown prompt override file ignored: {} (key={} not in defaults {})",
+                            file, key, defaults.keySet());
+                    unknown.add(key);
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("프롬프트 편집본 디렉터리를 스캔할 수 없습니다: " + overrideDir, e);
+        }
+        return unknown;
+    }
+
+    // 어드민 응답에 사용. 알려지지 않아 적용되지 않은 파일 키 목록.
+    public List<String> unknownOverrideKeys() {
+        return unknownOverrideKeys;
     }
 
     public String raw(String key) {

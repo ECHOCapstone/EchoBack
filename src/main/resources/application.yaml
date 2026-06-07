@@ -37,6 +37,11 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
         jdbc:
           time_zone: Asia/Seoul
+          # PronunciationFeedback 의 PhonemeError 자식 N건 + 종합 피드백 INSERT 가 한 트랜잭션 안에서
+          # 발생한다. batch_size 를 켜면 N+1 INSERT 가 한 번의 JDBC 라운드트립으로 묶여 처리량이 크게 는다.
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -227,6 +232,11 @@ app:
     # 현재 약관 본문 버전. 본문 파일은 classpath:content/terms/{kind}-{version}.md 로 둔다.
     # 버전이 바뀌면 동의 기록과 비교해 재동의를 요구할 수 있다.
     terms-version: "1"
+  member:
+    retention:
+      # 탈퇴 처리 후 hard delete 까지 보존할 일수. 같은 자격증명으로 다시 로그인하면 복구 가능.
+      # UserRetentionScheduler 가 매일 한 번 deleted_at 가 이 일수보다 오래된 사용자를 정리한다.
+      grace-days: 30
   messages:
     recording-guidance-fallback: "발음을 더 또렷하게 따라 읽어 보세요."
     feedback-guidance-fallback: "꾸준한 연습이 발음 개선에 도움이 됩니다."

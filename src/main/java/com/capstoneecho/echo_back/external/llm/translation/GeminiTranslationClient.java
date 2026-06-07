@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -162,8 +163,12 @@ public class GeminiTranslationClient implements TranslationClient {
                 log.warn("Gemini 번역 HTTP 오류 ({}) body={}", status, http.getResponseBodyAsString());
             }
             return null;
+        } catch (ResourceAccessException network) {
+            // 네트워크 / 타임아웃 — 일시적 실패. 의도된 fallback.
+            log.warn("Gemini 번역 네트워크 오류 — 빈 결과 반환: {}", network.getMessage());
+            return null;
         } catch (RuntimeException ex) {
-            log.warn("Gemini 번역 호출 실패 — 빈 결과 반환", ex);
+            log.error("Gemini 번역 호출 실패 (예측 못한 예외) — 빈 결과 반환", ex);
             return null;
         }
     }

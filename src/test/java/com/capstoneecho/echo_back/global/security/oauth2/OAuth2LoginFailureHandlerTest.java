@@ -30,7 +30,7 @@ class OAuth2LoginFailureHandlerTest {
                         "http://localhost:3000/oauth/callback",
                         ERROR_URI,
                         "http://localhost:3000/signup"),
-                null, null, null);
+                null, null, null, null);
         PendingOAuthTokenService pendingTokenService = new PendingOAuthTokenService(props);
         handler = new OAuth2LoginFailureHandler(props, pendingTokenService);
     }
