@@ -10,6 +10,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeAligner;
+import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
@@ -80,7 +81,8 @@ class ModelServerClientTest {
                 null,
                 null, null, null);
         return new ModelServerClient(
-                restClient, props, settings, new PhonemeNormalizer(), new PhonemeAligner());
+                restClient, props, settings,
+                new PhonemeNormalizer(), new PhonemeAligner(), new PhonemeMismatchInspector());
     }
 
     private static void respondJson(HttpExchange exchange, int status, String json) throws IOException {
