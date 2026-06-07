@@ -14,10 +14,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 // Gemini REST API 의 generateContent 를 호출해 영어 → 한국어 번역을 받아 온다.
 // 구조화 출력(JSON 스키마) 대신 텍스트 응답을 쓴다 — 번역은 자연어 한 줄이라 스키마가 과하다.
@@ -150,6 +152,16 @@ public class GeminiTranslationClient implements TranslationClient {
                     .retrieve()
                     .body(GeminiResponse.class);
             return extractText(response);
+        } catch (RestClientResponseException http) {
+            HttpStatus status = HttpStatus.resolve(http.getStatusCode().value());
+            if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+                log.warn("Gemini 번역 인증 실패 ({}) — API 키 확인 필요", status);
+            } else if (status == HttpStatus.TOO_MANY_REQUESTS) {
+                log.warn("Gemini 번역 쿼터 초과 (429)");
+            } else {
+                log.warn("Gemini 번역 HTTP 오류 ({}) body={}", status, http.getResponseBodyAsString());
+            }
+            return null;
         } catch (RuntimeException ex) {
             log.warn("Gemini 번역 호출 실패 — 빈 결과 반환", ex);
             return null;

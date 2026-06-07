@@ -15,6 +15,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.member.service.AdminBootstrap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,41 +46,53 @@ class KakaoOAuth2UserMapperTest {
         mapper = new KakaoOAuth2UserMapper(userRepository, socialAccountRepository, adminBootstrap);
     }
 
-    // 카카오 OIDC userinfo 응답은 sub / email / nickname / picture 키를 사용.
+    // 카카오 OIDC userinfo 응답은 sub / email / nickname / picture 키와 email_verified 를 함께 사용한다.
+    // Case B (이메일 매칭) 는 표준 가입 계정 도용 방어를 위해 email_verified=true 일 때만 연결한다.
     private static Map<String, Object> kakaoAttrs(String sub, String email, String nickname) {
-        return Map.of("sub", sub, "email", email, "nickname", nickname);
+        return kakaoAttrs(sub, email, nickname, true);
+    }
+
+    private static Map<String, Object> kakaoAttrs(String sub, String email, String nickname, Boolean emailVerified) {
+        Map<String, Object> attrs = new HashMap<>();
+        attrs.put("sub", sub);
+        attrs.put("email", email);
+        if (nickname != null) {
+            attrs.put("nickname", nickname);
+        }
+        if (emailVerified != null) {
+            attrs.put("email_verified", emailVerified);
+        }
+        return attrs;
     }
 
     @Test
-    @DisplayName("Case A — 이미 (KAKAO, sub) 로 SocialAccount 가 있으면 토큰만 갱신하고 기존 User 를 반환한다")
-    void caseAExistingSocialAccountUpdatesToken() {
+    @DisplayName("Case A — 이미 (KAKAO, sub) 로 SocialAccount 가 있으면 provider_email 만 갱신하고 기존 User 를 반환한다")
+    void caseAExistingSocialAccountKeepsUser() {
         User existingUser = User.fromOAuth2("alice@kakao.com", "Alice");
         SocialAccount existingAccount = SocialAccount.create(
-                existingUser, Provider.KAKAO, "kakao-sub-123", "alice@kakao.com", "old-token");
+                existingUser, Provider.KAKAO, "kakao-sub-123", "old@kakao.com");
         when(socialAccountRepository.findByProviderAndProviderUid(Provider.KAKAO, "kakao-sub-123"))
                 .thenReturn(Optional.of(existingAccount));
 
-        User result = mapper.upsert(
-                kakaoAttrs("kakao-sub-123", "alice@kakao.com", "Alice"), "new-token");
+        User result = mapper.upsert(kakaoAttrs("kakao-sub-123", "alice@kakao.com", "Alice"));
 
         assertThat(result).isSameAs(existingUser);
-        assertThat(existingAccount.getAccessToken()).isEqualTo("new-token");
+        assertThat(existingAccount.getProviderEmail()).isEqualTo("alice@kakao.com");
         verify(userRepository, never()).save(any());
         verify(userRepository, never()).findByEmail(any());
         verify(socialAccountRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Case B — 같은 이메일로 표준 가입한 User 가 있으면 새 SocialAccount 만 연결한다")
-    void caseBExistingUserGetsNewSocialAccount() {
+    @DisplayName("Case B — 같은 이메일 User 가 있고 email_verified=true 면 새 SocialAccount 만 연결한다")
+    void caseBExistingUserGetsNewSocialAccountWhenEmailVerified() {
         User existingUser = User.fromOAuth2("alice@kakao.com", "Alice");
         when(socialAccountRepository.findByProviderAndProviderUid(Provider.KAKAO, "kakao-sub-new"))
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail("alice@kakao.com"))
                 .thenReturn(Optional.of(existingUser));
 
-        User result = mapper.upsert(
-                kakaoAttrs("kakao-sub-new", "alice@kakao.com", "Kakao Alice"), "tok-1");
+        User result = mapper.upsert(kakaoAttrs("kakao-sub-new", "alice@kakao.com", "Kakao Alice"));
 
         assertThat(result).isSameAs(existingUser);
         verify(userRepository, never()).save(any());
@@ -90,7 +103,24 @@ class KakaoOAuth2UserMapperTest {
         assertThat(saved.getProvider()).isEqualTo(Provider.KAKAO);
         assertThat(saved.getProviderUid()).isEqualTo("kakao-sub-new");
         assertThat(saved.getProviderEmail()).isEqualTo("alice@kakao.com");
-        assertThat(saved.getAccessToken()).isEqualTo("tok-1");
+    }
+
+    @Test
+    @DisplayName("Case B — email_verified=false 면 표준 가입 계정 도용을 막기 위해 email_not_verified 로 거부한다")
+    void caseBRejectsLinkingWhenEmailNotVerified() {
+        User existingUser = User.fromOAuth2("alice@kakao.com", "Alice");
+        when(socialAccountRepository.findByProviderAndProviderUid(Provider.KAKAO, "kakao-sub-spoof"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmail("alice@kakao.com"))
+                .thenReturn(Optional.of(existingUser));
+
+        assertThatThrownBy(() -> mapper.upsert(
+                kakaoAttrs("kakao-sub-spoof", "alice@kakao.com", "Spoof", false)))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(ex -> assertThat(((OAuth2AuthenticationException) ex).getError().getErrorCode())
+                        .isEqualTo("email_not_verified"));
+
+        verify(socialAccountRepository, never()).save(any(SocialAccount.class));
     }
 
     @Test
@@ -101,8 +131,7 @@ class KakaoOAuth2UserMapperTest {
         when(userRepository.findByEmail("new@kakao.com"))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> mapper.upsert(
-                kakaoAttrs("kakao-sub-x", "new@kakao.com", "Newbie"), "tok-c"))
+        assertThatThrownBy(() -> mapper.upsert(kakaoAttrs("kakao-sub-x", "new@kakao.com", "Newbie")))
                 .isInstanceOf(PendingSignupException.class)
                 .satisfies(ex -> {
                     PendingSignupException pending = (PendingSignupException) ex;
@@ -123,8 +152,7 @@ class KakaoOAuth2UserMapperTest {
                 .thenReturn(Optional.empty());
         when(userRepository.findByEmail(any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> mapper.upsert(
-                Map.of("sub", "kakao-sub-noname", "email", "lonely@kakao.com"), "tok"))
+        assertThatThrownBy(() -> mapper.upsert(kakaoAttrs("kakao-sub-noname", "lonely@kakao.com", null)))
                 .isInstanceOf(PendingSignupException.class)
                 .satisfies(ex -> assertThat(((PendingSignupException) ex).nicknameHint()).isNull());
     }
@@ -132,8 +160,7 @@ class KakaoOAuth2UserMapperTest {
     @Test
     @DisplayName("Case D — sub 가 누락되면 invalid_user_info OAuth2AuthenticationException")
     void caseDMissingSubThrows() {
-        assertThatThrownBy(() -> mapper.upsert(
-                Map.of("email", "x@kakao.com"), "tok"))
+        assertThatThrownBy(() -> mapper.upsert(Map.of("email", "x@kakao.com")))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .satisfies(ex -> assertThat(((OAuth2AuthenticationException) ex).getError().getErrorCode())
                         .isEqualTo("invalid_user_info"));
@@ -145,8 +172,7 @@ class KakaoOAuth2UserMapperTest {
     @Test
     @DisplayName("Case D — email 이 누락되면 invalid_email OAuth2AuthenticationException")
     void caseDMissingEmailThrows() {
-        assertThatThrownBy(() -> mapper.upsert(
-                Map.of("sub", "kakao-sub-1"), "tok"))
+        assertThatThrownBy(() -> mapper.upsert(Map.of("sub", "kakao-sub-1")))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .satisfies(ex -> assertThat(((OAuth2AuthenticationException) ex).getError().getErrorCode())
                         .isEqualTo("invalid_email"));

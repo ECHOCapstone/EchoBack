@@ -54,6 +54,12 @@ public class PhonemeAssetService {
         if (bytes == null || bytes.length == 0) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "이미지가 비어 있습니다.");
         }
+        // Content-Type 헤더는 클라이언트가 임의로 바꿀 수 있으므로 파일 시그니처(magic number)로 한 번 더 검증한다.
+        // 실제 바이트가 다른 형식이면 (예: image/png 헤더 + .exe 본문) 거절해 비정상 자산 업로드를 막는다.
+        if (!matchesExtension(extension, bytes)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST, "이미지 형식과 실제 파일 내용이 일치하지 않습니다.");
+        }
         String newPath = storage.save(phoneme, extension, bytes);
         repository.findById(phoneme).ifPresentOrElse(
                 existing -> {
@@ -87,6 +93,47 @@ public class PhonemeAssetService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "잘못된 음소입니다: " + rawPhoneme);
         }
         return phoneme;
+    }
+
+    // 업로드 바이트의 시그니처가 클라이언트가 알려준 확장자와 일치하는지 검사한다.
+    //   png   : 89 50 4E 47 0D 0A 1A 0A
+    //   jpg   : FF D8 FF
+    //   webp  : RIFF .... WEBP (12 bytes)
+    //   svg   : "<svg" 또는 BOM 후 "<svg" 또는 "<?xml" 헤더 (XML)
+    private static boolean matchesExtension(String extension, byte[] bytes) {
+        return switch (extension) {
+            case "png" -> startsWith(bytes,
+                    (byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47,
+                    (byte) 0x0D, (byte) 0x0A, (byte) 0x1A, (byte) 0x0A);
+            case "jpg" -> startsWith(bytes, (byte) 0xFF, (byte) 0xD8, (byte) 0xFF);
+            case "webp" -> bytes.length >= 12
+                    && startsWith(bytes, (byte) 'R', (byte) 'I', (byte) 'F', (byte) 'F')
+                    && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
+            case "svg" -> looksLikeSvg(bytes);
+            default -> false;
+        };
+    }
+
+    private static boolean startsWith(byte[] bytes, byte... prefix) {
+        if (bytes.length < prefix.length) {
+            return false;
+        }
+        for (int i = 0; i < prefix.length; i++) {
+            if (bytes[i] != prefix[i]) return false;
+        }
+        return true;
+    }
+
+    // svg 는 XML 텍스트라 앞부분에 "<svg" 또는 XML 선언이 나타난다.
+    private static boolean looksLikeSvg(byte[] bytes) {
+        String head = new String(bytes, 0, Math.min(bytes.length, 512), java.nio.charset.StandardCharsets.UTF_8);
+        String lowered = head.toLowerCase(Locale.ROOT).strip();
+        // UTF-8 BOM 제거.
+        if (lowered.startsWith("﻿")) {
+            lowered = lowered.substring(1).strip();
+        }
+        return lowered.startsWith("<svg")
+                || (lowered.startsWith("<?xml") && lowered.contains("<svg"));
     }
 
     public record ImageData(byte[] bytes, String contentType) {}

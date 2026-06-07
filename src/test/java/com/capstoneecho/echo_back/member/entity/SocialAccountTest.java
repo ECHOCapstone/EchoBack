@@ -18,13 +18,12 @@ class SocialAccountTest {
         User user = newUser();
 
         SocialAccount account = SocialAccount.create(
-                user, Provider.GOOGLE, "sub-123", "alice@example.com", "access-token");
+                user, Provider.GOOGLE, "sub-123", "alice@example.com");
 
         assertThat(account.getUser()).isSameAs(user);
         assertThat(account.getProvider()).isEqualTo(Provider.GOOGLE);
         assertThat(account.getProviderUid()).isEqualTo("sub-123");
         assertThat(account.getProviderEmail()).isEqualTo("alice@example.com");
-        assertThat(account.getAccessToken()).isEqualTo("access-token");
         assertThat(account.getCreatedAt()).isNotNull();
     }
 
@@ -32,7 +31,7 @@ class SocialAccountTest {
     @DisplayName("create 는 user 가 null 이면 IllegalArgumentException 을 던진다")
     void createRejectsNullUser() {
         assertThatThrownBy(() ->
-                SocialAccount.create(null, Provider.GOOGLE, "sub-1", "a@b.com", "t"))
+                SocialAccount.create(null, Provider.GOOGLE, "sub-1", "a@b.com"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("user");
     }
@@ -41,7 +40,7 @@ class SocialAccountTest {
     @DisplayName("create 는 provider 가 null 이면 IllegalArgumentException 을 던진다")
     void createRejectsNullProvider() {
         assertThatThrownBy(() ->
-                SocialAccount.create(newUser(), null, "sub-1", "a@b.com", "t"))
+                SocialAccount.create(newUser(), null, "sub-1", "a@b.com"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("provider");
     }
@@ -50,31 +49,20 @@ class SocialAccountTest {
     @DisplayName("create 는 providerUid 가 비어 있으면 IllegalArgumentException 을 던진다")
     void createRejectsBlankProviderUid() {
         assertThatThrownBy(() ->
-                SocialAccount.create(newUser(), Provider.GOOGLE, " ", "a@b.com", "t"))
+                SocialAccount.create(newUser(), Provider.GOOGLE, " ", "a@b.com"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("providerUid");
         assertThatThrownBy(() ->
-                SocialAccount.create(newUser(), Provider.GOOGLE, null, "a@b.com", "t"))
+                SocialAccount.create(newUser(), Provider.GOOGLE, null, "a@b.com"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("providerUid");
-    }
-
-    @Test
-    @DisplayName("updateAccessToken 은 새로운 토큰으로 교체한다")
-    void updateAccessTokenReplacesValue() {
-        SocialAccount account = SocialAccount.create(
-                newUser(), Provider.GOOGLE, "sub-1", "a@b.com", "old-token");
-
-        account.updateAccessToken("new-token");
-
-        assertThat(account.getAccessToken()).isEqualTo("new-token");
     }
 
     @Test
     @DisplayName("updateProviderEmail 은 새로운 이메일로 교체하지만 blank 입력은 무시한다")
     void updateProviderEmailReplacesValueButIgnoresBlank() {
         SocialAccount account = SocialAccount.create(
-                newUser(), Provider.GOOGLE, "sub-1", "old@b.com", "t");
+                newUser(), Provider.GOOGLE, "sub-1", "old@b.com");
 
         account.updateProviderEmail("new@b.com");
         assertThat(account.getProviderEmail()).isEqualTo("new@b.com");

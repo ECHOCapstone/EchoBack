@@ -19,7 +19,9 @@ class DispatchingLlmClientTest {
     private DispatchingLlmClient dispatcher(String defaultProvider) {
         AppProperties props = new AppProperties(
                 null, null, null, new AppProperties.Llm(defaultProvider, null),
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null,
+                null,
+                null, null, null, null, null);
         return new DispatchingLlmClient(ruleBased, gemini, settings, props);
     }
 

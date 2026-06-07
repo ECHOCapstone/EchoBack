@@ -103,8 +103,10 @@ public class RankingService {
         return bucket;
     }
 
-    // 임계를 통과한 후보만 골라 평균 정확도 내림차순 → 활동 횟수 내림차순으로 정렬한다.
+    // 임계를 통과한 후보만 골라 평균 정확도 내림차순 → 활동 횟수 내림차순 → userId 오름차순으로 정렬한다.
     // 같은 평균이면 더 많이 학습한 쪽이 위로 — 꾸준함을 보상하는 tie-breaker.
+    // userId 비교는 모든 지표가 같을 때의 결정성 보장 — 시연 중 새로고침마다 같은 두 사용자의 순위가
+    // 무작위로 뒤집히는 것을 막는다.
     private List<Ranked> sortQualifiedCandidates(
             Map<Long, Aggregate> byUser, Long viewerId, int minActivity) {
         List<Ranked> ranked = new ArrayList<>();
@@ -122,7 +124,8 @@ public class RankingService {
         // 단계별 Comparator 를 따로 만들고 thenComparing 으로 합치는 형태가 안전하다.
         Comparator<Ranked> byAccuracyDesc = Comparator.comparingDouble(Ranked::accuracy).reversed();
         Comparator<Ranked> byActivityDesc = Comparator.comparingInt(Ranked::activityCount).reversed();
-        ranked.sort(byAccuracyDesc.thenComparing(byActivityDesc));
+        Comparator<Ranked> byUserIdAsc = Comparator.comparing(Ranked::userId);
+        ranked.sort(byAccuracyDesc.thenComparing(byActivityDesc).thenComparing(byUserIdAsc));
         return ranked;
     }
 

@@ -21,6 +21,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
             null, null, null, null, null, null, null,
             new AppProperties.Gamification(
                     10, 7, 3, 5, 7, 3, 70.0, 80.0, 10, "오늘의 랭킹", "the"),
+            null,
             new AppProperties.Messages(
                     "발음을 더 또렷하게 따라 읽어 보세요.",
                     "꾸준한 연습이 발음 개선에 도움이 됩니다.",

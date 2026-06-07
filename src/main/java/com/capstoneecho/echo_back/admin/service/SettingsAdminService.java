@@ -63,9 +63,7 @@ public class SettingsAdminService {
                 new Definition(RuntimeSettings.AUTH_PASSWORD_MAX_LENGTH, Type.INT,
                         () -> String.valueOf(runtime.passwordMaxLength())),
                 new Definition(RuntimeSettings.AUTH_PASSWORD_REQUIRE_CATEGORIES, Type.INT,
-                        () -> String.valueOf(runtime.passwordRequireCategories())),
-                new Definition(RuntimeSettings.SCORING_INSERTION_WEIGHT, Type.DOUBLE,
-                        () -> String.valueOf(runtime.scoringInsertionWeight())));
+                        () -> String.valueOf(runtime.passwordRequireCategories())));
     }
 
     public List<SettingResponse> list() {

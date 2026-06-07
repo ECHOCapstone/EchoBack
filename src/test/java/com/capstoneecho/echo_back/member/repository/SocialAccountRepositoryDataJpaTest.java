@@ -33,7 +33,7 @@ class SocialAccountRepositoryDataJpaTest {
     @DisplayName("findByProviderAndProviderUid 는 저장된 SocialAccount 를 반환한다")
     void findByProviderAndProviderUidReturnsPersisted() {
         User user = saveUser("alice@x.com", "Alice");
-        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-1", "alice@x.com", "t"));
+        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-1", "alice@x.com"));
 
         assertThat(repository.findByProviderAndProviderUid(Provider.GOOGLE, "sub-1"))
                 .isPresent()
@@ -55,7 +55,7 @@ class SocialAccountRepositoryDataJpaTest {
     @DisplayName("findByUserAndProvider 는 해당 user/provider 조합의 SocialAccount 를 반환한다")
     void findByUserAndProviderReturnsPersisted() {
         User user = saveUser("bob@x.com", "Bob");
-        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-2", "bob@x.com", "t"));
+        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-2", "bob@x.com"));
 
         assertThat(repository.findByUserAndProvider(user, Provider.GOOGLE))
                 .isPresent()
@@ -68,7 +68,7 @@ class SocialAccountRepositoryDataJpaTest {
     @DisplayName("findByProviderAndProviderUid 는 JOIN FETCH 로 user 까지 즉시 로드한다 (LazyInitializationException 회귀 방지)")
     void findByProviderAndProviderUidEagerlyLoadsUser() {
         User user = saveUser("eager@x.com", "Eager");
-        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-fj", "eager@x.com", "t"));
+        repository.save(SocialAccount.create(user, Provider.GOOGLE, "sub-fj", "eager@x.com"));
         em.flush();
         em.clear();
 
@@ -86,10 +86,10 @@ class SocialAccountRepositoryDataJpaTest {
     void uniqueConstraintOnProviderAndUid() {
         User userA = saveUser("a@x.com", "A");
         User userB = saveUser("b@x.com", "B");
-        repository.saveAndFlush(SocialAccount.create(userA, Provider.GOOGLE, "dup-sub", "a@x.com", "t"));
+        repository.saveAndFlush(SocialAccount.create(userA, Provider.GOOGLE, "dup-sub", "a@x.com"));
 
         assertThatThrownBy(() -> repository.saveAndFlush(
-                SocialAccount.create(userB, Provider.GOOGLE, "dup-sub", "b@x.com", "t")))
+                SocialAccount.create(userB, Provider.GOOGLE, "dup-sub", "b@x.com")))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

@@ -689,8 +689,8 @@ tracks:
             targetText: "How much would it cost to take a taxi from here?"
           - orderIndex: 4
             kind: "RECORD"
-            prompt: "녹음 버튼을 누르고 Excuse me, is this seat available 를 발음해 보세요."
-            targetText: "Excuse me, is this seat available"
+            prompt: "녹음 버튼을 누르고 Excuse me, is this seat available? 를 발음해 보세요."
+            targetText: "Excuse me, is this seat available?"
           - orderIndex: 5
             kind: "RECORD"
             prompt: "녹음 버튼을 누르고 Could you let me know when we reach the stop? 를 발음해 보세요."
@@ -996,8 +996,8 @@ tracks:
             targetText: null
           - orderIndex: 1
             kind: "RECORD"
-            prompt: "녹음 버튼을 누르고 So what brings you to the event tonight 를 발음해 보세요."
-            targetText: "So what brings you to the event tonight"
+            prompt: "녹음 버튼을 누르고 So what brings you to the event tonight? 를 발음해 보세요."
+            targetText: "So what brings you to the event tonight?"
           - orderIndex: 2
             kind: "RECORD"
             prompt: "녹음 버튼을 누르고 I've heard so many great things about you 를 발음해 보세요."

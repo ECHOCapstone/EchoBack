@@ -5,7 +5,6 @@ import java.util.Set;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -27,16 +26,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         OAuth2User oauth2User = super.loadUser(userRequest);
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-        User user = mapperRegistry.resolve(registrationId)
-                .upsert(oauth2User.getAttributes(), tokenValue(userRequest.getAccessToken()));
+        User user = mapperRegistry.resolve(registrationId).upsert(oauth2User.getAttributes());
 
         return new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
                 OAuth2Attributes.enrich(oauth2User.getAttributes(), user),
                 OAuth2Attributes.NAME_ATTRIBUTE_KEY);
-    }
-
-    private static String tokenValue(OAuth2AccessToken accessToken) {
-        return accessToken == null ? null : accessToken.getTokenValue();
     }
 }

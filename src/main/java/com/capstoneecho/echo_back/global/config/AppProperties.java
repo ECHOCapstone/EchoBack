@@ -15,12 +15,27 @@ public record AppProperties(
         Tts tts,
         Stats stats,
         Gamification gamification,
+        Scoring scoring,
         Messages messages,
         OAuth2 oauth2,
         Admin admin,
         Auth auth,
         Legal legal
 ) {
+
+    // 발음 채점 정책 — 약점 음소 가중치 및 PER → 점수 비선형 변환 파라미터.
+    // weak-phonemes 는 대문자 ARPABET 으로 yaml 에 둔다. PhonemeAligner 가 정렬 결과의 sub/del 대상
+    // 음소가 이 목록에 포함되어 있으면 weak-phoneme-multiplier 가중을 적용한다.
+    public record Scoring(
+            List<String> weakPhonemes,
+            double weakPhonemeMultiplier,
+            double insertionWeight,
+            double perToScoreExponent
+    ) {
+        public List<String> safeWeakPhonemes() {
+            return weakPhonemes == null ? List.of() : weakPhonemes;
+        }
+    }
 
     // 회원가입 시 강제되는 비밀번호 정책. 백엔드 validator 와 프론트 안내가 같은 출처를 공유한다.
     //   minLength / maxLength    : 글자수 범위.

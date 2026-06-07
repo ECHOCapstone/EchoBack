@@ -12,6 +12,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeAligner;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
+import com.capstoneecho.echo_back.external.modelserver.support.WeightedPerCalculator;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
@@ -79,10 +80,15 @@ class ModelServerClientTest {
                 null,
                 null,
                 null,
-                null, null, null);
+                null, null, null, null);
+        // 정렬 / 채점 정책 분리: 본 통합 테스트는 client 의 HTTP 경로만 검증하므로 uniform 정책으로 둔다.
+        WeightedPerCalculator uniformWeightedPer = new WeightedPerCalculator(
+                new AppProperties(null, null, null, null, null, null, null, null,
+                        new AppProperties.Scoring(java.util.List.of(), 1.0, 1.0, 1.0),
+                        null, null, null, null, null));
         return new ModelServerClient(
                 restClient, props, settings,
-                new PhonemeNormalizer(), new PhonemeAligner(), new PhonemeMismatchInspector());
+                new PhonemeNormalizer(), new PhonemeAligner(uniformWeightedPer), new PhonemeMismatchInspector());
     }
 
     private static void respondJson(HttpExchange exchange, int status, String json) throws IOException {

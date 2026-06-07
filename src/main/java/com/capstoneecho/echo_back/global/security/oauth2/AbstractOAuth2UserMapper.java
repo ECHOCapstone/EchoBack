@@ -14,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 // provider userinfo 응답을 User + SocialAccount 로 upsert 하는 공통 4분기 흐름.
 // 하위 클래스는 provider 식별자와 표시명 attribute 추출만 제공한다.
-//   A) (provider, sub) SocialAccount 존재 → access_token / provider_email 갱신 후 기존 User 반환
-//   B) email 로 기존 User 존재 → 새 SocialAccount 연결 (표준 로그인 + 소셜 로그인 방식 확장)
+//   A) (provider, sub) SocialAccount 존재 → provider_email 갱신 후 기존 User 반환
+//   B) email 로 기존 User 존재 → email_verified=true 일 때만 새 SocialAccount 연결
+//                                  (provider 가 검증하지 않은 email 은 표준 가입 계정의 자격증명을
+//                                  도용할 수 있어 거부한다)
 //   C) 둘 다 없음 → PendingSignupException — 사용자가 가입 폼에서 아이디·약관을 직접 채우게 안내한다.
 //                    이메일 / nicknameHint / providerUid 를 예외에 담아 FailureHandler 가 pending 토큰으로 묶는다.
 //   D) sub / email 누락 → OAuth2AuthenticationException
@@ -23,6 +25,7 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
 
     private static final String ATTR_SUB = "sub";
     private static final String ATTR_EMAIL = "email";
+    private static final String ATTR_EMAIL_VERIFIED = "email_verified";
 
     private final UserRepository userRepository;
     private final SocialAccountRepository socialAccountRepository;
@@ -46,7 +49,7 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
 
     @Override
     @Transactional
-    public User upsert(Map<String, Object> attributes, String accessToken) {
+    public User upsert(Map<String, Object> attributes) {
         String sub = asString(attributes.get(ATTR_SUB));
         String rawEmail = asString(attributes.get(ATTR_EMAIL));
 
@@ -59,11 +62,11 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
         // 표준 회원 풀과 같은 규칙으로 정규화 (case-insensitive + trim) — 같은 provider 이메일이
         // 대소문자만 다르게 들어와도 같은 사용자로 매핑되도록 한다.
         String email = rawEmail.trim().toLowerCase(Locale.ROOT);
+        Boolean emailVerified = asBoolean(attributes.get(ATTR_EMAIL_VERIFIED));
 
         User user = socialAccountRepository.findByProviderAndProviderUid(provider(), sub)
                 .map(existing -> {
                     // Case A — 이미 같은 provider 계정으로 로그인한 사용자.
-                    existing.updateAccessToken(accessToken);
                     existing.updateProviderEmail(email);
                     User linked = existing.getUser();
                     // 탈퇴 grace period 안에 같은 소셜 계정으로 다시 로그인 — 자동 복구.
@@ -75,12 +78,19 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
                 .orElseGet(() -> userRepository.findByEmail(email)
                         .map(existingUser -> {
                             // Case B — 같은 이메일의 기존 User 에 SocialAccount 만 추가.
+                            // provider 가 이메일 검증을 마치지 않았다면 누구나 그 이메일로 provider
+                            // 계정을 만들어 기존 표준 가입 계정의 자격을 가로챌 수 있으므로 거부한다.
+                            if (!Boolean.TRUE.equals(emailVerified)) {
+                                throw oauth2Error(
+                                        "email_not_verified",
+                                        provider() + " 가 이메일 검증을 마치지 않아 기존 계정에 자동 연결할 수 없습니다.");
+                            }
                             // 탈퇴된 계정도 같은 인증 정보로의 재진입이므로 복구한다.
                             if (existingUser.isDeleted()) {
                                 existingUser.restore();
                             }
                             socialAccountRepository.save(SocialAccount.create(
-                                    existingUser, provider(), sub, email, accessToken));
+                                    existingUser, provider(), sub, email));
                             return existingUser;
                         })
                         .orElseThrow(() -> new PendingSignupException(
@@ -95,6 +105,25 @@ public abstract class AbstractOAuth2UserMapper implements OAuth2UserMapper {
 
     private static String asString(Object value) {
         return value == null ? null : value.toString();
+    }
+
+    // OIDC userinfo / id_token claims 의 boolean 표기는 provider 마다 Boolean 또는 "true"/"false"
+    // 문자열로 도착한다. 그 외 값(예: 0/1, null)은 검증 안 됨으로 보수적으로 판단한다.
+    private static Boolean asBoolean(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        String normalized = value.toString().trim().toLowerCase(Locale.ROOT);
+        if ("true".equals(normalized)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(normalized)) {
+            return Boolean.FALSE;
+        }
+        return null;
     }
 
     private static OAuth2AuthenticationException oauth2Error(String code, String description) {

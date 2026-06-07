@@ -9,6 +9,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class TranslationService {
+
+    private static final Logger log = LoggerFactory.getLogger(TranslationService.class);
 
     private final TranslationCacheRepository repository;
     private final TranslationClient client;
@@ -114,12 +119,17 @@ public class TranslationService {
         }
     }
 
-    // 캐시 저장 실패가 사용자 응답을 막지 않도록 격리한다. 중복 저장은 hash PK 충돌로 자연스럽게 막힌다.
+    // 동시 요청으로 같은 hash 가 동시에 들어와 PK 충돌이 발생하는 race 만 무시한다.
+    // 다른 종류의 실패 (컬럼 길이 초과, DB 권한 등) 는 silent 로 삼키면 다음 요청에서 같은 외부 호출이
+    // 반복되어 비용 / 지연이 누적되므로 로그로 노출해 운영자가 인지할 수 있게 한다.
     private void persistQuietly(String sourceText, String targetText) {
         try {
             repository.save(TranslationCache.of(sourceText, targetText));
-        } catch (RuntimeException ignored) {
-            // 동시 요청으로 같은 hash 가 PK 충돌을 일으켜도 응답에는 영향 없다.
+        } catch (DataIntegrityViolationException race) {
+            // 같은 hash 를 다른 요청이 먼저 저장한 경우 — 응답에는 영향 없으므로 무시.
+        } catch (RuntimeException ex) {
+            log.warn("Translation cache persist failed (hash={}): {}",
+                    TranslationCache.hashOf(sourceText), ex.toString());
         }
     }
 
