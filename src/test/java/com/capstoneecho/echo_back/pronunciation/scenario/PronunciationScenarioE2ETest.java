@@ -267,14 +267,17 @@ class PronunciationScenarioE2ETest {
     }
 
     private static AnalyzeResult withError() {
-        AnalyzeError err = new AnalyzeError("SUB", 0, "AH", "AE");
+        // 오발음 시나리오 — substitution + deletion 두 건이 모두 잡혀 op-weighted 점수가 임계 미만으로 떨어진다.
+        // (denominator=4, weightedErrors=2.0 → adjustedPer=0.5 → score=50, passThreshold(75) 미만 → passed=false)
+        AnalyzeError sub = new AnalyzeError("substitution", 0, "AH", "AE");
+        AnalyzeError del = new AnalyzeError("deletion", 3, null, "L");
         return new AnalyzeResult(
-                List.of("AH", "P", "AH", "L"),
+                List.of("AH", "P", "AH"),
                 List.of("AE", "P", "AH", "L"),
-                List.of(0.85, 0.9, 0.8, 0.85),
+                List.of(0.85, 0.9, 0.8),
                 List.of(),
-                List.of(err),
-                0.35,
+                List.of(sub, del),
+                0.5,
                 1.0,
                 SpeechRate.NORMAL);
     }

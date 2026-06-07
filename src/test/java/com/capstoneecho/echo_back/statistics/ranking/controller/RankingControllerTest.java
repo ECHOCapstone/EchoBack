@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
+import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
+import com.capstoneecho.echo_back.global.settings.SettingsService;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.script.repository.ScriptRepository;
@@ -16,8 +18,6 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFeedback;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
-import com.capstoneecho.echo_back.statistics.ranking.entity.DemoRankingEntry;
-import com.capstoneecho.echo_back.statistics.ranking.repository.DemoRankingEntryRepository;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
 import java.io.File;
 import java.time.Instant;
@@ -36,66 +36,68 @@ class RankingControllerTest extends AbstractControllerIntegrationTest {
     @Autowired private TrackRepository trackRepository;
     @Autowired private ScriptRepository scriptRepository;
     @Autowired private FeedbackRepository feedbackRepository;
-    @Autowired private DemoRankingEntryRepository demoRankingEntryRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtProvider jwtProvider;
+    @Autowired private SettingsService settingsService;
     @Autowired private TransactionTemplate transactionTemplate;
 
     @BeforeEach
-    void seedDemoRanking() {
-        transactionTemplate.executeWithoutResult(s -> {
-            feedbackRepository.deleteAll();
-            demoRankingEntryRepository.deleteAll();
-            demoRankingEntryRepository.save(DemoRankingEntry.create("Aaron", 95));
-            demoRankingEntryRepository.save(DemoRankingEntry.create("Brenda", 88));
-            demoRankingEntryRepository.save(DemoRankingEntry.create("Cody", 81));
-            demoRankingEntryRepository.save(DemoRankingEntry.create("Dana", 74));
-            demoRankingEntryRepository.save(DemoRankingEntry.create("Erin", 67));
-        });
+    void resetState() {
+        transactionTemplate.executeWithoutResult(s -> feedbackRepository.deleteAll());
+        settingsService.set(RuntimeSettings.WEEKLY_WINDOW_DAYS, "7");
+        settingsService.set(RuntimeSettings.WEEKLY_TOP_N, "5");
+        settingsService.set(RuntimeSettings.RANKING_MIN_ACTIVITY_COUNT, "3");
     }
 
     @Test
-    @DisplayName("GET /api/ranking/today (오늘 피드백 없음) → demo 시드 정렬 + 본인은 unranked")
-    void todayWithoutOwnFeedbackReturnsDemoSeedAndUnranked() throws Exception {
-        User user = newUser("rkunranked");
+    @DisplayName("GET /api/ranking/weekly (활동 없음) → 빈 entries + myRank=0 + minActivityCount 노출")
+    void weeklyWithoutActivityReturnsEmptyEntries() throws Exception {
+        User user = newUser("empty");
         String token = issueToken(user);
 
-        mockMvc.perform(get("/api/ranking/today")
+        mockMvc.perform(get("/api/ranking/weekly")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.entries").isEmpty())
                 .andExpect(jsonPath("$.data.myRank").value(0))
-                .andExpect(jsonPath("$.data.myAccuracy").value(0.0))
-                .andExpect(jsonPath("$.data.entries[0].rank").value(1))
-                .andExpect(jsonPath("$.data.entries[0].accuracy").value(95.0))
-                .andExpect(jsonPath("$.data.entries[?(@.isMe == true)]").isEmpty())
-                .andDo(document("ranking/today"));
+                .andExpect(jsonPath("$.data.myActivityCount").value(0))
+                .andExpect(jsonPath("$.data.myEntryShown").value(false))
+                .andExpect(jsonPath("$.data.windowDays").value(7))
+                .andExpect(jsonPath("$.data.minActivityCount").value(3))
+                .andExpect(jsonPath("$.data.period").isNotEmpty())
+                .andDo(document("ranking/weekly"));
 
-        assertSnippetCreated("ranking/today");
+        assertSnippetCreated("ranking/weekly");
     }
 
     @Test
-    @DisplayName("GET /api/ranking/today (오늘 피드백 있음) → 본인 항목 포함")
-    void todayWithOwnFeedbackIncludesSelf() throws Exception {
-        User user = newUser("rkwithfb");
-        Script script = seedScript("rkfb");
-        completeFeedbackAt(user, script, "Coffee Shop", 84.0, Instant.now());
+    @DisplayName("GET /api/ranking/weekly (임계 통과) → 본인 entry 포함 + myEntryShown=true")
+    void weeklyWithQualifyingActivityIncludesSelf() throws Exception {
+        User user = newUser("qualify");
+        Script script = seedScript("qualify");
+        Instant now = Instant.now();
+        completeFeedbackAt(user, script, "S1", 80.0, now);
+        completeFeedbackAt(user, script, "S2", 90.0, now);
+        completeFeedbackAt(user, script, "S3", 100.0, now);
         String token = issueToken(user);
 
-        mockMvc.perform(get("/api/ranking/today")
+        mockMvc.perform(get("/api/ranking/weekly")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.myRank").value(Matchers.greaterThan(0)))
-                .andExpect(jsonPath("$.data.myAccuracy").value(84.0))
+                .andExpect(jsonPath("$.data.myAccuracy").value(90.0))
+                .andExpect(jsonPath("$.data.myActivityCount").value(3))
+                .andExpect(jsonPath("$.data.myEntryShown").value(true))
                 .andExpect(jsonPath("$.data.entries[?(@.isMe == true)]").exists())
-                .andExpect(jsonPath("$.data.unitTitle").isNotEmpty());
+                .andExpect(jsonPath("$.data.entries[0].activityCount").value(3));
     }
 
     @Test
-    @DisplayName("GET /api/ranking/today 인증 누락 → 401 UNAUTHORIZED")
+    @DisplayName("GET /api/ranking/weekly 인증 누락 → 401 UNAUTHORIZED")
     void missingAuthReturns401() throws Exception {
-        mockMvc.perform(get("/api/ranking/today"))
+        mockMvc.perform(get("/api/ranking/weekly"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }

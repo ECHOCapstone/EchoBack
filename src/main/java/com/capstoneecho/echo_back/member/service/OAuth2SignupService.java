@@ -14,13 +14,15 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.SocialAccountRepository;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // OAuth2 신규 사용자 가입 폼 제출을 처리한다.
 // pendingToken 으로 provider / providerUid / email 을 신뢰 가능하게 복원하고,
-// 사용자가 직접 정한 username + nickname + agreedTerms 검증 후 User + SocialAccount 를 동시 생성한다.
+// 사용자가 직접 정한 nickname + agreedTerms 검증 후 User + SocialAccount 를 동시 생성한다.
+// 내부 username 은 User entity 가 (provider, providerUid) 로부터 자동 생성한다 — 사용자에게 노출되지 않는다.
 // 응답은 표준 가입과 동일한 AuthTokenResponse — 프론트가 한 번의 흐름으로 메인 화면 진입 가능.
 @Service
 public class OAuth2SignupService {
@@ -55,12 +57,12 @@ public class OAuth2SignupService {
         }
         // pending 토큰 검증 — 변조 / 만료 / 다른 종류의 토큰이면 INVALID_TOKEN.
         PendingOAuthClaims pending = pendingTokenService.verify(request.pendingToken());
+        // provider 가 검증한 이메일을 표준 회원 풀과 같은 규칙으로 정규화한다 (case-insensitive + trim).
+        String email = normalizeEmail(pending.email());
 
-        // username / email 중복 — race condition 안전망. unique 제약이 최종 SSOT.
-        if (userRepository.existsByUsername(request.username())) {
-            throw new BusinessException(ErrorCode.USERNAME_DUPLICATED);
-        }
-        if (userRepository.existsByEmail(pending.email())) {
+        // 이메일 / provider+sub 중복 — race condition 안전망. unique 제약이 최종 SSOT.
+        // username 은 (provider, providerUid) 로부터 결정적으로 생성되므로 이 두 검사로 username 충돌도 함께 막힌다.
+        if (userRepository.existsByEmail(email)) {
             // 같은 이메일이 이미 가입돼 있음 — Case B 가 되었어야 하는데 race 로 끼어든 상황.
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
@@ -71,7 +73,8 @@ public class OAuth2SignupService {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
 
-        User newUser = User.fromOAuth2Signup(request.username(), pending.email(), request.nickname());
+        User newUser = User.fromOAuth2Signup(
+                pending.provider(), pending.providerUid(), email, request.nickname());
         // 표준 가입과 동일한 동의 모델 — 시간을 한 번에 기록한다.
         newUser.applyAgreements(authService.buildAgreementRecord(
                 request.agreedTerms(),
@@ -80,9 +83,14 @@ public class OAuth2SignupService {
                 Boolean.TRUE.equals(request.agreedMarketing())));
         userRepository.save(newUser);
         socialAccountRepository.save(SocialAccount.create(
-                newUser, pending.provider(), pending.providerUid(), pending.email(), null));
+                newUser, pending.provider(), pending.providerUid(), email, null));
 
         return issueToken(newUser);
+    }
+
+    // 표준 회원 풀과 같은 규칙. 표준화: trim + lowercase. null 은 그대로 돌려보내 호출 측에서 거절되게 한다.
+    private static String normalizeEmail(String raw) {
+        return raw == null ? null : raw.trim().toLowerCase(Locale.ROOT);
     }
 
     private AuthTokenResponse issueToken(User user) {

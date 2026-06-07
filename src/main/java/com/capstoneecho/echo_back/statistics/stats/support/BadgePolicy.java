@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.statistics.stats.support;
 
 import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.statistics.badges.BadgeCondition;
 import com.capstoneecho.echo_back.statistics.badges.BadgeDef;
@@ -17,10 +18,13 @@ public class BadgePolicy {
 
     private final BadgeRegistry badgeRegistry;
     private final RecordingRepository recordingRepository;
+    private final FeedbackRepository feedbackRepository;
 
-    public BadgePolicy(BadgeRegistry badgeRegistry, RecordingRepository recordingRepository) {
+    public BadgePolicy(BadgeRegistry badgeRegistry, RecordingRepository recordingRepository,
+                       FeedbackRepository feedbackRepository) {
         this.badgeRegistry = badgeRegistry;
         this.recordingRepository = recordingRepository;
+        this.feedbackRepository = feedbackRepository;
     }
 
     public List<Badge> evaluate(User user, long completedFeedbackCount) {
@@ -30,17 +34,20 @@ public class BadgePolicy {
         // 일괄 계산해도 비용이 작다.
         long recordingCount = user == null ? 0
                 : recordingRepository.countByUser_Id(user.getId());
+        long completedTrackCount = user == null ? 0
+                : feedbackRepository.countTracksFullyCompletedByUser(user.getId());
         int userExp = user == null ? 0 : user.getExp();
         int userStreak = user == null ? 0 : user.getStreak();
         for (BadgeDef def : defs) {
             result.add(new Badge(def.id(), def.name(),
-                    achieved(def, completedFeedbackCount, recordingCount, userExp, userStreak)));
+                    achieved(def, completedFeedbackCount, recordingCount, completedTrackCount,
+                            userExp, userStreak)));
         }
         return result;
     }
 
     private boolean achieved(BadgeDef def, long completedFeedbackCount, long recordingCount,
-                             int userExp, int userStreak) {
+                             long completedTrackCount, int userExp, int userStreak) {
         if (!BadgeCondition.isKnown(def.condition())) {
             return false;
         }
@@ -50,6 +57,7 @@ public class BadgePolicy {
             case USER_STREAK -> userStreak >= def.threshold();
             case TOTAL_EXP -> userExp >= def.threshold();
             case RECORDING_COUNT -> recordingCount >= def.threshold();
+            case COMPLETED_TRACK_COUNT -> completedTrackCount >= def.threshold();
         };
     }
 }

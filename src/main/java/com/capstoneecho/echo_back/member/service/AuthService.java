@@ -17,7 +17,9 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,10 @@ public class AuthService {
     private final PasswordPolicyEvaluator passwordPolicyEvaluator;
     private final LegalTermsRegistry legalTermsRegistry;
     private final long jwtExpirationMs;
+    // 더미 BCrypt 해시 — 로그인 시도에서 사용자가 존재하지 않을 때도 BCrypt 매칭을 한 번 실행해
+    // 응답 시간을 사용자 존재 여부에 무관하게 일정하게 유지한다 (user enumeration 방어).
+    // 무작위 입력으로 한 번 인코딩한 값이라 실제 사용자 비밀번호와 우연히 일치할 가능성이 사실상 0.
+    private final String dummyPasswordHash;
 
     public AuthService(
             UserRepository userRepository,
@@ -48,6 +54,14 @@ public class AuthService {
         this.passwordPolicyEvaluator = passwordPolicyEvaluator;
         this.legalTermsRegistry = legalTermsRegistry;
         this.jwtExpirationMs = appProperties.jwt().expirationMs();
+        this.dummyPasswordHash = passwordEncoder.encode("not-a-real-user-" + UUID.randomUUID());
+    }
+
+    // 식별자 정규화 — username / email 둘 다 trim + lowercase 로 일관시켜 "Admin" vs "admin",
+    // "User@Mail.com" vs "user@mail.com" 같은 변종이 동일 사용자로 취급되도록 한다.
+    // null 은 그대로 돌려보내 호출 측의 @NotBlank 검증이 거절하게 한다.
+    private static String normalize(String raw) {
+        return raw == null ? null : raw.trim().toLowerCase(Locale.ROOT);
     }
 
     public AuthTokenResponse signup(SignupRequest request) {
@@ -59,15 +73,18 @@ public class AuthService {
         if (!policyResult.valid()) {
             throw new BusinessException(ErrorCode.PASSWORD_TOO_WEAK, policyResult.reason());
         }
-        if (userRepository.existsByUsername(request.username())) {
+        // 식별자를 한 번에 정규화하고 그 값으로 중복 검사 / 저장을 일관 수행한다.
+        String username = normalize(request.username());
+        String email = normalize(request.email());
+        if (userRepository.existsByUsername(username)) {
             throw new BusinessException(ErrorCode.USERNAME_DUPLICATED);
         }
-        if (userRepository.existsByEmail(request.email())) {
+        if (userRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
 
         String hash = passwordEncoder.encode(request.password());
-        User created = User.signup(request.username(), request.email(), hash, request.nickname());
+        User created = User.signup(username, email, hash, request.nickname());
         // 동의 시점을 같은 트랜잭션에서 한 묶음으로 기록한다 (필수 3종 + 선택 1종).
         created.applyAgreements(buildAgreementRecord(
                 request.agreedTerms(),
@@ -105,14 +122,17 @@ public class AuthService {
         if (request == null) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
-        User user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
-
-        String storedHash = user.getPasswordHash();
-        if (storedHash == null || storedHash.isBlank()) {
-            throw new BusinessException(ErrorCode.LOGIN_FAILED);
-        }
-        if (!passwordEncoder.matches(request.password(), storedHash)) {
+        // 사용자 존재 여부와 무관하게 BCrypt 매칭을 항상 한 번 실행해 응답 시간을 일정하게 유지한다.
+        // - user 가 없으면 dummyPasswordHash 와 매칭 (결과 항상 false).
+        // - user 가 있지만 비밀번호가 없는 (OAuth 전용) 계정도 dummyPasswordHash 와 매칭 (false).
+        // - 비밀번호 계정이면 실제 storedHash 와 매칭.
+        // 어느 경로든 결과 비교는 동일한 LOGIN_FAILED 로 통일해 user enumeration 을 막는다.
+        User user = userRepository.findByUsername(normalize(request.username())).orElse(null);
+        String hashToMatch = (user != null && user.getPasswordHash() != null && !user.getPasswordHash().isBlank())
+                ? user.getPasswordHash()
+                : dummyPasswordHash;
+        boolean passwordOk = passwordEncoder.matches(request.password(), hashToMatch);
+        if (user == null || user.getPasswordHash() == null || user.getPasswordHash().isBlank() || !passwordOk) {
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
         }
 
@@ -130,7 +150,7 @@ public class AuthService {
         if (username == null || username.isBlank()) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
-        return new AvailabilityResponse(!userRepository.existsByUsername(username));
+        return new AvailabilityResponse(!userRepository.existsByUsername(normalize(username)));
     }
 
     @Transactional(readOnly = true)
@@ -138,7 +158,7 @@ public class AuthService {
         if (email == null || email.isBlank()) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
-        return new AvailabilityResponse(!userRepository.existsByEmail(email));
+        return new AvailabilityResponse(!userRepository.existsByEmail(normalize(email)));
     }
 
     // 로그인된 사용자가 자신의 비밀번호를 교체한다.

@@ -9,6 +9,8 @@ import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
+import com.capstoneecho.echo_back.external.modelserver.support.PhonemeAligner;
+import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
@@ -77,7 +79,8 @@ class ModelServerClientTest {
                 null,
                 null,
                 null, null, null);
-        return new ModelServerClient(restClient, props, settings);
+        return new ModelServerClient(
+                restClient, props, settings, new PhonemeNormalizer(), new PhonemeAligner());
     }
 
     private static void respondJson(HttpExchange exchange, int status, String json) throws IOException {
@@ -109,7 +112,7 @@ class ModelServerClientTest {
     }
 
     @Test
-    @DisplayName("analyze sends multipart with audio + canonical and maps response")
+    @DisplayName("analyze: canonical 이 있으면 백엔드가 정규화된 perceived 로 errors / per 를 재계산한다")
     void analyzeMultipartCarriesCanonical() {
         AtomicReference<String> capturedBody = new AtomicReference<>();
         AtomicReference<String> capturedContentType = new AtomicReference<>();
@@ -117,6 +120,8 @@ class ModelServerClientTest {
             byte[] requestBody = exchange.getRequestBody().readAllBytes();
             capturedBody.set(new String(requestBody, StandardCharsets.UTF_8));
             capturedContentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+            // 모델 서버가 보낸 errors / per 는 의도적으로 잘못된 표기 ("delete") 와 부정확한 값으로 둔다 —
+            // 백엔드가 PhonemeAligner 로 재계산하면 표준 "deletion" 표기와 정확한 per 가 나와야 한다.
             respondJson(exchange, 200,
                     "{\"perceived\":[\"HH\",\"AH\"],"
                             + "\"canonical\":[\"HH\",\"AH\",\"L\",\"OW\"],"
@@ -139,17 +144,16 @@ class ModelServerClientTest {
         assertThat(capturedBody.get()).contains("HH AH L OW");
 
         assertThat(result.perceived()).containsExactly("HH", "AH");
-        assertThat(result.canonical()).isNotNull();
-        assertThat(result.canonical())
-                .containsExactly("HH", "AH", "L", "OW");
+        assertThat(result.canonical()).containsExactly("HH", "AH", "L", "OW");
         assertThat(result.peakSoftmax()).containsExactly(0.9, 0.8);
-        assertThat(result.errors()).hasSize(1);
-        AnalyzeError err = result.errors().get(0);
-        assertThat(err.op()).isEqualTo("delete");
-        assertThat(err.canonicalIndex()).isEqualTo(2);
-        assertThat(err.canonical()).isEqualTo("L");
-        assertThat(err.perceived()).isNull();
-        assertThat(result.per()).isNotNull();
+        // 재계산 결과: canonical 길이 4 vs perceived 길이 2 → 마지막 두 canonical 음소가 deletion.
+        assertThat(result.errors()).hasSize(2);
+        assertThat(result.errors()).extracting(AnalyzeError::op)
+                .containsExactly("deletion", "deletion");
+        assertThat(result.errors().get(0).canonical()).isEqualTo("L");
+        assertThat(result.errors().get(0).canonicalIndex()).isEqualTo(2);
+        assertThat(result.errors().get(1).canonical()).isEqualTo("OW");
+        assertThat(result.errors().get(1).canonicalIndex()).isEqualTo(3);
         assertThat(result.per()).isEqualTo(0.5);
         assertThat(result.durationSec()).isEqualTo(1.23);
     }

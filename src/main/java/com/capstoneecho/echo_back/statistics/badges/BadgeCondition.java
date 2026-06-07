@@ -10,11 +10,13 @@ import java.util.stream.Collectors;
 //   USER_STREAK              — 현재 연속 학습 일수.
 //   TOTAL_EXP                — 누적 EXP. threshold 점 이상이면 달성.
 //   RECORDING_COUNT          — 누적 녹음 시도 횟수.
+//   COMPLETED_TRACK_COUNT    — 모든 챕터의 종합 피드백을 완료한 트랙 수. threshold 개 이상이면 달성.
 public enum BadgeCondition {
     COMPLETED_FEEDBACK_COUNT,
     USER_STREAK,
     TOTAL_EXP,
-    RECORDING_COUNT;
+    RECORDING_COUNT,
+    COMPLETED_TRACK_COUNT;
 
     public static boolean isKnown(String raw) {
         if (raw == null || raw.isBlank()) return false;

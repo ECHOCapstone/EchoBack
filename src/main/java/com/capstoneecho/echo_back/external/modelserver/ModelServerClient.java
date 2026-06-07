@@ -5,6 +5,8 @@ import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
+import com.capstoneecho.echo_back.external.modelserver.support.PhonemeAligner;
+import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
@@ -30,12 +32,20 @@ public class ModelServerClient {
     private final RestClient restClient;
     private final AppProperties appProperties;
     private final SettingsService settings;
+    private final PhonemeNormalizer phonemeNormalizer;
+    private final PhonemeAligner phonemeAligner;
 
     public ModelServerClient(
-            RestClient restClient, AppProperties appProperties, SettingsService settings) {
+            RestClient restClient,
+            AppProperties appProperties,
+            SettingsService settings,
+            PhonemeNormalizer phonemeNormalizer,
+            PhonemeAligner phonemeAligner) {
         this.restClient = restClient;
         this.appProperties = appProperties;
         this.settings = settings;
+        this.phonemeNormalizer = phonemeNormalizer;
+        this.phonemeAligner = phonemeAligner;
     }
 
     public G2pResult g2p(String text) {
@@ -57,6 +67,40 @@ public class ModelServerClient {
         }
         AnalyzeWire wire = execute("/analyze", body, AnalyzeWire.class);
         return toResult(wire);
+    }
+
+    // 모델 서버 응답의 perceived 를 표준 ARPABET 음소로 정규화한 뒤, 정답과 백엔드에서 다시 정렬해
+    // errors / per 를 일관되게 재계산한다. canonical 이 비어 있으면 정렬 기반이 없으므로 모델 응답을 그대로 둔다.
+    private AnalyzeResult toResult(AnalyzeWire wire) {
+        PhonemeNormalizer.NormalizedPhonemes normalized =
+                phonemeNormalizer.normalize(wire.perceived(), wire.peakSoftmax());
+        List<String> normalizedPerceived = normalized.phonemes();
+        List<Double> normalizedSoftmax = normalized.peakSoftmax();
+
+        List<String> canonical = wire.canonical();
+        boolean canRealign = canonical != null && !canonical.isEmpty();
+
+        List<AnalyzeError> errors;
+        Double per;
+        if (canRealign) {
+            PhonemeAligner.AlignmentResult alignment = phonemeAligner.align(canonical, normalizedPerceived);
+            errors = alignment.errors();
+            per = alignment.per();
+        } else {
+            errors = wire.errors() == null ? List.of() : wire.errors();
+            per = wire.per();
+        }
+
+        return new AnalyzeResult(
+                normalizedPerceived,
+                canonical,
+                normalizedSoftmax,
+                wire.alignment(),
+                errors,
+                per,
+                wire.durationSec() == null ? 0.0 : wire.durationSec(),
+                wire.speechRate()
+        );
     }
 
     // 선택 가능한 음소인식 모델 후보 + 활성 모델 (모델 서버 /models).
@@ -113,19 +157,6 @@ public class ModelServerClient {
         } catch (RestClientResponseException ex) {
             throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
         }
-    }
-
-    private static AnalyzeResult toResult(AnalyzeWire wire) {
-        return new AnalyzeResult(
-                wire.perceived(),
-                wire.canonical(),
-                wire.peakSoftmax(),
-                wire.alignment(),
-                wire.errors(),
-                wire.per(),
-                wire.durationSec() == null ? 0.0 : wire.durationSec(),
-                wire.speechRate()
-        );
     }
 
     // 모델 서버 /analyze 응답은 snake_case 키를 쓰므로 @JsonAlias 로 camelCase 와 양쪽을 모두 받는다.

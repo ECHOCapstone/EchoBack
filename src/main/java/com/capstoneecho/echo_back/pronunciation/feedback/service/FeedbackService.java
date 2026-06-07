@@ -236,7 +236,9 @@ public class FeedbackService {
                 score,
                 plan.priorAttempts());
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
-        boolean passed = score >= settings.passThreshold() && !llm.retryRecommended();
+        // 통과 판정은 점수 임계만 본다 — RuntimeSettings.passThreshold 가 SSOT.
+        // LLM 의 retryRecommended 는 안내 / 약점 표시용으로 별도 응답 필드에 그대로 노출한다.
+        boolean passed = score >= settings.passThreshold();
 
         // (3) 쓰기 단계: feedback 을 다시 조회해 이번 시도를 RetryAttempt 로 저장한다 (다음 호출의 누적 컨텍스트).
         writeTx.executeWithoutResult(status -> {
