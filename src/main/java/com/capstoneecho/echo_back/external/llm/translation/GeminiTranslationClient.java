@@ -141,8 +141,9 @@ public class GeminiTranslationClient implements TranslationClient {
             GeminiResponse response = restClient.post()
                     .uri(uri -> uri
                             .path("/v1beta/models/{model}:generateContent")
-                            .queryParam("key", apiKey)
                             .build(model))
+                    // API 키는 헤더로 전달 — 쿼리 파라미터는 로그 / 프록시에 평문 노출 위험.
+                    .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()

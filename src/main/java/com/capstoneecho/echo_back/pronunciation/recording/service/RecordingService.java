@@ -131,9 +131,6 @@ public class RecordingService {
         // op 별 가중 채점 — substitution/deletion 은 1.0, insertion 은 0.5 (기본).
         // 분모는 max(N_canonical, N_perceived) 로 정규화되어 per 가 항상 [0,1] 범위.
         Double stepScore = analyze.per() == null ? null : scoringPolicy.scoreFromAnalyze(analyze);
-        // 임시 디버그 — 채점 메트릭 추적. 원인 확인 후 제거 예정.
-        log.info("SCORE_DEBUG target='{}' canonical={} perceived={} per={} stepScore={}",
-                prepared.targetText(), canonical, analyze.perceived(), analyze.per(), stepScore);
         LlmStepContext context = new LlmStepContext(
                 prepared.chapterTitle(),
                 prepared.targetText(),

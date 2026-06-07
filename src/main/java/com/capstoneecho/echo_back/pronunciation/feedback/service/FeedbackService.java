@@ -326,16 +326,16 @@ public class FeedbackService {
         Instant now = Instant.now();
         int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
         if (affected == 1) {
-            // 챕터 / 세션 완료가 확정됐을 때 학습 진행 상태도 함께 정리한다 — 같은 단위를 다시 학습할 때
+            // 챕터 / 세션 완료가 확정됐을 때만 학습 진행 상태를 정리한다 — 같은 단위를 다시 학습할 때
             // 처음부터 시작하도록.
+            // affected == 0 인 재요청(이미 완료된 피드백) 분기에서는 호출하지 않는다 — 사용자가 챕터를
+            // 끝낸 뒤 다시 시작해 일부 진행한 상태에서 complete 가 또 들어오면 그 진행이 사라지기 때문.
             resetProgressForFeedback(userId, scriptId, sessionId);
             return memberService.awardCompletionRewards(userId, settings.completionExp());
         }
         if (!feedback.isCompleted()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
-        // 이미 완료된 피드백에 대한 재요청 — 진행 상태도 이미 정리됐을 가능성이 높지만 멱등이라 한 번 더 호출해도 안전.
-        resetProgressForFeedback(userId, scriptId, sessionId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return UserResponse.from(user);

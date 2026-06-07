@@ -70,6 +70,11 @@ public class ModelServerClient {
             body.add("model", textPart("model", model));
         }
         AnalyzeWire wire = execute("/analyze", body, AnalyzeWire.class);
+        // 모델 서버가 204 / 빈 본문을 돌려주면 RestClient 가 wire=null 을 반환한다. 그대로 toResult 에 넘기면
+        // NPE 로 500 이 떨어지므로, 호출 측에 정상적인 "모델 서버 오류" 로 통지한다.
+        if (wire == null) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, "empty response from model server");
+        }
         return toResult(wire);
     }
 
