@@ -12,9 +12,4 @@ public record JwtPrincipal(Long userId, String username, String email, String ro
             role = "USER";
         }
     }
-
-    // role 미지정 시 USER 로 보는 하위호환 생성자.
-    public JwtPrincipal(Long userId, String username, String email) {
-        this(userId, username, email, "USER");
-    }
 }

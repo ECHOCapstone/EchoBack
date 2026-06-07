@@ -91,7 +91,8 @@ public record AppProperties(
             return badges == null ? List.of() : badges;
         }
 
-        // condition 은 BadgePolicy 가 해석하는 enum-like 식별자 (FIRST_FEEDBACK, STREAK).
+        // condition 은 BadgePolicy 가 해석하는 BadgeCondition enum 값
+        // (COMPLETED_FEEDBACK_COUNT / USER_STREAK / TOTAL_EXP / RECORDING_COUNT / COMPLETED_TRACK_COUNT).
         public record Badge(String id, String name, String condition, int threshold) {}
     }
 
