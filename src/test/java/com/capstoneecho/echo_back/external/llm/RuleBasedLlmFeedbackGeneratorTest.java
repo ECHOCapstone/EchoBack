@@ -20,7 +20,8 @@ class RuleBasedLlmFeedbackGeneratorTest {
     private static final AppProperties FIXTURE = new AppProperties(
             null, null, null, null, null, null, null,
             new AppProperties.Gamification(
-                    10, 7, 3, 5, 7, 3, 70.0, 80.0, 10, "오늘의 랭킹", "the"),
+                    10, 7, 3, 5, 7, 70.0, 80.0, 10, "the"),
+            null,
             null,
             new AppProperties.Messages(
                     "발음을 더 또렷하게 따라 읽어 보세요.",

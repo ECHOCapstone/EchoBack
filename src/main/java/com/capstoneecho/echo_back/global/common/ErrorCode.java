@@ -17,6 +17,9 @@ public enum ErrorCode {
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "로그인에 실패했습니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없습니다."),
+    CHALLENGE_INACTIVE(HttpStatus.CONFLICT, "활성 중인 챌린지가 없습니다."),
+    CHALLENGE_ATTEMPT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "오늘의 도전 가능 횟수를 모두 사용했어요."),
     TRACK_NOT_FOUND(HttpStatus.NOT_FOUND, "트랙을 찾을 수 없습니다."),
     SCRIPT_NOT_FOUND(HttpStatus.NOT_FOUND, "스크립트를 찾을 수 없습니다."),
     STEP_NOT_FOUND(HttpStatus.NOT_FOUND, "스크립트 단계를 찾을 수 없습니다."),

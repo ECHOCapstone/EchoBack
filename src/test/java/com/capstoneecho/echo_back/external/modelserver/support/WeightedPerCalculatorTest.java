@@ -31,6 +31,7 @@ class WeightedPerCalculatorTest {
         return new AppProperties(
                 null, null, null, null, null, null, null, null,
                 scoring,
+                null,
                 null, null, null, null, null);
     }
 
