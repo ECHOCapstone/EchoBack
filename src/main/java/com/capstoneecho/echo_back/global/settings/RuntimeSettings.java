@@ -18,8 +18,6 @@ public class RuntimeSettings {
     public static final String SCORE_FALLBACK_ON_ERROR = "gamification.scoreFallbackOnError";
     public static final String WEEKLY_TOP_N = "gamification.weeklyTopN";
     public static final String WEEKLY_WINDOW_DAYS = "gamification.weeklyWindowDays";
-    public static final String RANKING_MIN_ACTIVITY_COUNT = "gamification.rankingMinActivityCount";
-    public static final String DEFAULT_RANKING_UNIT_TITLE = "gamification.defaultRankingUnitTitle";
     public static final String DEFAULT_PRACTICE_WORD = "gamification.defaultPracticeWord";
     public static final String MSG_RECORDING_GUIDANCE = "messages.recordingGuidanceFallback";
     public static final String MSG_FEEDBACK_GUIDANCE = "messages.feedbackGuidanceFallback";
@@ -93,16 +91,6 @@ public class RuntimeSettings {
 
     public int weeklyWindowDays() {
         return settings.getInt(WEEKLY_WINDOW_DAYS, gamification.weeklyWindowDays());
-    }
-
-    // 주간 랭킹에 노출되기 위해 필요한 최소 완료 피드백 건수. 최소 1 로 클램프 — 0 으로 두면
-    // "활동 없는 사용자" 가 정렬 후보가 되어 의미 없는 랭킹이 만들어진다.
-    public int rankingMinActivityCount() {
-        return Math.max(1, settings.getInt(RANKING_MIN_ACTIVITY_COUNT, gamification.rankingMinActivityCount()));
-    }
-
-    public String defaultRankingUnitTitle() {
-        return settings.getOrDefault(DEFAULT_RANKING_UNIT_TITLE, gamification.defaultRankingUnitTitle());
     }
 
     public String defaultPracticeWord() {

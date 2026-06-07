@@ -25,6 +25,7 @@ class AdminBootstrapTest {
         return new AppProperties(
                 null, null, null, null, null, null, null, null,
                 null,
+                null,
                 null, null,
                 new AppProperties.Admin(bootstrapUsername, seed), null, null);
     }
@@ -177,6 +178,7 @@ class AdminBootstrapTest {
                 new AppProperties.Admin.SeedAdmin("admin", "admin@echo.local", "secret123", "관리자");
         AppProperties props = new AppProperties(
                 null, null, null, null, null, null, null, null,
+                null,
                 null,
                 null, null,
                 new AppProperties.Admin("root", seed), null, null);

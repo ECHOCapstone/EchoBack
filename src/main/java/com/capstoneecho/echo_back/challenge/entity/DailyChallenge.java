@@ -1,0 +1,87 @@
+package com.capstoneecho.echo_back.challenge.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+// 어드민이 등록한 "오늘의 챌린지" 문장. 한 번에 active=true 인 행은 ChallengeService 가 도메인 차원에서
+// 단 하나만 유지하도록 보장한다. 활성화 / 비활성화 시점을 따로 남겨 랭킹 윈도와 배지 발급 시점 계산에 쓴다.
+@Entity
+@Table(name = "daily_challenges", indexes = {
+        @Index(name = "ix_daily_challenges_active", columnList = "active"),
+        @Index(name = "ix_daily_challenges_created", columnList = "created_at")
+})
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class DailyChallenge {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "target_text", nullable = false, length = 500)
+    private String targetText;
+
+    @Column(name = "korean_translation", length = 500)
+    private String koreanTranslation;
+
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "activated_at")
+    private Instant activatedAt;
+
+    @Column(name = "deactivated_at")
+    private Instant deactivatedAt;
+
+    private DailyChallenge(String targetText, String koreanTranslation) {
+        this.targetText = targetText;
+        this.koreanTranslation = koreanTranslation;
+        this.active = false;
+    }
+
+    public static DailyChallenge create(String targetText, String koreanTranslation) {
+        if (targetText == null || targetText.isBlank()) {
+            throw new IllegalArgumentException("targetText is required");
+        }
+        String trimmedKr = (koreanTranslation == null || koreanTranslation.isBlank())
+                ? null : koreanTranslation.trim();
+        return new DailyChallenge(targetText.trim(), trimmedKr);
+    }
+
+    @PrePersist
+    void onCreate() {
+        this.createdAt = Instant.now();
+    }
+
+    // 챌린지를 활성 상태로 전환한다. 이미 활성이면 활성 시각은 갱신하지 않아 랭킹 윈도가 흔들리지 않게 한다.
+    public void activate() {
+        if (this.active) {
+            return;
+        }
+        this.active = true;
+        this.activatedAt = Instant.now();
+        this.deactivatedAt = null;
+    }
+
+    // 챌린지를 비활성 상태로 전환한다. 이미 비활성이면 종료 시각은 갱신하지 않는다 (이중 종료 방지).
+    public void deactivate() {
+        if (!this.active) {
+            return;
+        }
+        this.active = false;
+        this.deactivatedAt = Instant.now();
+    }
+}

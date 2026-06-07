@@ -16,6 +16,7 @@ public record AppProperties(
         Stats stats,
         Gamification gamification,
         Scoring scoring,
+        Challenge challenge,
         Messages messages,
         OAuth2 oauth2,
         Admin admin,
@@ -121,23 +122,36 @@ public record AppProperties(
             String frontendSignupUri
     ) {}
 
-    // 게임화 / 학습 정책 상수 (EXP 보상, streak 상한, 추천 수, 통계 윈도우, 통과 점수 등).
-    // passThreshold 는 step 통과 여부를 판정하는 0~100 점수 임계. 기본 80.
-    // priorAttemptsCap 은 LLM 호출에 묶어 보내는 이전 시도 최대 개수 (가장 최근부터). 토큰 폭증 방지.
-    // rankingMinActivityCount 는 주간 랭킹에 노출되기 위해 필요한 최소 완료 피드백 건수.
+    // 게임화 / 학습 정책 상수.
+    //   completionExp / streakCap   : 챕터 완료 보상 EXP, streak 상한.
+    //   dailyRecommended            : 메인 화면 "오늘의 추천 학습" 개수.
+    //   weeklyTopN / weeklyWindowDays : 통계 화면의 주간 윈도 (랭킹과 무관).
+    //   scoreFallbackOnError        : 모델 / LLM 분석 실패 시 fallback 점수.
+    //   passThreshold               : step 통과 여부 판정 (0~100). 어드민이 런타임에 조정 가능.
+    //   priorAttemptsCap            : LLM 호출에 묶는 이전 시도 최대 개수 (토큰 폭증 방지).
     public record Gamification(
             int completionExp,
             int streakCap,
             int dailyRecommended,
             int weeklyTopN,
             int weeklyWindowDays,
-            int rankingMinActivityCount,
             double scoreFallbackOnError,
             double passThreshold,
             int priorAttemptsCap,
-            String defaultRankingUnitTitle,
             String defaultPracticeWord
     ) {}
+
+    // "오늘의 챌린지" 정책.
+    //   dailyAttemptLimit : 사용자가 활성 챌린지에 도전할 수 있는 하루 최대 횟수.
+    //   topN              : 랭킹 상위 노출 인원.
+    //   rankBadge         : 챌린지 종료 시점에 등수별로 발급할 배지 식별자. 빈 값이면 그 등수는 배지 없음.
+    public record Challenge(
+            int dailyAttemptLimit,
+            int topN,
+            RankBadge rankBadge
+    ) {
+        public record RankBadge(String goldId, String silverId, String bronzeId) {}
+    }
 
     // LLM 실패 시 사용자에게 노출되는 폴백 문구 및 공통 유저 메시지.
     public record Messages(

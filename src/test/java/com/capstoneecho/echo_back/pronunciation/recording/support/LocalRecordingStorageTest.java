@@ -42,6 +42,7 @@ class LocalRecordingStorageTest {
                 null,
                 null,
                 null,
+                null,
                 null, null, null);
         storage = new LocalRecordingStorage(properties);
     }
