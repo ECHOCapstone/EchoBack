@@ -6,6 +6,7 @@ import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeAligner;
+import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
@@ -34,18 +35,21 @@ public class ModelServerClient {
     private final SettingsService settings;
     private final PhonemeNormalizer phonemeNormalizer;
     private final PhonemeAligner phonemeAligner;
+    private final PhonemeMismatchInspector phonemeMismatchInspector;
 
     public ModelServerClient(
             RestClient restClient,
             AppProperties appProperties,
             SettingsService settings,
             PhonemeNormalizer phonemeNormalizer,
-            PhonemeAligner phonemeAligner) {
+            PhonemeAligner phonemeAligner,
+            PhonemeMismatchInspector phonemeMismatchInspector) {
         this.restClient = restClient;
         this.appProperties = appProperties;
         this.settings = settings;
         this.phonemeNormalizer = phonemeNormalizer;
         this.phonemeAligner = phonemeAligner;
+        this.phonemeMismatchInspector = phonemeMismatchInspector;
     }
 
     public G2pResult g2p(String text) {
@@ -90,6 +94,10 @@ public class ModelServerClient {
             errors = wire.errors() == null ? List.of() : wire.errors();
             per = wire.per();
         }
+
+        // 정규화 + 정렬 결과의 음소 집합이 표준 ARPABET 밖이면 한 줄 WARN — 운영자가 tmux 로그로
+        // 새 비표준 케이스를 모니터링하고 PhonemeNormalizer 사전에 반영할 수 있게 한다.
+        phonemeMismatchInspector.inspect(canonical, normalizedPerceived);
 
         return new AnalyzeResult(
                 normalizedPerceived,
