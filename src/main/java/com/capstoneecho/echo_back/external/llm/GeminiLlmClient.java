@@ -10,10 +10,12 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
 
 // Gemini REST API 의 generateContent + 구조화 출력 (responseFormat.text.schema) 을 사용해
@@ -156,9 +158,21 @@ public class GeminiLlmClient implements LlmClient {
                 return null;
             }
             return objectMapper.readValue(json, type);
+        } catch (RestClientResponseException http) {
+            // HTTP 응답 상태로 원인을 분리해 운영자가 401(키 만료)과 429(쿼터 초과)를 구분할 수 있게 한다.
+            // 그 외는 5xx / 4xx 응답으로 묶어 동일 폴백.
+            HttpStatus status = HttpStatus.resolve(http.getStatusCode().value());
+            if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+                log.warn("Gemini 인증 실패 ({}) — API 키 확인 필요. 규칙 기반 폴백 사용", status);
+            } else if (status == HttpStatus.TOO_MANY_REQUESTS) {
+                log.warn("Gemini 쿼터 초과 (429) — 규칙 기반 폴백 사용");
+            } else {
+                log.warn("Gemini HTTP 오류 ({}) — 규칙 기반 폴백 사용. body={}",
+                        status, http.getResponseBodyAsString());
+            }
+            return null;
         } catch (RuntimeException ex) {
-            // HTTP 호출 실패와 JSON 파싱 실패 모두 unchecked 라 한곳에서 잡는다.
-            // 호출 측은 null 을 받아 규칙 기반 폴백으로 떨어진다. 원인 추적을 위해 throwable 을 함께 남긴다.
+            // 네트워크 / 타임아웃 / JSON 파싱 실패 등. unchecked 라 한곳에서 잡고 폴백으로 떨어진다.
             log.warn("Gemini 호출/파싱 실패 — 규칙 기반 폴백 사용", ex);
             return null;
         }

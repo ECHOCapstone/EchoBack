@@ -23,7 +23,9 @@ class AdminBootstrapTest {
 
     private AppProperties propsWith(String bootstrapUsername, AppProperties.Admin.SeedAdmin seed) {
         return new AppProperties(
-                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null,
+                null, null,
                 new AppProperties.Admin(bootstrapUsername, seed), null, null);
     }
 
@@ -174,7 +176,9 @@ class AdminBootstrapTest {
         AppProperties.Admin.SeedAdmin seed =
                 new AppProperties.Admin.SeedAdmin("admin", "admin@echo.local", "secret123", "관리자");
         AppProperties props = new AppProperties(
-                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null,
+                null, null,
                 new AppProperties.Admin("root", seed), null, null);
         when(userRepository.findByUsername(eq("admin"))).thenReturn(Optional.empty());
         when(passwordEncoder.encode("secret123"))

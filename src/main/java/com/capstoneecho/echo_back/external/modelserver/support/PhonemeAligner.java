@@ -6,11 +6,19 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 // 정답 (canonical) 과 정규화된 인식 결과 (perceived) 두 음소 시퀀스를 표준 Levenshtein DP 로 정렬해
-// substitution / deletion / insertion 시퀀스와 phoneme error rate (PER) 를 새로 계산한다.
+// substitution / deletion / insertion 시퀀스를 만들고, PER 는 WeightedPerCalculator 에 위임해
+// 약점 음소 가중치 / insertion 가중치 같은 정책이 한 곳에서만 정의되도록 한다.
+//
 // 모델 서버의 alignment 가 비표준 음소 분해 전에 만들어진 경우 그 결과가 정답과 어긋나므로,
 // 분해 후의 perceived 와 정답을 백엔드가 다시 정렬해 채점 / 시각화의 단일 출처가 되게 한다.
 @Component
 public class PhonemeAligner {
+
+    private final WeightedPerCalculator weightedPerCalculator;
+
+    public PhonemeAligner(WeightedPerCalculator weightedPerCalculator) {
+        this.weightedPerCalculator = weightedPerCalculator;
+    }
 
     public AlignmentResult align(List<String> canonical, List<String> perceived) {
         List<String> c = canonical == null ? List.of() : canonical;
@@ -63,8 +71,8 @@ public class PhonemeAligner {
             }
         }
 
-        // PER = 편집 거리 / canonical 길이. canonical 이 비면 0.0 으로 안전 처리한다 (의미 있는 분모가 없음).
-        double per = n == 0 ? 0.0 : (double) dp[n][m] / n;
+        // 가중 PER 는 WeightedPerCalculator 가 단일 출처. canonical 이 비면 자체적으로 0.0 으로 처리한다.
+        double per = weightedPerCalculator.computeWeightedPer(errors, n);
         return new AlignmentResult(errors, per);
     }
 

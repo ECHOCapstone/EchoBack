@@ -22,7 +22,9 @@ class OAuth2LoginFailureHandlerTest {
     void setUp() {
         AppProperties props = new AppProperties(
                 new AppProperties.Jwt("test-secret-secret-secret-secret-secret", 3_600_000L),
-                null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null,
+                null,
                 new AppProperties.OAuth2(
                         "http://localhost:3000/oauth/callback",
                         ERROR_URI,

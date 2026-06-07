@@ -1,7 +1,10 @@
 package com.capstoneecho.echo_back.global.common;
 
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -16,6 +19,8 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 // RuntimeSettings 가 컨텍스트에 없는 슬라이스 테스트에서도 동작하도록 ObjectProvider 로 받는다.
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private final ObjectProvider<RuntimeSettings> settingsProvider;
 
@@ -62,8 +67,21 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure(ErrorCode.INVALID_REQUEST, uploadTooLargeMessage()));
     }
 
+    // DB 제약(unique / FK / NOT NULL) 위반은 의미상 클라이언트 요청이 충돌 / 중복인 경우가 많아
+    // 500 INTERNAL_ERROR 가 아닌 409 CONFLICT 로 전달한다. 본문 코드는 INVALID_REQUEST 를 재사용해
+    // FE 의 에러 매핑 사전에 새 코드 추가 없이 처리되도록 한다.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().toString());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.failure(ErrorCode.INVALID_REQUEST, "동일한 정보로 이미 등록된 항목이 있어 처리할 수 없습니다."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception ex) {
+        // 운영에서 원인 추적이 가능하도록 stacktrace 를 함께 남긴다 — 그 외 사용자 응답은 단일 메시지.
+        log.error("Unhandled exception", ex);
         return ResponseEntity
                 .status(ErrorCode.INTERNAL_ERROR.getStatus())
                 .body(ApiResponse.failure(ErrorCode.INTERNAL_ERROR, null));

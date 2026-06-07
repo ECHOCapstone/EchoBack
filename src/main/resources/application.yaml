@@ -123,7 +123,9 @@ app:
     max-age-sec: 3600
   model-server:
     base-url: "http://localhost:8001"
-    timeout-ms: 10000
+    # 모델 서버는 g2p + audio analyze + LLM 호출이 한 요청에 묶여 처리되므로 10초로는 첫 호출 시 모델
+    # warm-up 직후 타임아웃이 자주 발생한다. 30초까지 늘려 정상 응답이 끊기지 않게 한다.
+    timeout-ms: 30000
   llm:
     # rule-based (기본, 외부 호출 없음) | gemini (Google Generative AI 호출)
     provider: ${APP_LLM_PROVIDER:rule-based}
@@ -177,12 +179,34 @@ app:
     # 단 한 번 잘 발음한 사용자가 1등을 차지하는 운에 의한 상위 노출을 막는다.
     ranking-min-activity-count: 3
     score-fallback-on-error: 70.0
-    # 단어 / 문장 통과 점수 임계. 학습자 부담을 낮추기 위해 다소 너그럽게 둔다 (75 이상이면 통과).
-    # 어드민이 런타임에 조정할 수 있다 (RuntimeSettings.passThreshold).
-    pass-threshold: 75.0
+    # 단어 / 문장 통과 점수 임계. 한국인 학습자가 흔한 약점 (V/R/TH 등) 을 제대로 발음하지 못해도 통과되는
+    # 문제를 줄이기 위해 80 으로 둔다 (이전 75 에서 복귀). 어드민이 런타임에 조정할 수 있다.
+    pass-threshold: 80.0
     prior-attempts-cap: 10
     default-ranking-unit-title: "오늘의 랭킹"
     default-practice-word: "the"
+  scoring:
+    # 한국인 학습자가 흔히 약한 ARPABET 음소. canonical 의 이 음소에 대한 substitution / deletion 에
+    # 가중치 weak-phoneme-multiplier 를 곱해 약점이 점수에 더 강하게 반영되도록 한다.
+    # 설문 / 학습 데이터로 보완 가능 — 값만 바꾸면 즉시 반영된다.
+    weak-phonemes:
+      - V
+      - R
+      - L
+      - TH
+      - DH
+      - F
+      - Z
+      - ZH
+      - AH
+      - AE
+      - ER
+    # 약점 음소에서 발생한 오류의 가중치 배율 (>= 1.0). 1.0 = 일반 음소와 동일, 1.5 = 50% 더 무겁게.
+    weak-phoneme-multiplier: 1.5
+    # CTC insertion 오류 가중치. 한국인이 자주 보이는 추가 음소 ("globarrr") 가 점수에 반영되는 정도.
+    insertion-weight: 0.7
+    # PER → 점수 변환의 지수. 1.0 = 선형, > 1.0 = 약점이 적어도 점수 하락이 더 가파르다.
+    per-to-score-exponent: 1.0
   auth:
     # 회원가입 시 적용되는 비밀번호 정책. 백엔드 검증과 프론트 안내가 같은 출처를 공유한다.
     password-policy:

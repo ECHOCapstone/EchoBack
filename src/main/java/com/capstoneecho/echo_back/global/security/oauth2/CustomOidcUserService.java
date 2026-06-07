@@ -6,7 +6,6 @@ import java.util.Set;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
@@ -29,8 +28,7 @@ public class CustomOidcUserService extends OidcUserService {
     public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
         OidcUser oidcUser = super.loadUser(userRequest);
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-        User user = mapperRegistry.resolve(registrationId)
-                .upsert(oidcUser.getAttributes(), tokenValue(userRequest.getAccessToken()));
+        User user = mapperRegistry.resolve(registrationId).upsert(oidcUser.getAttributes());
 
         // OidcUser.getAttributes() 는 idToken claims + userInfo claims 의 병합이다.
         // userInfo 쪽에 내부 식별자를 실어 SuccessHandler 가 동일한 key 로 꺼내 쓰게 한다.
@@ -40,9 +38,5 @@ public class CustomOidcUserService extends OidcUserService {
                 oidcUser.getIdToken(),
                 new OidcUserInfo(enriched),
                 OAuth2Attributes.NAME_ATTRIBUTE_KEY);
-    }
-
-    private static String tokenValue(OAuth2AccessToken accessToken) {
-        return accessToken == null ? null : accessToken.getTokenValue();
     }
 }

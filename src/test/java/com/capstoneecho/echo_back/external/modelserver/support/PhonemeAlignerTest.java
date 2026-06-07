@@ -3,13 +3,17 @@ package com.capstoneecho.echo_back.external.modelserver.support;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.global.config.AppProperties;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+// PhonemeAligner 가 op 시퀀스를 만드는 정렬 동작 자체를 검증한다. PER 가중치 정책은 별도
+// WeightedPerCalculatorTest 에서 검증하므로, 본 테스트는 uniform 정책 (가중치 모두 1.0) 을 주입해
+// 편집거리 / canonical 길이 라는 단순 PER 의미가 유지되게 한다.
 class PhonemeAlignerTest {
 
-    private final PhonemeAligner aligner = new PhonemeAligner();
+    private final PhonemeAligner aligner = new PhonemeAligner(uniformWeightedPerCalculator());
 
     @Test
     @DisplayName("ts 분해 후 정렬: results 발음 시 첫 음소만 substitution, 나머지는 정확 매칭")
@@ -59,7 +63,7 @@ class PhonemeAlignerTest {
                 .containsOnly("insertion");
         assertThat(result.errors()).extracting(AnalyzeError::perceived)
                 .containsExactlyInAnyOrder("HH", "IY", "K");
-        // PER = 편집거리 / canonical 길이 = 3 / 3 = 1.0
+        // uniform 정책에서 PER = 편집거리 / canonical 길이 = 3 / 3 = 1.0
         assertThat(result.per()).isCloseTo(1.0, within(1e-9));
     }
 
@@ -80,6 +84,18 @@ class PhonemeAlignerTest {
 
         assertThat(result.errors()).isEmpty();
         assertThat(result.per()).isZero();
+    }
+
+    // weak 음소 가중치와 insertion 가중치를 모두 1.0 으로 둔 uniform 정책. 본 테스트는 정렬 로직 자체만
+    // 검증하므로, WeightedPerCalculator 의 가중 정책이 PER 기댓값에 섞이지 않도록 분리한다.
+    private static WeightedPerCalculator uniformWeightedPerCalculator() {
+        AppProperties.Scoring scoring = new AppProperties.Scoring(
+                List.of(), 1.0, 1.0, 1.0);
+        AppProperties props = new AppProperties(
+                null, null, null, null, null, null, null, null,
+                scoring,
+                null, null, null, null, null);
+        return new WeightedPerCalculator(props);
     }
 
     private static org.assertj.core.data.Offset<Double> within(double delta) {

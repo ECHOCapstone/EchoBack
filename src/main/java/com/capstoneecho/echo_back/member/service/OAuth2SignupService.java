@@ -84,7 +84,7 @@ public class OAuth2SignupService {
                 Boolean.TRUE.equals(request.agreedMarketing())));
         userRepository.save(newUser);
         socialAccountRepository.save(SocialAccount.create(
-                newUser, pending.provider(), pending.providerUid(), email, null));
+                newUser, pending.provider(), pending.providerUid(), email));
 
         return issueToken(newUser);
     }

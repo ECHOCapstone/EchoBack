@@ -56,13 +56,12 @@ class GoogleOAuth2UserMapperLazyLoadingIntegrationTest {
         tx.executeWithoutResult(status -> {
             User user = userRepository.save(User.fromOAuth2(email, "Alice"));
             socialAccountRepository.save(
-                    SocialAccount.create(user, Provider.GOOGLE, sub, email, "old-token"));
+                    SocialAccount.create(user, Provider.GOOGLE, sub, email));
         });
 
         // act — mapper.upsert 가 자기 @Transactional 안에서 끝나고, 호출자는 트랜잭션 밖
         User result = mapper.upsert(
-                Map.of("sub", sub, "email", email, "name", "Alice", "email_verified", true),
-                "new-token");
+                Map.of("sub", sub, "email", email, "name", "Alice", "email_verified", true));
 
         // assert — fetch join 이 빠지면 여기서 LazyInitializationException 으로 터진다.
         // (회귀를 정확히 잡는 지점)

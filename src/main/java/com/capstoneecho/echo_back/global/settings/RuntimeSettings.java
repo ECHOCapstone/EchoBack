@@ -62,16 +62,6 @@ public class RuntimeSettings {
         return Math.max(1, Math.min(4, raw));
     }
 
-    public static final String SCORING_INSERTION_WEIGHT = "scoring.insertionWeight";
-
-    // 발음 채점에서 insertion 오류 (정답에 없는 추가 음소) 에 적용할 가중치 [0,1].
-    // substitution / deletion 은 1.0 으로 두고, insertion 은 학습자 친화적으로 약화한다.
-    // 기본 0.5 — 한 단어를 늘여 발음해도 점수가 0 으로 폭락하지 않게 한다.
-    public double scoringInsertionWeight() {
-        double raw = settings.getDouble(SCORING_INSERTION_WEIGHT, 0.5);
-        return Math.max(0.0, Math.min(1.0, raw));
-    }
-
     public double passThreshold() {
         return settings.getDouble(PASS_THRESHOLD, gamification.passThreshold());
     }
