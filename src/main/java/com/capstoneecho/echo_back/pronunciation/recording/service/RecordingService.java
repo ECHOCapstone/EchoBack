@@ -4,11 +4,11 @@ import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PriorAttempt;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
@@ -23,8 +23,6 @@ import com.capstoneecho.echo_back.learning.session.repository.SessionSentenceRep
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.WeakPhonemeAnalyzer;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadResponse;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
@@ -57,11 +55,10 @@ public class RecordingService {
     private final RecordingStorage recordingStorage;
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
+    private final CanonicalCacheService canonicalCacheService;
     private final ObjectMapper objectMapper;
     private final WavHeaderValidator wavHeaderValidator;
-    private final ScoringPolicy scoringPolicy;
     private final PriorAttemptAssembler priorAttemptAssembler;
-    private final WeakPhonemeAnalyzer weakPhonemeAnalyzer;
     private final RuntimeSettings settings;
     // 읽기/쓰기 트랜잭션을 명시적으로 분리해, 느린 모델 서버·LLM HTTP 호출 동안 DB 커넥션을 잡지 않게 한다.
     private final TransactionTemplate readTx;
@@ -80,11 +77,10 @@ public class RecordingService {
             RecordingStorage recordingStorage,
             ModelServerClient modelServerClient,
             LlmClient llmClient,
+            CanonicalCacheService canonicalCacheService,
             ObjectMapper objectMapper,
             WavHeaderValidator wavHeaderValidator,
-            ScoringPolicy scoringPolicy,
             PriorAttemptAssembler priorAttemptAssembler,
-            WeakPhonemeAnalyzer weakPhonemeAnalyzer,
             RuntimeSettings settings,
             PlatformTransactionManager txManager) {
         this.userRepository = userRepository;
@@ -96,21 +92,22 @@ public class RecordingService {
         this.recordingStorage = recordingStorage;
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
+        this.canonicalCacheService = canonicalCacheService;
         this.objectMapper = objectMapper;
         this.wavHeaderValidator = wavHeaderValidator;
-        this.scoringPolicy = scoringPolicy;
         this.priorAttemptAssembler = priorAttemptAssembler;
-        this.weakPhonemeAnalyzer = weakPhonemeAnalyzer;
         this.settings = settings;
         this.readTx = new TransactionTemplate(txManager);
         this.readTx.setReadOnly(true);
         this.writeTx = new TransactionTemplate(txManager);
     }
 
-    // 녹음 1건 업로드 흐름. 느린 외부 호출이 DB 커넥션을 잡지 않도록 세 단계로 분리한다:
-    //   (1) READ TX  — 부모 매핑/검증 + 목표 텍스트·이전 시도 등 LLM 입력 데이터를 트랜잭션 안에서 모두 추출
-    //   (2) HTTP     — 트랜잭션 밖에서 모델 서버 g2p/analyze + LLM 호출 (커넥션 미점유)
-    //   (3) WRITE TX — 오디오 디스크 저장 + Recording 영속화 (롤백 시 오디오도 정리)
+    // 녹음 1건 업로드 흐름. 느린 외부 호출이 DB 커넥션을 잡지 않도록 단계 분리:
+    //   (1) READ TX    — 부모 매핑/검증 + 입력 데이터 (targetText, priorAttempts) 추출
+    //   (2) CANONICAL  — 캐시 hit 면 즉시, miss 면 LlmCanonicalGenerator 호출 후 캐시
+    //   (3) MODEL HTTP — /transcribe 호출해 perceived 만 받는다
+    //   (4) LLM HTTP   — 한 번의 호출로 alignment + errors + score + tips + feedback 전부 받는다
+    //   (5) WRITE TX   — 오디오 디스크 저장 + Recording 영속화 (롤백 시 오디오도 정리)
     public RecordingUploadResponse upload(
             Long userId, RecordingUploadRequest request, byte[] audioBytes) {
         if (request == null) {
@@ -119,8 +116,7 @@ public class RecordingService {
         wavHeaderValidator.require(audioBytes);
         Mode mode = detectMode(request);
 
-        // (1) 읽기 단계: 부모 엔티티 검증 + 입력 데이터 추출. 부모는 ID 만 들고 나가고, 쓰기 단계에서는
-        // EntityManager.getReference 로 프록시를 만들어 추가 SELECT 없이 INSERT 한다.
+        // (1) 읽기 단계: 부모 엔티티 검증 + 입력 데이터 추출.
         PreparedInput prepared = readTx.execute(status -> {
             ResolvedParents parents = resolveParents(userId, request, mode);
             String targetText = resolveTargetText(parents);
@@ -136,38 +132,47 @@ public class RecordingService {
             return new PreparedInput(targetText, chapterTitle, priorAttempts, ids);
         });
 
-        // (2) 외부 호출 단계: DB 트랜잭션 밖에서 수행한다.
-        G2pResult g2p = modelServerClient.g2p(prepared.targetText());
-        String canonical = g2p.phonemes() == null ? "" : g2p.phonemes();
-        AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
-        // op 별 가중 채점 — substitution/deletion 은 1.0, insertion 은 0.5 (기본).
-        // 분모는 max(N_canonical, N_perceived) 로 정규화되어 per 가 항상 [0,1] 범위.
-        Double stepScore = analyze.per() == null ? null : scoringPolicy.scoreFromAnalyze(analyze);
+        // (2) canonical 조회/생성 — lazy backfill. LLM 실패 시 BusinessException 으로 사용자에게 명시 노출.
+        CanonicalResult canonicalResult = resolveCanonical(mode, prepared.parentIds());
+        List<String> canonicalPhonemes = canonicalResult.flatPhonemes();
+        String canonicalSpaceSep = String.join(" ", canonicalPhonemes);
+
+        // (3) 모델 서버 /transcribe.
+        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, canonicalSpaceSep);
+
+        // (4) LLM 단일 호출 — alignment + score + errors + tips + feedback.
         LlmStepContext context = new LlmStepContext(
                 prepared.chapterTitle(),
                 prepared.targetText(),
-                analyze.perceived(),
-                analyze.canonicalOrEmpty(),
-                analyze.errors(),
-                g2p.words(),
-                weakPhonemeAnalyzer.firstCanonical(analyze.errors()),
-                stepScore,
+                transcribe.perceived(),
+                canonicalPhonemes,
+                canonicalResult.words(),
                 prepared.priorAttempts());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
+        double stepScore = feedback.score();
 
-        // (3) 쓰기 단계: 짧은 트랜잭션 안에서 오디오 저장 + Recording 영속화 + 응답 조립.
+        // (5) 쓰기 단계: 짧은 트랜잭션 안에서 오디오 저장 + Recording 영속화 + 응답 조립.
         return writeTx.execute(status ->
-                persist(mode, audioBytes, prepared, g2p, analyze, stepScore, feedback));
+                persist(mode, audioBytes, prepared, canonicalResult, canonicalPhonemes,
+                        transcribe, stepScore, feedback));
     }
 
-    // 오디오 디스크 저장 + Recording 영속화. 부모 엔티티는 READ TX 가 검증한 ID 로부터 프록시를 만들어
-    // 추가 SELECT 없이 INSERT 만 수행한다.
+    private CanonicalResult resolveCanonical(Mode mode, ParentIds ids) {
+        return switch (mode) {
+            case SCRIPT_FLOW -> canonicalCacheService.resolveForStep(ids.stepId());
+            case SESSION_SENTENCE -> canonicalCacheService.resolveForSentence(ids.sentenceId());
+        };
+    }
+
+    // 오디오 디스크 저장 + Recording 영속화. 부모 엔티티는 EntityManager.getReference 로 프록시만 만들어
+    // 추가 SELECT 없이 FK 만 세팅한다.
     private RecordingUploadResponse persist(
             Mode mode,
             byte[] audioBytes,
             PreparedInput prepared,
-            G2pResult g2p,
-            AnalyzeResult analyze,
+            CanonicalResult canonicalResult,
+            List<String> canonicalPhonemes,
+            TranscribeResult transcribe,
             Double stepScore,
             LlmStepFeedback feedback) {
         ParentIds ids = prepared.parentIds();
@@ -177,31 +182,28 @@ public class RecordingService {
 
         Recording recording = buildRecording(mode, ids, audioPath, prepared.targetText());
         recording.applyAnalysisSnapshot(
-                AnalysisSnapshotFormat.joinTokens(analyze.perceived()),
-                AnalysisSnapshotFormat.joinTokens(analyze.canonicalOrEmpty()),
-                AnalysisSnapshotFormat.joinSoftmax(analyze.peakSoftmax()));
-        recording.applyErrorsJson(priorAttemptAssembler.toErrorsJson(analyze.errors()));
+                AnalysisSnapshotFormat.joinTokens(transcribe.perceived()),
+                AnalysisSnapshotFormat.joinTokens(canonicalPhonemes),
+                AnalysisSnapshotFormat.joinSoftmax(transcribe.peakSoftmax()));
+        recording.applyErrorsJson(priorAttemptAssembler.toErrorsJson(feedback.errors()));
         recording.applyWrongWordsJson(serializeWrongWords(feedback));
         recording.applyStepScore(stepScore);
         recording.applyGuidanceKr(feedback.guidanceKr());
         Recording saved = recordingRepository.save(recording);
 
         double passThreshold = settings.passThreshold();
-        // 통과 판정은 점수 임계만 본다 — 점수 임계 (RuntimeSettings.passThreshold) 가 SSOT.
+        // 통과 판정은 LLM 점수 임계만 본다 — RuntimeSettings.passThreshold 가 SSOT.
         // LLM 의 retryRecommended 는 별도 신호로 응답에 그대로 실어 보내, FE 가 약점 안내 등에 활용할 수 있게 한다.
-        // 두 신호를 AND 로 묶으면 점수가 충분히 높아도 LLM 정성 판정 한 번으로 미통과가 되어
-        // "75점이면 통과" 라는 학습자 기대와 어긋난다.
         boolean passed = stepScore != null && stepScore >= passThreshold;
         return RecordingUploadResponse.fromUpload(
                 saved,
-                analyze.perceived(),
-                analyze.canonicalOrEmpty(),
-                analyze.peakSoftmax(),
-                analyze.errors().stream().map(RecordingService::toErrorView).toList(),
+                transcribe.perceived(),
+                canonicalPhonemes,
+                transcribe.peakSoftmax(),
                 feedback,
                 passed,
-                analyze.speechRate(),
-                g2p.words(),
+                transcribe.speechRate(),
+                canonicalResult.words(),
                 passThreshold);
     }
 
@@ -329,7 +331,6 @@ public class RecordingService {
     }
 
     // 부모 엔티티는 EntityManager.getReference 로 프록시만 만들어 추가 SELECT 없이 FK 만 세팅한다.
-    // 부모 관계 검증은 READ TX 에서 이미 수행됐으므로 unchecked 팩토리로 만든다.
     private Recording buildRecording(
             Mode mode, ParentIds ids, String audioPath, String targetText) {
         User user = entityManager.getReference(User.class, ids.userId());
@@ -345,11 +346,6 @@ public class RecordingService {
                 yield Recording.forSessionSentenceUnchecked(user, session, sentence, audioPath, targetText);
             }
         };
-    }
-
-    private static RecordingUploadResponse.PhonemeErrorView toErrorView(AnalyzeError e) {
-        return new RecordingUploadResponse.PhonemeErrorView(
-                e.op(), e.canonical(), e.perceived(), e.canonicalIndex());
     }
 
     private enum Mode {

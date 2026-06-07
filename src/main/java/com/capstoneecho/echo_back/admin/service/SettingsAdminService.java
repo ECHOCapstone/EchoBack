@@ -36,8 +36,6 @@ public class SettingsAdminService {
                         () -> String.valueOf(runtime.dailyRecommended())),
                 new Definition(RuntimeSettings.PRIOR_ATTEMPTS_CAP, Type.INT,
                         () -> String.valueOf(runtime.priorAttemptsCap())),
-                new Definition(RuntimeSettings.SCORE_FALLBACK_ON_ERROR, Type.DOUBLE,
-                        () -> String.valueOf(runtime.scoreFallbackOnError())),
                 new Definition(RuntimeSettings.WEEKLY_TOP_N, Type.INT,
                         () -> String.valueOf(runtime.weeklyTopN())),
                 new Definition(RuntimeSettings.WEEKLY_WINDOW_DAYS, Type.INT,

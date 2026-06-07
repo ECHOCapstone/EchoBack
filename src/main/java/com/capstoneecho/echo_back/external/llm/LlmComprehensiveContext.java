@@ -1,6 +1,5 @@
 package com.capstoneecho.echo_back.external.llm;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import java.util.List;
 
 // 한 챕터 종합 피드백 시 LLM 에 전달하는 입력.
@@ -10,7 +9,7 @@ public record LlmComprehensiveContext(
         String chapterTitle,
         String chapterContent,
         List<StepSummary> stepSummaries,
-        List<AnalyzeError> aggregatedErrors,
+        List<LlmPhonemeError> aggregatedErrors,
         String dominantWeakPhoneme,
         double overallAccuracy
 ) {

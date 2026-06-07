@@ -1,7 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.external.llm.PriorAttempt;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.RetryAttempt;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import java.util.ArrayList;
@@ -12,11 +12,11 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 // Recording / RetryAttempt 엔티티 목록을 LLM 호출용 PriorAttempt 리스트로 변환한다.
-// errors_json 컬럼이 비어 있으면 빈 오류 리스트로 폴백해 호출이 깨지지 않게 한다.
+// errors_json 컬럼은 LlmPhonemeError 리스트 ([{op,canonical,perceived,canonicalIndex}, ...]) 로 저장된다.
 @Component
 public class PriorAttemptAssembler {
 
-    private static final TypeReference<List<AnalyzeError>> ERROR_LIST_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<LlmPhonemeError>> ERROR_LIST_TYPE = new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
 
@@ -56,7 +56,7 @@ public class PriorAttemptAssembler {
         return out;
     }
 
-    public List<AnalyzeError> parseErrors(String json) {
+    public List<LlmPhonemeError> parseErrors(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
         }
@@ -67,9 +67,8 @@ public class PriorAttemptAssembler {
         }
     }
 
-    // AnalyzeError 목록을 errors_json 컬럼 문자열로 직렬화한다. 비어 있으면 컬럼을 비우도록 null 을 돌린다.
-    // 직렬화 실패는 데이터 손상을 뜻하므로 삼키지 않고 그대로 전파해 호출 트랜잭션을 실패시킨다.
-    public String toErrorsJson(List<AnalyzeError> errors) {
+    // LlmPhonemeError 목록을 errors_json 컬럼 문자열로 직렬화한다. 비어 있으면 NULL.
+    public String toErrorsJson(List<LlmPhonemeError> errors) {
         if (errors == null || errors.isEmpty()) {
             return null;
         }

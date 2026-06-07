@@ -10,10 +10,12 @@ import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
-import com.capstoneecho.echo_back.support.LlmMockResponses;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
+import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
@@ -27,9 +29,9 @@ import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.support.DefaultSentenceSplitter;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
+import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
-import com.capstoneecho.echo_back.member.dto.UserResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackDetailResponse;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.FeedbackGenerateRequest;
 import com.capstoneecho.echo_back.pronunciation.feedback.dto.RetryWordResult;
@@ -37,8 +39,8 @@ import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFee
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
+import com.capstoneecho.echo_back.support.LlmMockResponses;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,13 +91,17 @@ class FeedbackServiceTest {
     @MockitoBean
     private LlmClient llmClient;
 
+    @MockitoBean
+    private LlmCanonicalGenerator canonicalGenerator;
+
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient);
-        when(modelServerClient.g2p(anyString()))
-                .thenReturn(new G2pResult("HH AH L OW", List.of()));
-        when(modelServerClient.analyze(any(byte[].class), anyString()))
-                .thenReturn(perfectAnalyzeResult());
+        Mockito.reset(modelServerClient, llmClient, canonicalGenerator);
+        when(canonicalGenerator.generate(anyString()))
+                .thenReturn(new CanonicalResult(List.of(
+                        new CanonicalWord("the", List.of("HH", "AH", "L", "OW")))));
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.defaultStep());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
@@ -211,7 +217,7 @@ class FeedbackServiceTest {
     }
 
     @Test
-    @DisplayName("retryWord 는 audio + perceived/canonical 일치 시 RetryWordResult(correct=true, score=100) 반환, feedback 은 변경되지 않는다")
+    @DisplayName("retryWord 는 audio + perceived/canonical 일치 시 RetryWordResult(correct=true) 반환, feedback 은 변경되지 않는다")
     void retryWordReturnsRetryWordResultAndDoesNotPersist() {
         User user = newUser("u-retry");
         Script script = seedScript("RetryScript");
@@ -229,7 +235,7 @@ class FeedbackServiceTest {
         assertThat(response.correct()).isTrue();
         assertThat(response.perceived()).containsExactly("HH", "AH", "L", "OW");
         assertThat(response.canonical()).containsExactly("HH", "AH", "L", "OW");
-        assertThat(response.score()).isEqualTo(100.0);
+        assertThat(response.score()).isEqualTo(85.0);
         assertThat(response.guidanceKr()).isNotBlank();
 
         PronunciationFeedback reloaded = feedbackRepository.findById(fb.getId()).orElseThrow();
@@ -258,16 +264,15 @@ class FeedbackServiceTest {
 
     // ---------- helpers ----------
 
-    private static AnalyzeResult perfectAnalyzeResult() {
-        return new AnalyzeResult(
-                List.of("HH", "AH", "L", "OW"),
+    private static TranscribeResult perfectTranscribe() {
+        return new TranscribeResult(
                 List.of("HH", "AH", "L", "OW"),
                 List.of(0.9, 0.85, 0.8, 0.75),
-                List.of(),
-                List.of(),
-                0.0,
                 1.23,
-                com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate.NORMAL);
+                SpeechRate.NORMAL,
+                1.0,
+                "echo-baseline",
+                "echo");
     }
 
     private record ScriptFixture(User user, Script script, LearningStep step) {}

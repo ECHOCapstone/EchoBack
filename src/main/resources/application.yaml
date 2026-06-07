@@ -181,9 +181,7 @@ app:
     # 통계 화면에서 사용하는 주간 윈도 일수 / 상위 노출 개수. 챌린지 랭킹과는 무관하다.
     weekly-top-n: 5
     weekly-window-days: 7
-    score-fallback-on-error: 70.0
-    # 단어 / 문장 통과 점수 임계. 채점 곡선이 비선형으로 강화되어 콩글리쉬가 분명히 낮게 떨어지므로
-    # 75 로 합격선을 다시 낮춰 정상 발음 학습자가 70대 초반에서 막히지 않게 한다.
+    # 단어 / 문장 통과 점수 임계. LLM 이 결정성 있게 0~100 점수를 돌려주고, 이 값 이상이면 통과.
     pass-threshold: 75.0
     prior-attempts-cap: 10
     default-practice-word: "the"
@@ -198,28 +196,6 @@ app:
       gold-id: "CHALLENGE_GOLD"
       silver-id: "CHALLENGE_SILVER"
       bronze-id: "CHALLENGE_BRONZE"
-  scoring:
-    # 한국인 학습자가 흔히 약한 ARPABET 음소. canonical 의 이 음소에 대한 substitution / deletion 에
-    # 가중치 weak-phoneme-multiplier 를 곱해 약점이 점수에 더 강하게 반영되도록 한다.
-    # 설문 / 학습 데이터로 보완 가능 — 값만 바꾸면 즉시 반영된다.
-    weak-phonemes:
-      - V
-      - R
-      - L
-      - TH
-      - DH
-      - F
-      - Z
-      - ZH
-      - AH
-      - AE
-      - ER
-    # 약점 음소에서 발생한 오류의 가중치 배율 (>= 1.0). 1.0 = 일반 음소와 동일, 1.8 = 80% 더 무겁게.
-    weak-phoneme-multiplier: 1.8
-    # CTC insertion 오류 가중치. 한국인이 자주 보이는 추가 음소 ("globarrr") 가 점수에 거의 정상치로 반영되도록 0.9.
-    insertion-weight: 0.9
-    # PER → 점수 변환의 지수. 1.4 로 두면 PER 0.1 → 86점, PER 0.2 → 73점 으로 변별력이 명확해진다.
-    per-to-score-exponent: 1.4
   auth:
     # 회원가입 시 적용되는 비밀번호 정책. 백엔드 검증과 프론트 안내가 같은 출처를 공유한다.
     password-policy:

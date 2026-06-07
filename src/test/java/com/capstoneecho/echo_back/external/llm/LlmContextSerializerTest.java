@@ -1,6 +1,5 @@
 package com.capstoneecho.echo_back.external.llm;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -21,9 +20,9 @@ class LlmContextSerializerTest {
     @Test
     @DisplayName("errors: 항목별로 op / canonical / perceived / canonicalIndex 라벨링")
     void errorsAreLabeled() {
-        AnalyzeError err = new AnalyzeError("SUB", 2, "AH", "EH");
+        LlmPhonemeError err = new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "EH", "AH", 2);
         String s = LlmContextSerializer.errors(List.of(err));
-        assertThat(s).contains("op=SUB").contains("canonical=EH").contains("perceived=AH")
+        assertThat(s).contains("op=SUBSTITUTION").contains("canonical=EH").contains("perceived=AH")
                 .contains("canonicalIndex=2");
     }
 
@@ -48,10 +47,10 @@ class LlmContextSerializerTest {
                 Instant.parse("2026-01-01T00:00:00Z"),
                 85.5,
                 "HH AH",
-                List.of(new AnalyzeError("SUB", 1, "AH", "EH")));
+                List.of(new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "EH", "AH", 1)));
         String s = LlmContextSerializer.priorAttempts(List.of(a));
         assertThat(s).contains("[1]").contains("score=85.5").contains("perceived=HH AH")
-                .contains("errors:").contains("SUB");
+                .contains("errors:").contains("SUBSTITUTION");
     }
 
     @Test

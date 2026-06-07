@@ -1,7 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.recording.dto;
 
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import java.time.Instant;
 import java.util.List;
 
@@ -30,7 +30,7 @@ public record RecordingHistoryResponse(
             String guidanceKr,
             List<String> perceived,
             List<String> canonical,
-            List<AnalyzeError> errors,
+            List<LlmPhonemeError> errors,
             List<WrongWord> wrongWords,
             Instant createdAt
     ) {}

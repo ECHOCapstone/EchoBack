@@ -1,7 +1,6 @@
 package com.capstoneecho.echo_back.pronunciation.recording.service;
 
 import com.capstoneecho.echo_back.external.llm.WrongWord;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;

@@ -1,17 +1,19 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.service;
 
+import com.capstoneecho.echo_back.external.llm.AlignmentOp;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
 import com.capstoneecho.echo_back.external.llm.LlmComprehensiveFeedback;
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
 import com.capstoneecho.echo_back.external.llm.PracticeItem;
 import com.capstoneecho.echo_back.external.llm.PriorAttempt;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
+import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
@@ -34,8 +36,6 @@ import com.capstoneecho.echo_back.pronunciation.feedback.entity.RetryAttempt;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.RetryAttemptRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringPolicy;
-import com.capstoneecho.echo_back.pronunciation.feedback.support.WeakPhonemeAnalyzer;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
@@ -66,15 +66,13 @@ public class FeedbackService {
     private final RetryAttemptRepository retryAttemptRepository;
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
-    private final ScoringPolicy scoringPolicy;
-    private final WeakPhonemeAnalyzer weakPhonemeAnalyzer;
+    private final LlmCanonicalGenerator canonicalGenerator;
     private final PriorAttemptAssembler priorAttemptAssembler;
     private final MemberService memberService;
     private final WavHeaderValidator wavHeaderValidator;
     private final ObjectMapper objectMapper;
     private final RuntimeSettings settings;
     private final ProgressService progressService;
-    // 읽기/쓰기 트랜잭션 경계를 명시해 HTTP 구간에서 커넥션을 반납한다.
     private final TransactionTemplate readTx;
     private final TransactionTemplate writeTx;
 
@@ -87,8 +85,7 @@ public class FeedbackService {
             RetryAttemptRepository retryAttemptRepository,
             ModelServerClient modelServerClient,
             LlmClient llmClient,
-            ScoringPolicy scoringPolicy,
-            WeakPhonemeAnalyzer weakPhonemeAnalyzer,
+            LlmCanonicalGenerator canonicalGenerator,
             PriorAttemptAssembler priorAttemptAssembler,
             MemberService memberService,
             WavHeaderValidator wavHeaderValidator,
@@ -104,8 +101,7 @@ public class FeedbackService {
         this.retryAttemptRepository = retryAttemptRepository;
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
-        this.scoringPolicy = scoringPolicy;
-        this.weakPhonemeAnalyzer = weakPhonemeAnalyzer;
+        this.canonicalGenerator = canonicalGenerator;
         this.priorAttemptAssembler = priorAttemptAssembler;
         this.memberService = memberService;
         this.wavHeaderValidator = wavHeaderValidator;
@@ -117,12 +113,6 @@ public class FeedbackService {
         this.writeTx = new TransactionTemplate(txManager);
     }
 
-    // 챕터 종합 피드백 생성:
-    // (1) recordingIds 로 같은 script (또는 session) 의 녹음들 일괄 조회
-    // (2) Recording.errors_json 을 역직렬화해 chapter 전체 약점 음소 빈도 계산 (weakPhoneme)
-    // (3) step 별 best 점수 + 시도 횟수 요약 → LLM comprehensiveFeedback 호출 (구조화 출력)
-    // (4) LLM 결과의 strengths / weaknesses / nextPracticeItems 를 JSON 으로 캐싱
-    // (5) PronunciationFeedback 엔티티 저장 + 응답
     public FeedbackDetailResponse generate(Long userId, FeedbackGenerateRequest request) {
         if (request == null
                 || request.recordingIds() == null
@@ -136,7 +126,7 @@ public class FeedbackService {
         }
         List<Long> recordingIds = request.recordingIds();
 
-        // (1) 읽기 단계: 녹음 일괄 조회·검증 + 집계(약점 음소·step 요약)를 트랜잭션 안에서 끝내고 순수 데이터만 들고 나온다.
+        // (1) 읽기 단계: 녹음 일괄 조회·검증 + 집계 (약점 음소·step 요약) 를 트랜잭션 안에서 끝낸다.
         GeneratePlan plan = readTx.execute(status -> {
             userRepository.findById(userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -164,7 +154,7 @@ public class FeedbackService {
         LlmComprehensiveFeedback llm =
                 callComprehensive(plan.chapterTitle(), plan.chapterContent(), plan.aggregated());
 
-        // (3) 쓰기 단계: 부모 엔티티를 다시 조회해 PronunciationFeedback 을 영속화하고 응답 DTO 까지 트랜잭션 안에서 만든다.
+        // (3) 쓰기 단계: 부모 엔티티를 다시 조회해 PronunciationFeedback 을 영속화.
         return writeTx.execute(status -> {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
@@ -191,17 +181,11 @@ public class FeedbackService {
         });
     }
 
-    // READ TX 에서 추출해 HTTP·쓰기 단계로 넘기는 종합 피드백 입력 데이터.
     private record GeneratePlan(
             boolean hasScript, String chapterTitle, String chapterContent,
             Aggregated aggregated, String seededPracticeWord) {}
 
-    // 단어 / 구 재시도 흐름:
-    // (1) WAV 검증 → feedback 조회 → 연습 단어 (또는 클라이언트가 명시한 word) 결정
-    // (2) 모델 서버 g2p / analyze
-    // (3) 같은 feedback 의 이전 retry-word 시도들을 RetryAttempt 에서 불러와 priorAttempts 로 채운다
-    // (4) LLM 구조화 결과로 응답 구성
-    // (5) 이번 시도를 RetryAttempt 로 저장해 다음 호출의 누적 컨텍스트가 된다
+    // 단어 / 구 재시도. 한 단어 단위 canonical 은 매번 LLM 으로 생성 (단어 단위 캐시는 미정 — 단어가 임의).
     public RetryWordResult retryWord(Long userId, Long feedbackId, byte[] audioBytes) {
         return retryWord(userId, feedbackId, audioBytes, null);
     }
@@ -210,7 +194,6 @@ public class FeedbackService {
             Long userId, Long feedbackId, byte[] audioBytes, String overrideWord) {
         wavHeaderValidator.require(audioBytes);
 
-        // (1) 읽기 단계: feedback 조회 + 재시도 단어/약점 음소/이전 시도(priorAttempts)를 트랜잭션 안에서 추출.
         RetryPlan plan = readTx.execute(status -> {
             PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
@@ -218,37 +201,32 @@ public class FeedbackService {
             Pageable cap = PageRequest.of(0, settings.priorAttemptsCap());
             List<RetryAttempt> recent = retryAttemptRepository
                     .findByFeedback_IdOrderByCreatedAtDesc(feedbackId, cap);
-            return new RetryPlan(word, feedback.getWeakPhoneme(),
-                    priorAttemptAssembler.fromRetries(recent));
+            return new RetryPlan(word, priorAttemptAssembler.fromRetries(recent));
         });
 
-        // (2) HTTP 단계: 트랜잭션 밖에서 모델 서버 g2p/analyze + LLM 호출.
-        G2pResult g2p = modelServerClient.g2p(plan.word());
-        String canonical = g2p == null || g2p.phonemes() == null ? "" : g2p.phonemes();
-        AnalyzeResult analyze = modelServerClient.analyze(audioBytes, canonical);
+        // 단어 단위 canonical 은 LLM 호출. 단어 단위 캐시는 두지 않는다 — 사용자가 임의로 입력하는 word 도 받기 때문.
+        CanonicalResult canonicalResult = canonicalGenerator.generate(plan.word());
+        List<String> canonicalPhonemes = canonicalResult.flatPhonemes();
+        String canonicalSpaceSep = String.join(" ", canonicalPhonemes);
 
-        List<String> perceived = analyze.perceived() == null ? List.of() : analyze.perceived();
-        List<String> canonicalPhonemes = analyze.canonicalOrEmpty();
-        double score = scoringPolicy.singleWordScore(analyze);
+        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, canonicalSpaceSep);
+        List<String> perceived = transcribe.perceived();
 
         LlmRetryContext context = new LlmRetryContext(
                 plan.word(),
                 perceived,
                 canonicalPhonemes,
-                analyze.errors(),
-                plan.weakPhoneme(),
-                score,
+                canonicalResult.words(),
                 plan.priorAttempts());
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
+        double score = llm.score();
         // 통과 판정은 점수 임계만 본다 — RuntimeSettings.passThreshold 가 SSOT.
-        // LLM 의 retryRecommended 는 안내 / 약점 표시용으로 별도 응답 필드에 그대로 노출한다.
         boolean passed = score >= settings.passThreshold();
 
-        // (3) 쓰기 단계: feedback 을 다시 조회해 이번 시도를 RetryAttempt 로 저장한다 (다음 호출의 누적 컨텍스트).
         writeTx.executeWithoutResult(status -> {
             PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-            persistRetryAttempt(feedback, plan.word(), perceived, canonicalPhonemes, analyze, score, llm);
+            persistRetryAttempt(feedback, plan.word(), perceived, canonicalPhonemes, llm);
         });
 
         return new RetryWordResult(
@@ -262,11 +240,8 @@ public class FeedbackService {
                 llm.phonemeTips());
     }
 
-    // READ TX 에서 추출해 HTTP·쓰기 단계로 넘기는 재시도 입력 데이터.
-    private record RetryPlan(String word, String weakPhoneme, List<PriorAttempt> priorAttempts) {}
+    private record RetryPlan(String word, List<PriorAttempt> priorAttempts) {}
 
-    // overrideWord 가 들어오면 우선 — 종합 피드백의 nextPracticeItems 중 어떤 항목을 재시도할지 클라이언트가 명시한다.
-    // 없으면 feedback 의 practiceWord, 둘 다 없으면 외부화된 폴백 단어로 떨어진다.
     private String resolveRetryWord(PronunciationFeedback feedback, String overrideWord) {
         if (overrideWord != null && !overrideWord.isBlank()) {
             return overrideWord;
@@ -283,16 +258,14 @@ public class FeedbackService {
             String word,
             List<String> perceived,
             List<String> canonical,
-            AnalyzeResult analyze,
-            double score,
             LlmRetryFeedback llm) {
         RetryAttempt attempt = RetryAttempt.create(
                 feedback,
                 word,
                 AnalysisSnapshotFormat.joinTokens(perceived),
                 AnalysisSnapshotFormat.joinTokens(canonical),
-                priorAttemptAssembler.toErrorsJson(analyze.errors()),
-                score,
+                priorAttemptAssembler.toErrorsJson(llm.errors()),
+                (double) llm.score(),
                 llm.guidanceKr(),
                 llm.correct());
         retryAttemptRepository.save(attempt);
@@ -312,12 +285,6 @@ public class FeedbackService {
         return FeedbackDetailResponse.from(feedback, objectMapper);
     }
 
-    // 완료 토글:
-    // (1) atomic UPDATE + 진행도 reset 을 한 짧은 트랜잭션 (writeTx) 에 묶는다 — 같은 피드백 row 의
-    //     컨텍스트에 묶여 일관된다.
-    // (2) 같은 사용자에 대한 reward (User.exp / streak 갱신) 는 별도 트랜잭션 (MemberService 의
-    //     @Transactional) 에서 수행한다. User row 와 PronunciationFeedback row 를 한 트랜잭션이
-    //     같이 잠그면 동일 사용자의 동시 학습 흐름 사이에 데드락이 자주 생긴다.
     public UserResponse complete(Long userId, Long feedbackId) {
         CompletionOutcome outcome = writeTx.execute(status -> {
             PronunciationFeedback feedback = feedbackRepository
@@ -329,8 +296,6 @@ public class FeedbackService {
             Instant now = Instant.now();
             int affected = feedbackRepository.markCompletedAtomically(feedbackId, userId, now);
             if (affected == 1) {
-                // 챕터 / 세션 완료가 확정됐을 때만 학습 진행 상태를 정리한다 — 같은 단위를 다시 학습할 때
-                // 처음부터 시작하도록. affected == 0 인 재요청에서는 호출하지 않는다.
                 resetProgressForFeedback(userId, scriptId, sessionId);
                 return new CompletionOutcome(true, null);
             }
@@ -350,7 +315,6 @@ public class FeedbackService {
 
     private record CompletionOutcome(boolean awarded, UserResponse fallbackUserResponse) {}
 
-    // 피드백이 가진 단위 종류 (챕터 / 세션) 에 맞춰 진행 상태를 정리한다. 둘 다 null 이면 호출 자체가 noop.
     private void resetProgressForFeedback(Long userId, Long scriptId, Long sessionId) {
         if (scriptId != null) {
             progressService.resetChapter(userId, scriptId);
@@ -367,29 +331,84 @@ public class FeedbackService {
     }
 
     // 챕터 누적 통계 + step 별 best 점수 / 시도 횟수 / 약점 음소 요약을 만든다.
-    // Recording.errors_json 을 역직렬화해 모든 음소 오류를 누적한다.
+    // Recording.errors_json (LlmPhonemeError 리스트) 를 역직렬화해 모든 음소 오류를 누적한다.
     private Aggregated aggregate(List<Recording> recordings) {
-        double accuracy = scoringPolicy.aggregate(recordings);
-        List<AnalyzeError> aggregatedErrors = new ArrayList<>();
+        double accuracy = averageScore(recordings);
+        List<LlmPhonemeError> aggregatedErrors = new ArrayList<>();
         Map<Long, BestPerStep> bestByStep = new LinkedHashMap<>();
         for (Recording r : recordings) {
-            List<AnalyzeError> errs = priorAttemptAssembler.parseErrors(r.getErrorsJson());
+            List<LlmPhonemeError> errs = priorAttemptAssembler.parseErrors(r.getErrorsJson());
             aggregatedErrors.addAll(errs);
             Long stepId = r.getStep() == null ? null : r.getStep().getId();
             String targetText = r.getTargetTextSnapshot() == null ? "" : r.getTargetTextSnapshot();
-            String stepWeak = weakPhonemeAnalyzer.firstCanonical(errs);
+            String stepWeak = firstCanonicalPhoneme(errs);
             double score = r.getStepScore() == null ? 0.0 : r.getStepScore();
             bestByStep.merge(
                     stepId == null ? -1L * (bestByStep.size() + 1) : stepId,
                     new BestPerStep(targetText, 1, score, stepWeak),
                     BestPerStep::merge);
         }
-        String dominantWeak = weakPhonemeAnalyzer.topOneFromErrors(aggregatedErrors);
+        String dominantWeak = mostFrequentCanonical(aggregatedErrors);
         List<LlmComprehensiveContext.StepSummary> stepSummaries = bestByStep.values().stream()
                 .map(b -> new LlmComprehensiveContext.StepSummary(
                         b.targetText(), b.attempts(), b.bestScore(), b.weakPhoneme()))
                 .toList();
         return new Aggregated(accuracy, dominantWeak, aggregatedErrors, stepSummaries);
+    }
+
+    // 녹음 점수 평균. 점수가 한 건도 없으면 0 — LLM 채점 실패 시 만점 회귀 방지.
+    private static double averageScore(List<Recording> recordings) {
+        if (recordings == null || recordings.isEmpty()) {
+            return 0.0;
+        }
+        double sum = 0.0;
+        int count = 0;
+        for (Recording r : recordings) {
+            Double s = r.getStepScore();
+            if (s != null) {
+                sum += Math.max(0.0, Math.min(100.0, s));
+                count++;
+            }
+        }
+        return count == 0 ? 0.0 : sum / count;
+    }
+
+    // step 한 건의 대표 약점 음소 — errors 의 첫 canonical 비-공백.
+    private static String firstCanonicalPhoneme(List<LlmPhonemeError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        for (LlmPhonemeError e : errors) {
+            String c = e.canonical();
+            if (c != null && !c.isBlank()) {
+                return c.trim().toUpperCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    // 챕터 종합 — 누적 errors 의 canonical 빈도 최댓값.
+    private static String mostFrequentCanonical(List<LlmPhonemeError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (LlmPhonemeError e : errors) {
+            String c = e.canonical();
+            if (c == null || c.isBlank()) {
+                continue;
+            }
+            counts.merge(c.trim().toUpperCase(Locale.ROOT), 1, Integer::sum);
+        }
+        String top = null;
+        int topCount = -1;
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            if (entry.getValue() > topCount) {
+                topCount = entry.getValue();
+                top = entry.getKey();
+            }
+        }
+        return top;
     }
 
     private LlmComprehensiveFeedback callComprehensive(
@@ -404,7 +423,6 @@ public class FeedbackService {
         return llmClient.comprehensiveFeedback(context);
     }
 
-    // 직렬화 실패는 데이터 손상을 뜻하므로 삼키지 않고 전파해 생성 트랜잭션을 실패시킨다.
     private void applyComprehensive(PronunciationFeedback feedback, LlmComprehensiveFeedback llm) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("strengths", llm.strengths());
@@ -413,13 +431,11 @@ public class FeedbackService {
         feedback.applyComprehensiveJson(objectMapper.writeValueAsString(payload));
     }
 
-    // 챕터에 미리 박힌 연습 단어. 없으면 null 을 돌려 pickPracticeWord 가 LLM 추천으로 넘어가게 한다.
     private String seededPracticeWord(Script script) {
         String seeded = script.getPracticeWord();
         return (seeded != null && !seeded.isBlank()) ? seeded : null;
     }
 
-    // 챕터에 미리 박힌 단어(seeded) → LLM 추천 첫 항목 → 외부화된 폴백 단어 순.
     private String pickPracticeWord(String seeded, LlmComprehensiveFeedback llm) {
         if (seeded != null && !seeded.isBlank()) {
             return seeded;
@@ -437,10 +453,9 @@ public class FeedbackService {
         return settings.defaultPracticeWord();
     }
 
-    // 챕터의 모든 시도에서 모인 음소 오류를 PhonemeError 자식으로 저장한다.
     private void attachAggregatedErrors(
-            PronunciationFeedback feedback, List<AnalyzeError> errors) {
-        for (AnalyzeError e : errors) {
+            PronunciationFeedback feedback, List<LlmPhonemeError> errors) {
+        for (LlmPhonemeError e : errors) {
             PhonemeOp op = mapOp(e.op());
             if (op == null) {
                 continue;
@@ -449,23 +464,22 @@ public class FeedbackService {
         }
     }
 
-    private static PhonemeOp mapOp(String op) {
+    private static PhonemeOp mapOp(AlignmentOp.ErrorType op) {
         if (op == null) {
             return null;
         }
-        String upper = op.trim().toUpperCase(Locale.ROOT);
-        return switch (upper) {
-            case "SUB", "SUBSTITUTION" -> PhonemeOp.SUB;
-            case "DEL", "DELETION" -> PhonemeOp.DEL;
-            case "INS", "INSERTION" -> PhonemeOp.INS;
-            default -> null;
+        return switch (op) {
+            case SUBSTITUTION -> PhonemeOp.SUB;
+            case DELETION -> PhonemeOp.DEL;
+            case INSERTION -> PhonemeOp.INS;
+            case MATCH -> null;
         };
     }
 
     private record Aggregated(
             double accuracy,
             String weakPhoneme,
-            List<AnalyzeError> aggregatedErrors,
+            List<LlmPhonemeError> aggregatedErrors,
             List<LlmComprehensiveContext.StepSummary> stepSummaries
     ) {}
 

@@ -8,15 +8,18 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.capstoneecho.echo_back.external.llm.AlignmentOp;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
+import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
 import com.capstoneecho.echo_back.learning.script.entity.Script;
@@ -45,14 +48,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-// docs/diagrams/19~21-test-scenarios SVG 의 TC-01 ~ TC-10 중 백엔드 책임 분기를 명시적으로 단언한다.
-// TC-03/04/06/12/13 는 모델 서버, TC-14/15/18 은 프론트 책임이라 본 슬라이스 범위 밖.
-// TC-11/16/17 은 별도 도메인 테스트가 이미 커버한다 (TrackControllerTest / FeedbackServiceConcurrencyTest / StatsServiceTest).
+// 백엔드 책임 분기를 명시적으로 단언한다. 모델 서버 응답 / LLM 점수 / canonical 캐시를 mock 으로 주입.
 @SpringBootTest
 @ActiveProfiles("test")
 class PronunciationScenarioE2ETest {
 
-    // 백엔드 통과 임계 (app.gamification.pass-threshold=80) 을 기준으로 점수를 양 / 음 양쪽에 두고 단언한다.
     private static final byte[] VALID_WAV =
             new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E'};
 
@@ -66,24 +66,28 @@ class PronunciationScenarioE2ETest {
 
     @MockitoBean private ModelServerClient modelServerClient;
     @MockitoBean private LlmClient llmClient;
+    @MockitoBean private CanonicalCacheService canonicalCacheService;
     @MockitoBean private RecordingStorage recordingStorage;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient, recordingStorage);
-        when(modelServerClient.g2p(anyString()))
-                .thenReturn(new G2pResult("AE P AH L", List.of()));
+        Mockito.reset(modelServerClient, llmClient, canonicalCacheService, recordingStorage);
+        when(canonicalCacheService.resolveForStep(anyLong()))
+                .thenReturn(appleCanonical());
+        when(canonicalCacheService.resolveForSentence(anyLong()))
+                .thenReturn(appleCanonical());
         when(recordingStorage.save(anyLong(), any(byte[].class)))
                 .thenReturn("u/202605/test.wav");
     }
 
     @Test
-    @DisplayName("TC-01: 정확도 90% 이상 + LLM 권고 없음 → 응답 passed=true / retryRecommended=false")
+    @DisplayName("TC-01: LLM 점수 ≥ 임계 + 권고 없음 → 응답 passed=true / retryRecommended=false")
     void tc01_normalPronunciationIsMarkedPassed() {
         ScriptFlowFixture f = seedScriptFlow("apple");
-        when(modelServerClient.analyze(any(byte[].class), anyString())).thenReturn(perfect());
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(92, false));
+                .thenReturn(stepLlm(92, false, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -97,9 +101,11 @@ class PronunciationScenarioE2ETest {
     @DisplayName("TC-02: 오발음 errors + LLM 재학습 권고 → 응답 retryRecommended=true / passed=false")
     void tc02_misPronunciationTriggersRetryRecommendation() {
         ScriptFlowFixture f = seedScriptFlow("apple");
-        when(modelServerClient.analyze(any(byte[].class), anyString())).thenReturn(withError());
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(perfectTranscribe());
+        LlmPhonemeError err = new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "AE", "AH", 0);
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(65, true));
+                .thenReturn(stepLlm(65, true, List.of(err)));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -110,49 +116,13 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-03: 묵음 처리 — G2P 가 묵음 음소를 뺀 canonical 을 돌려주면 그 값이 LLM 컨텍스트로 전달된다")
-    void tc03_silentLettersAreExcludedFromCanonical() {
-        // "knight" 의 K 가 묵음이라 G2P 응답이 N AY T 만 돌려준다고 가정한다.
-        // 백엔드는 모델 서버 G2P 결과를 그대로 LLM 컨텍스트에 실어야 한다 (자체 추측 / 보강 없이).
-        ScriptFlowFixture f = seedScriptFlow("knight");
-        when(modelServerClient.g2p(anyString()))
-                .thenReturn(new G2pResult("N AY T", List.of()));
-        when(modelServerClient.analyze(any(byte[].class), anyString()))
-                .thenReturn(new AnalyzeResult(
-                        List.of("N", "AY", "T"),
-                        List.of("N", "AY", "T"),
-                        List.of(0.92, 0.9, 0.88),
-                        List.of(),
-                        List.of(),
-                        0.0,
-                        0.6,
-                        SpeechRate.NORMAL));
-        when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(95, false));
-
-        RecordingUploadResponse r = recordingService.upload(
-                f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
-
-        // (1) 모델 서버에 보낸 canonical 인자에 K 가 없어야 한다.
-        ArgumentCaptor<String> g2pToAnalyze = ArgumentCaptor.forClass(String.class);
-        verify(modelServerClient).analyze(any(byte[].class), g2pToAnalyze.capture());
-        assertThat(g2pToAnalyze.getValue()).isEqualTo("N AY T").doesNotContain("K");
-
-        // (2) LLM 컨텍스트의 canonical / perceived 모두에 K 가 없어야 한다.
-        ArgumentCaptor<LlmStepContext> llmCtx = ArgumentCaptor.forClass(LlmStepContext.class);
-        verify(llmClient).stepFeedback(llmCtx.capture());
-        assertThat(llmCtx.getValue().canonical()).containsExactly("N", "AY", "T");
-        assertThat(llmCtx.getValue().perceived()).containsExactly("N", "AY", "T");
-        assertThat(r.passed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트 + PER=1) → 점수 0 + retryRecommended=true")
+    @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트) → LLM 0점 + retryRecommended=true")
     void tc05_silentInputYieldsZeroScoreAndRetry() {
         ScriptFlowFixture f = seedScriptFlow("apple");
-        when(modelServerClient.analyze(any(byte[].class), anyString())).thenReturn(silent());
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(silentTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(0, true));
+                .thenReturn(stepLlm(0, true, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -167,9 +137,10 @@ class PronunciationScenarioE2ETest {
     @DisplayName("TC-08: 같은 step 두 번 → 두 번째 LLM 호출의 priorAttempts 에 첫 시도가 포함된다")
     void tc08_repeatedAttemptsAreFedToLlmAsPriorContext() {
         ScriptFlowFixture f = seedScriptFlow("apple");
-        when(modelServerClient.analyze(any(byte[].class), anyString())).thenReturn(withError());
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(70, true));
+                .thenReturn(stepLlm(70, true, List.of()));
 
         recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -188,12 +159,13 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-09: 추천 학습 (script-flow) 점수 ≥ 80 → passed=true")
-    void tc09_scriptFlowPassesAtOrAbove80() {
+    @DisplayName("TC-09: 추천 학습 (script-flow) 점수 ≥ 75 → passed=true")
+    void tc09_scriptFlowPassesAtOrAbove75() {
         ScriptFlowFixture f = seedScriptFlow("apple");
-        when(modelServerClient.analyze(any(byte[].class), anyString())).thenReturn(scoring(80.0));
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(80, false));
+                .thenReturn(stepLlm(80, false, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -203,12 +175,13 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-10: 맞춤 학습 (session-sentence) 점수 ≥ 80 → passed=true")
-    void tc10_sessionFlowPassesAtOrAbove80() {
+    @DisplayName("TC-10: 맞춤 학습 (session-sentence) 점수 ≥ 75 → passed=true")
+    void tc10_sessionFlowPassesAtOrAbove75() {
         SessionFlowFixture f = seedSessionFlow("apple is red.");
-        when(modelServerClient.analyze(any(byte[].class), anyString())).thenReturn(scoring(85.0));
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(85, false));
+                .thenReturn(stepLlm(85, false, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(),
@@ -247,64 +220,37 @@ class PronunciationScenarioE2ETest {
         return new SessionFlowFixture(user.getId(), saved.getId(), sentence.getId());
     }
 
-    private static LlmStepFeedback stepLlm(int score, boolean retry) {
+    private static LlmStepFeedback stepLlm(int score, boolean retry, List<LlmPhonemeError> errors) {
         return new LlmStepFeedback(
-                score, retry, "ok",
+                score, List.of(), errors, retry, "ok",
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
     }
 
-    private static AnalyzeResult perfect() {
-        return new AnalyzeResult(
-                List.of("AE", "P", "AH", "L"),
+    private static CanonicalResult appleCanonical() {
+        return new CanonicalResult(List.of(
+                new CanonicalWord("apple", List.of("AE", "P", "AH", "L"))));
+    }
+
+    private static TranscribeResult perfectTranscribe() {
+        return new TranscribeResult(
                 List.of("AE", "P", "AH", "L"),
                 List.of(0.95, 0.92, 0.88, 0.9),
-                List.of(),
-                List.of(),
-                0.05,
                 1.0,
-                SpeechRate.NORMAL);
+                SpeechRate.NORMAL,
+                1.0,
+                "echo-baseline",
+                "echo");
     }
 
-    private static AnalyzeResult withError() {
-        // 오발음 시나리오 — substitution + deletion 두 건이 모두 잡혀 op-weighted 점수가 임계 미만으로 떨어진다.
-        // (denominator=4, weightedErrors=2.0 → adjustedPer=0.5 → score=50, passThreshold(75) 미만 → passed=false)
-        AnalyzeError sub = new AnalyzeError("substitution", 0, "AH", "AE");
-        AnalyzeError del = new AnalyzeError("deletion", 3, null, "L");
-        return new AnalyzeResult(
-                List.of("AH", "P", "AH"),
-                List.of("AE", "P", "AH", "L"),
-                List.of(0.85, 0.9, 0.8),
+    private static TranscribeResult silentTranscribe() {
+        return new TranscribeResult(
                 List.of(),
-                List.of(sub, del),
+                List.of(),
                 0.5,
+                SpeechRate.NORMAL,
                 1.0,
-                SpeechRate.NORMAL);
-    }
-
-    private static AnalyzeResult silent() {
-        return new AnalyzeResult(
-                List.of(),
-                List.of("AE", "P", "AH", "L"),
-                List.of(),
-                List.of(),
-                List.of(),
-                1.0,
-                0.5,
-                SpeechRate.NORMAL);
-    }
-
-    // 백엔드 ScoringPolicy.perToScore: (1 - per) * 100. 원하는 점수에서 역산해 PER 을 만든다.
-    private static AnalyzeResult scoring(double score) {
-        double per = 1.0 - (score / 100.0);
-        return new AnalyzeResult(
-                List.of("AE", "P", "AH", "L"),
-                List.of("AE", "P", "AH", "L"),
-                List.of(0.9, 0.9, 0.9, 0.9),
-                List.of(),
-                List.of(),
-                per,
-                1.0,
-                SpeechRate.NORMAL);
+                "echo-baseline",
+                "echo");
     }
 }

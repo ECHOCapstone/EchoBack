@@ -1,6 +1,6 @@
 package com.capstoneecho.echo_back.external.llm;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,14 +18,27 @@ public final class LlmContextSerializer {
         return String.join(" ", values);
     }
 
-    public static String errors(List<AnalyzeError> errors) {
+    // 단어별 canonical (LlmCanonicalGenerator 결과). LLM 이 alignment / wrongWords 단어 매핑에 쓴다.
+    public static String canonicalWords(List<CanonicalWord> words) {
+        if (words == null || words.isEmpty()) {
+            return "(없음)";
+        }
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        for (CanonicalWord w : words) {
+            sb.append(String.format("  [%d] %s — %s%n", i++, w.word(), String.join(" ", w.phonemes())));
+        }
+        return sb.toString().stripTrailing();
+    }
+
+    public static String errors(List<LlmPhonemeError> errors) {
         if (errors == null || errors.isEmpty()) {
             return "(없음)";
         }
         return errors.stream()
                 .map(e -> String.format(
                         "  - op=%s canonical=%s perceived=%s canonicalIndex=%s",
-                        nullable(e.op()),
+                        e.op() == null ? "-" : e.op().name(),
                         nullable(e.canonical()),
                         nullable(e.perceived()),
                         e.canonicalIndex() == null ? "-" : e.canonicalIndex().toString()))
@@ -46,9 +59,9 @@ public final class LlmContextSerializer {
                     nullable(a.perceived())));
             if (!a.errors().isEmpty()) {
                 sb.append("      errors:\n");
-                for (AnalyzeError err : a.errors()) {
+                for (LlmPhonemeError err : a.errors()) {
                     sb.append(String.format("        - %s %s→%s (idx=%s)%n",
-                            nullable(err.op()),
+                            err.op() == null ? "-" : err.op().name(),
                             nullable(err.canonical()),
                             nullable(err.perceived()),
                             err.canonicalIndex() == null ? "-" : err.canonicalIndex().toString()));

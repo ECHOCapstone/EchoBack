@@ -21,13 +21,12 @@ class DispatchingLlmClientTest {
                 null, null, null, new AppProperties.Llm(defaultProvider, null),
                 null, null, null, null,
                 null,
-                null,
                 null, null, null, null, null, null);
         return new DispatchingLlmClient(ruleBased, gemini, settings, props);
     }
 
     private static LlmStepContext context() {
-        return new LlmStepContext(null, null, null, null, null, null, null, null, null);
+        return new LlmStepContext(null, null, null, null, null, null);
     }
 
     @Test

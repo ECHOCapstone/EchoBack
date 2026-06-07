@@ -39,11 +39,26 @@ public class LearningStep {
     @Column(name = "target_text", columnDefinition = "TEXT")
     private String targetText;
 
+    // LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON.
+    // 포맷: {"words":[{"word":"...","phonemes":["..."]}, ...]}. NULL = 아직 생성 전.
+    @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
+    private String canonicalCachedJson;
+
+    // 1 = legacy g2p (없음), 2 = LLM 생성본. lazy backfill 시점에 2 로 승급한다.
+    @Column(name = "canonical_version", nullable = false)
+    private int canonicalVersion = 1;
+
     private LearningStep(Script script, StepKind kind, String prompt, String targetText) {
         this.script = script;
         this.kind = kind;
         this.prompt = prompt;
         this.targetText = targetText;
+    }
+
+    // LLM 으로 만든 canonical JSON 을 캐시하고 버전을 2 로 승급한다.
+    public void applyCanonicalCache(String json) {
+        this.canonicalCachedJson = (json == null || json.isBlank()) ? null : json;
+        this.canonicalVersion = 2;
     }
 
     public static LearningStep intro(Script script, String prompt) {

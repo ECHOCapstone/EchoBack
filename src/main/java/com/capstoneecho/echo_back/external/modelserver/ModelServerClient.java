@@ -1,11 +1,8 @@
 package com.capstoneecho.echo_back.external.modelserver;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeResult;
-import com.capstoneecho.echo_back.external.modelserver.dto.G2pResult;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
-import com.capstoneecho.echo_back.external.modelserver.support.PhonemeAligner;
+import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
 import com.capstoneecho.echo_back.global.common.BusinessException;
@@ -27,6 +24,11 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+// 모델 서버의 새 contract:
+//   POST /transcribe (multipart: audio, canonical, model?, keep_silence?)
+//     -> { perceived, peak_softmax, duration_sec, speech_rate, speech_rate_ratio, model_id, model_type }
+// 옛 /analyze, /g2p 는 모두 삭제. canonical 은 LlmCanonicalGenerator 가 만들고,
+// alignment / errors / per / score 는 LLM 피드백 호출이 담당한다.
 @Component
 public class ModelServerClient {
 
@@ -34,7 +36,6 @@ public class ModelServerClient {
     private final AppProperties appProperties;
     private final SettingsService settings;
     private final PhonemeNormalizer phonemeNormalizer;
-    private final PhonemeAligner phonemeAligner;
     private final PhonemeMismatchInspector phonemeMismatchInspector;
 
     public ModelServerClient(
@@ -42,23 +43,23 @@ public class ModelServerClient {
             AppProperties appProperties,
             SettingsService settings,
             PhonemeNormalizer phonemeNormalizer,
-            PhonemeAligner phonemeAligner,
             PhonemeMismatchInspector phonemeMismatchInspector) {
         this.restClient = restClient;
         this.appProperties = appProperties;
         this.settings = settings;
         this.phonemeNormalizer = phonemeNormalizer;
-        this.phonemeAligner = phonemeAligner;
         this.phonemeMismatchInspector = phonemeMismatchInspector;
     }
 
-    public G2pResult g2p(String text) {
-        MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
-        body.add("text", textPart("text", text == null ? "" : text));
-        return execute("/g2p", body, G2pResult.class);
+    // 음성 인식만 받는다. canonical 은 모델 서버가 정렬에 참고할 수 있도록 함께 보내지만, alignment / errors /
+    // 점수 계산은 모두 백엔드 (LLM 피드백 호출) 가 처리한다.
+    public TranscribeResult transcribe(byte[] audioBytes, String canonicalArpabetSpaceSep) {
+        return transcribe(audioBytes, canonicalArpabetSpaceSep, null);
     }
 
-    public AnalyzeResult analyze(byte[] audioBytes, String canonicalArpabetSpaceSep) {
+    // keepSilence 가 null 이면 모델 서버 기본값 사용.
+    public TranscribeResult transcribe(
+            byte[] audioBytes, String canonicalArpabetSpaceSep, Boolean keepSilence) {
         MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
         body.add("audio", audioPart(audioBytes));
         if (canonicalArpabetSpaceSep != null && !canonicalArpabetSpaceSep.isBlank()) {
@@ -69,51 +70,42 @@ public class ModelServerClient {
         if (!model.isBlank()) {
             body.add("model", textPart("model", model));
         }
-        AnalyzeWire wire = execute("/analyze", body, AnalyzeWire.class);
-        // 모델 서버가 204 / 빈 본문을 돌려주면 RestClient 가 wire=null 을 반환한다. 그대로 toResult 에 넘기면
-        // NPE 로 500 이 떨어지므로, 호출 측에 정상적인 "모델 서버 오류" 로 통지한다.
+        if (keepSilence != null) {
+            body.add("keep_silence", textPart("keep_silence", keepSilence ? "true" : "false"));
+        }
+        TranscribeWire wire = execute("/transcribe", body, TranscribeWire.class);
         if (wire == null) {
             throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, "empty response from model server");
         }
-        return toResult(wire);
+        return toResult(wire, canonicalArpabetSpaceSep);
     }
 
-    // 모델 서버 응답의 perceived 를 표준 ARPABET 음소로 정규화한 뒤, 정답과 백엔드에서 다시 정렬해
-    // errors / per 를 일관되게 재계산한다. canonical 이 비어 있으면 정렬 기반이 없으므로 모델 응답을 그대로 둔다.
-    private AnalyzeResult toResult(AnalyzeWire wire) {
+    // perceived 를 표준 ARPABET 으로 정규화하고, canonical 토큰과 함께 mismatch inspector 에 흘려보낸다.
+    private TranscribeResult toResult(TranscribeWire wire, String canonicalString) {
         PhonemeNormalizer.NormalizedPhonemes normalized =
                 phonemeNormalizer.normalize(wire.perceived(), wire.peakSoftmax());
         List<String> normalizedPerceived = normalized.phonemes();
         List<Double> normalizedSoftmax = normalized.peakSoftmax();
 
-        List<String> canonical = wire.canonical();
-        boolean canRealign = canonical != null && !canonical.isEmpty();
+        List<String> canonicalTokens = splitCanonical(canonicalString);
+        // 비표준 음소가 perceived / canonical 어느 쪽에 있어도 한 줄 WARN — 사전 확장 단서.
+        phonemeMismatchInspector.inspect(canonicalTokens, normalizedPerceived);
 
-        List<AnalyzeError> errors;
-        Double per;
-        if (canRealign) {
-            PhonemeAligner.AlignmentResult alignment = phonemeAligner.align(canonical, normalizedPerceived);
-            errors = alignment.errors();
-            per = alignment.per();
-        } else {
-            errors = wire.errors() == null ? List.of() : wire.errors();
-            per = wire.per();
-        }
-
-        // 정규화 + 정렬 결과의 음소 집합이 표준 ARPABET 밖이면 한 줄 WARN — 운영자가 tmux 로그로
-        // 새 비표준 케이스를 모니터링하고 PhonemeNormalizer 사전에 반영할 수 있게 한다.
-        phonemeMismatchInspector.inspect(canonical, normalizedPerceived);
-
-        return new AnalyzeResult(
+        return new TranscribeResult(
                 normalizedPerceived,
-                canonical,
                 normalizedSoftmax,
-                wire.alignment(),
-                errors,
-                per,
-                wire.durationSec() == null ? 0.0 : wire.durationSec(),
-                wire.speechRate()
-        );
+                wire.durationSec(),
+                wire.speechRate() == null ? SpeechRate.NORMAL : wire.speechRate(),
+                wire.speechRateRatio(),
+                wire.modelId(),
+                wire.modelType());
+    }
+
+    private static List<String> splitCanonical(String canonical) {
+        if (canonical == null || canonical.isBlank()) {
+            return List.of();
+        }
+        return List.of(canonical.trim().split("\\s+"));
     }
 
     // 선택 가능한 음소인식 모델 후보 + 활성 모델 (모델 서버 /models).
@@ -172,17 +164,15 @@ public class ModelServerClient {
         }
     }
 
-    // 모델 서버 /analyze 응답은 snake_case 키를 쓰므로 @JsonAlias 로 camelCase 와 양쪽을 모두 받는다.
-    // speechRate 는 fast / normal / slow 분류, 누락 시 SpeechRate.fromString 이 NORMAL 로 폴백한다.
+    // /transcribe 응답 wire 포맷. snake_case 및 camelCase 양쪽을 모두 받는다.
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record AnalyzeWire(
+    record TranscribeWire(
             List<String> perceived,
-            List<String> canonical,
             @JsonAlias("peak_softmax") List<Double> peakSoftmax,
-            List<Object> alignment,
-            List<AnalyzeError> errors,
-            Double per,
             @JsonAlias("duration_sec") Double durationSec,
-            @JsonAlias("speech_rate") SpeechRate speechRate
+            @JsonAlias("speech_rate") SpeechRate speechRate,
+            @JsonAlias("speech_rate_ratio") Double speechRateRatio,
+            @JsonAlias("model_id") String modelId,
+            @JsonAlias("model_type") String modelType
     ) {}
 }

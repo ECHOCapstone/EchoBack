@@ -25,7 +25,6 @@ class OAuth2LoginFailureHandlerTest {
                 null, null, null, null, null, null, null,
                 null,
                 null,
-                null,
                 new AppProperties.OAuth2(
                         "http://localhost:3000/oauth/callback",
                         ERROR_URI,

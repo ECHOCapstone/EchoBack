@@ -1,6 +1,5 @@
 package com.capstoneecho.echo_back.external.llm;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -16,22 +15,27 @@ class StructuredOutputRecordsTest {
     @DisplayName("LlmStepFeedback: score 는 0~100 으로 clamp, 리스트는 null-safe")
     void stepFeedbackNormalizes() {
         LlmStepFeedback over = new LlmStepFeedback(
-                150, true, "g", PronunciationGuide.empty(), null, null, null, null);
+                150, null, null, true, "g", PronunciationGuide.empty(), null, null, null, null);
         LlmStepFeedback under = new LlmStepFeedback(
-                -10, false, "g", PronunciationGuide.empty(), null, null, null, null);
+                -10, null, null, false, "g", PronunciationGuide.empty(), null, null, null, null);
         assertThat(over.score()).isEqualTo(100);
         assertThat(under.score()).isEqualTo(0);
         assertThat(over.strengths()).isEmpty();
         assertThat(over.wrongWords()).isEmpty();
         assertThat(over.phonemeTips()).isEmpty();
+        assertThat(over.alignment()).isEmpty();
+        assertThat(over.errors()).isEmpty();
     }
 
     @Test
     @DisplayName("LlmRetryFeedback: score clamp + 빈 phonemeTips 폴백")
     void retryFeedbackNormalizes() {
-        LlmRetryFeedback f = new LlmRetryFeedback(200, true, false, "ok", PronunciationGuide.empty(), null);
+        LlmRetryFeedback f = new LlmRetryFeedback(
+                200, null, null, true, false, "ok", PronunciationGuide.empty(), null);
         assertThat(f.score()).isEqualTo(100);
         assertThat(f.phonemeTips()).isEmpty();
+        assertThat(f.alignment()).isEmpty();
+        assertThat(f.errors()).isEmpty();
     }
 
     @Test
@@ -73,7 +77,7 @@ class StructuredOutputRecordsTest {
         PriorAttempt a = new PriorAttempt(Instant.now(), 80.0, "p", null);
         assertThat(a.errors()).isEmpty();
 
-        AnalyzeError err = new AnalyzeError("SUB", 1, "AH", "EH");
+        LlmPhonemeError err = new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "EH", "AH", 1);
         PriorAttempt b = new PriorAttempt(Instant.now(), null, null, List.of(err));
         assertThat(b.errors()).containsExactly(err);
     }
@@ -81,17 +85,16 @@ class StructuredOutputRecordsTest {
     @Test
     @DisplayName("Context records: 입력 null 은 모두 빈 값으로 정규화")
     void contextRecordsAreDefensive() {
-        LlmStepContext step = new LlmStepContext(
-                null, null, null, null, null, null, null, null, null);
+        LlmStepContext step = new LlmStepContext(null, null, null, null, null, null);
         assertThat(step.chapterTitle()).isEmpty();
         assertThat(step.targetText()).isEmpty();
         assertThat(step.perceived()).isEmpty();
+        assertThat(step.canonicalWords()).isEmpty();
         assertThat(step.priorAttempts()).isEmpty();
 
-        LlmRetryContext retry = new LlmRetryContext(
-                null, null, null, null, null, null, null);
+        LlmRetryContext retry = new LlmRetryContext(null, null, null, null, null);
         assertThat(retry.word()).isEmpty();
-        assertThat(retry.errors()).isEmpty();
+        assertThat(retry.canonicalWords()).isEmpty();
 
         LlmComprehensiveContext comp = new LlmComprehensiveContext(
                 null, null, null, null, null, 0.0);

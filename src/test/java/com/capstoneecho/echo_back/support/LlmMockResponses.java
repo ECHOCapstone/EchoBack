@@ -8,7 +8,7 @@ import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.List;
 
-// LlmClient mock 응답 모음. 새 인터페이스 (stepFeedback / retryFeedback / comprehensiveFeedback) 에 맞춘다.
+// LlmClient mock 응답 모음.
 public final class LlmMockResponses {
 
     private LlmMockResponses() {
@@ -16,7 +16,7 @@ public final class LlmMockResponses {
 
     public static LlmStepFeedback defaultStep() {
         return new LlmStepFeedback(
-                85, false,
+                85, List.of(), List.of(), false,
                 "발음을 더 또렷하게 따라 읽어 보세요.",
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
@@ -24,7 +24,7 @@ public final class LlmMockResponses {
 
     public static LlmStepFeedback stepWithWrongWord(String word, int index) {
         return new LlmStepFeedback(
-                70, true,
+                70, List.of(), List.of(), true,
                 "ɔ 모음을 더 둥글게 발음해 보세요.",
                 PronunciationGuide.empty(),
                 List.of(), List.of(),
@@ -33,7 +33,9 @@ public final class LlmMockResponses {
     }
 
     public static LlmRetryFeedback defaultRetry() {
-        return new LlmRetryFeedback(85, true, false, "잘 했어요.", PronunciationGuide.empty(), List.of());
+        return new LlmRetryFeedback(
+                85, List.of(), List.of(), true, false,
+                "잘 했어요.", PronunciationGuide.empty(), List.of());
     }
 
     public static LlmComprehensiveFeedback defaultComprehensive() {

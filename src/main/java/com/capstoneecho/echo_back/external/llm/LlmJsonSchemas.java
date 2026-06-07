@@ -8,6 +8,9 @@ import java.util.Map;
 // Gemini 2.5+ 는 properties 정의 순서대로 출력하므로 LinkedHashMap 으로 순서를 명시한다.
 public final class LlmJsonSchemas {
 
+    private static final List<String> ERROR_TYPE_VALUES = List.of("MATCH", "SUBSTITUTION", "INSERTION", "DELETION");
+    private static final List<String> NON_MATCH_ERROR_VALUES = List.of("SUBSTITUTION", "INSERTION", "DELETION");
+
     private LlmJsonSchemas() {}
 
     public static Map<String, Object> stepFeedback() {
@@ -19,7 +22,7 @@ public final class LlmJsonSchemas {
 
         Map<String, Object> phonemeTip = object(
                 ordered(
-                        entry("phoneme", typed("string", "약점 음소의 ARPAbet 또는 IPA 표기")),
+                        entry("phoneme", typed("string", "약점 음소의 ARPAbet 표기")),
                         entry("koreanCue", typed("string", "한국식 발음 단서 (한글 음차)")),
                         entry("tip", typed("string", "입 모양 / 혀 위치 등 추가 발음 요령"))),
                 List.of("phoneme", "koreanCue", "tip"));
@@ -27,6 +30,10 @@ public final class LlmJsonSchemas {
         return object(
                 ordered(
                         entry("score", typedRange("integer", "0~100 점수", 0, 100)),
+                        entry("alignment", array(alignmentOpItem(),
+                                "canonical ↔ perceived 정렬 시퀀스 (MATCH 포함)")),
+                        entry("errors", array(phonemeErrorItem(),
+                                "alignment 에서 추출한 비-MATCH 항목들")),
                         entry("retryRecommended", typed("boolean", "재학습 권고 여부")),
                         entry("guidanceKr", typed("string", "한국어 1~2 문장 피드백")),
                         entry("pronunciationGuide", pronunciationGuide()),
@@ -34,7 +41,8 @@ public final class LlmJsonSchemas {
                         entry("weaknesses", array(typed("string", null), "보완할 점 1~3개")),
                         entry("wrongWords", array(wrongWord, "약점이 두드러진 단어 목록")),
                         entry("phonemeTips", array(phonemeTip, "약점 음소별 한국식 단서 1~3개"))),
-                List.of("score", "retryRecommended", "guidanceKr", "pronunciationGuide"));
+                List.of("score", "alignment", "errors", "retryRecommended",
+                        "guidanceKr", "pronunciationGuide"));
     }
 
     public static Map<String, Object> retryFeedback() {
@@ -48,12 +56,17 @@ public final class LlmJsonSchemas {
         return object(
                 ordered(
                         entry("score", typedRange("integer", "0~100 점수", 0, 100)),
+                        entry("alignment", array(alignmentOpItem(),
+                                "canonical ↔ perceived 정렬 시퀀스 (MATCH 포함)")),
+                        entry("errors", array(phonemeErrorItem(),
+                                "alignment 에서 추출한 비-MATCH 항목들")),
                         entry("correct", typed("boolean", "정답 음소 시퀀스 일치 여부 (정성 판정)")),
                         entry("retryRecommended", typed("boolean", "추가 재시도 권고 여부")),
                         entry("guidanceKr", typed("string", "한국어 1~2 문장 피드백")),
                         entry("pronunciationGuide", pronunciationGuide()),
                         entry("phonemeTips", array(phonemeTip, "약점 음소별 단서"))),
-                List.of("score", "correct", "retryRecommended", "guidanceKr", "pronunciationGuide"));
+                List.of("score", "alignment", "errors", "correct", "retryRecommended",
+                        "guidanceKr", "pronunciationGuide"));
     }
 
     public static Map<String, Object> comprehensiveFeedback() {
@@ -74,6 +87,32 @@ public final class LlmJsonSchemas {
                         entry("nextPracticeItems", array(practiceItem,
                                 "다음 학습 단어 / 구 / 문장 3~5개 혼합 추천"))),
                 List.of("overallScore", "summaryKr", "nextPracticeItems"));
+    }
+
+    private static Map<String, Object> alignmentOpItem() {
+        return object(
+                ordered(
+                        entry("errorType", enumValue(ERROR_TYPE_VALUES,
+                                "MATCH = 일치, SUBSTITUTION/INSERTION/DELETION = 비-MATCH")),
+                        entry("canonical", typed("string",
+                                "정답 음소 (INSERTION 이면 빈 문자열)")),
+                        entry("perceived", typed("string",
+                                "인식 음소 (DELETION 이면 빈 문자열)")),
+                        entry("canonicalIndex", typed("integer",
+                                "canonical 시퀀스 내 0-based 인덱스 (INSERTION 이면 -1)"))),
+                List.of("errorType"));
+    }
+
+    private static Map<String, Object> phonemeErrorItem() {
+        return object(
+                ordered(
+                        entry("op", enumValue(NON_MATCH_ERROR_VALUES,
+                                "SUBSTITUTION / INSERTION / DELETION")),
+                        entry("canonical", typed("string", "정답 음소 (INSERTION 이면 빈 문자열)")),
+                        entry("perceived", typed("string", "인식 음소 (DELETION 이면 빈 문자열)")),
+                        entry("canonicalIndex", typed("integer",
+                                "canonical 시퀀스 내 0-based 인덱스 (INSERTION 이면 -1)"))),
+                List.of("op"));
     }
 
     private static Map<String, Object> pronunciationGuide() {

@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.pronunciation.feedback.support;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.external.llm.AlignmentOp;
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,12 +24,12 @@ class PriorAttemptAssemblerTest {
     }
 
     @Test
-    @DisplayName("parseErrors: 정상 JSON 은 AnalyzeError 리스트로 역직렬화")
+    @DisplayName("parseErrors: 정상 JSON 은 LlmPhonemeError 리스트로 역직렬화")
     void parseErrorsHappy() {
-        String json = "[{\"op\":\"SUB\",\"canonicalIndex\":2,\"perceived\":\"AH\",\"canonical\":\"EH\"}]";
-        List<AnalyzeError> errs = assembler.parseErrors(json);
+        String json = "[{\"op\":\"SUBSTITUTION\",\"canonicalIndex\":2,\"perceived\":\"AH\",\"canonical\":\"EH\"}]";
+        List<LlmPhonemeError> errs = assembler.parseErrors(json);
         assertThat(errs).hasSize(1);
-        assertThat(errs.get(0).op()).isEqualTo("SUB");
+        assertThat(errs.get(0).op()).isEqualTo(AlignmentOp.ErrorType.SUBSTITUTION);
         assertThat(errs.get(0).canonicalIndex()).isEqualTo(2);
         assertThat(errs.get(0).canonical()).isEqualTo("EH");
     }

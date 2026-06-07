@@ -15,7 +15,6 @@ public record AppProperties(
         Tts tts,
         Stats stats,
         Gamification gamification,
-        Scoring scoring,
         Challenge challenge,
         Messages messages,
         OAuth2 oauth2,
@@ -24,20 +23,6 @@ public record AppProperties(
         Legal legal,
         Member member
 ) {
-
-    // 발음 채점 정책 — 약점 음소 가중치 및 PER → 점수 비선형 변환 파라미터.
-    // weak-phonemes 는 대문자 ARPABET 으로 yaml 에 둔다. PhonemeAligner 가 정렬 결과의 sub/del 대상
-    // 음소가 이 목록에 포함되어 있으면 weak-phoneme-multiplier 가중을 적용한다.
-    public record Scoring(
-            List<String> weakPhonemes,
-            double weakPhonemeMultiplier,
-            double insertionWeight,
-            double perToScoreExponent
-    ) {
-        public List<String> safeWeakPhonemes() {
-            return weakPhonemes == null ? List.of() : weakPhonemes;
-        }
-    }
 
     // 회원가입 시 강제되는 비밀번호 정책. 백엔드 validator 와 프론트 안내가 같은 출처를 공유한다.
     //   minLength / maxLength    : 글자수 범위.
@@ -133,7 +118,6 @@ public record AppProperties(
     //   completionExp / streakCap   : 챕터 완료 보상 EXP, streak 상한.
     //   dailyRecommended            : 메인 화면 "오늘의 추천 학습" 개수.
     //   weeklyTopN / weeklyWindowDays : 통계 화면의 주간 윈도 (랭킹과 무관).
-    //   scoreFallbackOnError        : 모델 / LLM 분석 실패 시 fallback 점수.
     //   passThreshold               : step 통과 여부 판정 (0~100). 어드민이 런타임에 조정 가능.
     //   priorAttemptsCap            : LLM 호출에 묶는 이전 시도 최대 개수 (토큰 폭증 방지).
     public record Gamification(
@@ -142,7 +126,6 @@ public record AppProperties(
             int dailyRecommended,
             int weeklyTopN,
             int weeklyWindowDays,
-            double scoreFallbackOnError,
             double passThreshold,
             int priorAttemptsCap,
             String defaultPracticeWord

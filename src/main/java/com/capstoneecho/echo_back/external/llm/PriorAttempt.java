@@ -1,6 +1,5 @@
 package com.capstoneecho.echo_back.external.llm;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
 import java.time.Instant;
 import java.util.List;
 
@@ -10,7 +9,7 @@ public record PriorAttempt(
         Instant attemptedAt,
         Double score,
         String perceived,
-        List<AnalyzeError> errors
+        List<LlmPhonemeError> errors
 ) {
     public PriorAttempt {
         errors = errors == null ? List.of() : List.copyOf(errors);

@@ -14,8 +14,12 @@ import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.support.LlmMockResponses;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
+import java.util.List;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
@@ -60,13 +64,16 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
 
     @MockitoBean private ModelServerClient modelServerClient;
     @MockitoBean private LlmClient llmClient;
+    @MockitoBean private LlmCanonicalGenerator canonicalGenerator;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient);
-        when(modelServerClient.g2p(anyString())).thenReturn(AnalyzeMockResponses.helloG2p());
-        when(modelServerClient.analyze(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.perfect());
+        Mockito.reset(modelServerClient, llmClient, canonicalGenerator);
+        when(canonicalGenerator.generate(anyString()))
+                .thenReturn(new CanonicalResult(List.of(
+                        new CanonicalWord("hello", List.of("HH", "AH", "L", "OW")))));
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(AnalyzeMockResponses.perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.defaultStep());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
@@ -146,7 +153,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.perceived[0]").value("HH"))
                 .andExpect(jsonPath("$.data.canonical").isArray())
                 .andExpect(jsonPath("$.data.canonical[0]").value("HH"))
-                .andExpect(jsonPath("$.data.score").value(100.0))
+                .andExpect(jsonPath("$.data.score").value(85.0))
                 .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty())
                 .andExpect(jsonPath("$.data.id").doesNotExist())
                 .andExpect(jsonPath("$.data.accuracy").doesNotExist())
@@ -164,11 +171,12 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 feedbackRepository.save(
                         PronunciationFeedback.forScript(
                                 user, script, "RetryScriptWrong", 60.0, "AH", "water", "old")));
-        when(modelServerClient.analyze(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.withWaterError());
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(AnalyzeMockResponses.misalignedTranscribe());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.LlmRetryFeedback(
-                        75, false, true, "둥글게 발음해 보세요.",
+                        75, java.util.List.of(), java.util.List.of(),
+                        false, true, "둥글게 발음해 보세요.",
                         com.capstoneecho.echo_back.external.llm.PronunciationGuide.empty(),
                         java.util.List.of()));
 

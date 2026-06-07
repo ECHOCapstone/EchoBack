@@ -1,6 +1,6 @@
 package com.capstoneecho.echo_back.challenge.dto;
 
-import com.capstoneecho.echo_back.external.modelserver.dto.AnalyzeError;
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import java.util.List;
 
 // 사용자가 챌린지에 한 번 도전한 직후의 응답.
@@ -19,5 +19,5 @@ public record ChallengeAttemptResponse(
         int attemptsLimit,
         List<String> perceived,
         List<String> canonical,
-        List<AnalyzeError> errors
+        List<LlmPhonemeError> errors
 ) {}

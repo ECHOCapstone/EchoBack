@@ -1,9 +1,11 @@
 package com.capstoneecho.echo_back.pronunciation.recording.dto;
 
+import com.capstoneecho.echo_back.external.llm.AlignmentOp;
+import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PhonemeTip;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
-import com.capstoneecho.echo_back.external.modelserver.dto.G2pWord;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -15,9 +17,8 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 // 녹음 1건 업로드 후 클라이언트에 돌려주는 응답.
-// 모델 서버 분석 결과 (perceived / canonical / errors / stepScore) 와
-// LLM 구조화 결과 (guidanceKr / passed / retryRecommended / wrongWords / phonemeTips ...) 를 함께 담는다.
-// passed 는 step 통과 임계 (app.gamification.pass-threshold) 기준 — 클라이언트의 "다음으로 / 재학습" 분기 SSOT.
+// 모델 서버 (perceived / peakSoftmax / speechRate) + LLM (alignment / errors / score / guidance ...) 의 합.
+// passed 는 step 통과 임계 (app.gamification.pass-threshold) 기준 — 클라이언트의 "다음 / 재학습" 분기 SSOT.
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RecordingUploadResponse(
         Long id,
@@ -35,15 +36,17 @@ public record RecordingUploadResponse(
         String guidanceKr,
         List<String> strengths,
         List<String> weaknesses,
-        List<PhonemeErrorView> errors,
+        // LLM 이 만든 음소 오류 (FE 시각화 source).
+        List<LlmPhonemeError> errors,
+        // LLM 이 만든 canonical ↔ perceived 정렬 (MATCH 포함). FE 가 음소별 색칠에 사용.
+        List<AlignmentOp> alignment,
         List<WrongWord> wrongWords,
         List<PhonemeTip> phonemeTips,
         // 모델 서버가 분류한 발화 속도. FAST 면 프론트가 "조금 천천히" 안내를 노출한다.
         SpeechRate speechRate,
-        // 단어별 canonical 음소 (g2p words). 프론트가 음소를 단어 경계로 잘라 보여줄 때 사용한다.
-        List<G2pWord> canonicalWords,
-        // 합격선 점수 (게임화 설정. 어드민이 바꿀 수 있음). 프론트의 점수 게이지가 이 값으로 합격선
-        // 마커를 그려, FE 하드코딩과 BE 의 passed 판정이 어긋나는 일을 막는다.
+        // 단어별 canonical 음소 (LLM canonical). 프론트가 음소를 단어 경계로 잘라 보여줄 때 사용.
+        List<CanonicalWord> canonicalWords,
+        // 합격선 점수 (게임화 설정). 프론트의 점수 게이지가 이 값으로 합격선 마커를 그린다.
         Double passThreshold,
         Instant createdAt
 ) {
@@ -51,16 +54,7 @@ public record RecordingUploadResponse(
     private static final Logger log = LoggerFactory.getLogger(RecordingUploadResponse.class);
     private static final TypeReference<List<WrongWord>> WRONG_WORDS_TYPE = new TypeReference<>() {};
 
-    public record PhonemeErrorView(
-            String op,
-            String canonical,
-            String perceived,
-            Integer canonicalIndex
-    ) {}
-
     // 저장된 Recording 으로부터 read-side 응답을 재구성한다.
-    // wrongWordsJson 은 List<WrongWord> 로 역직렬화하며, 파싱 실패 / NULL 입력은 빈 리스트로 폴백한다.
-    // 음소 시퀀스는 엔티티에 정규화 저장되지 않으므로 빈 리스트로 채워진다.
     public static RecordingUploadResponse from(Recording recording, ObjectMapper objectMapper) {
         if (recording == null) {
             throw new IllegalArgumentException("recording is required");
@@ -91,13 +85,11 @@ public record RecordingUploadResponse(
                 List.of(),
                 List.of(),
                 List.of(),
+                List.of(),
                 deserializeWrongWords(recording.getId(), recording.getWrongWordsJson(), objectMapper),
                 List.of(),
-                // 조회 응답은 엔티티에 발화 속도가 저장되지 않아 NORMAL 로 폴백.
                 SpeechRate.NORMAL,
-                // 조회 응답은 단어별 음소를 보관하지 않으므로 빈 리스트.
                 List.of(),
-                // 조회 응답은 실시간 게임화 설정을 함께 싣지 않는다 (FE 가 fetch 안 함).
                 null,
                 recording.getCreatedAt());
     }
@@ -108,11 +100,10 @@ public record RecordingUploadResponse(
             List<String> perceived,
             List<String> canonical,
             List<Double> peakSoftmax,
-            List<PhonemeErrorView> errors,
             LlmStepFeedback feedback,
             boolean passed,
             SpeechRate speechRate,
-            List<G2pWord> canonicalWords,
+            List<CanonicalWord> canonicalWords,
             double passThreshold) {
         Long scriptId = saved.getScript() == null ? null : saved.getScript().getId();
         Long stepId = saved.getStep() == null ? null : saved.getStep().getId();
@@ -136,7 +127,8 @@ public record RecordingUploadResponse(
                 feedback.guidanceKr(),
                 feedback.strengths(),
                 feedback.weaknesses(),
-                errors == null ? List.of() : List.copyOf(errors),
+                feedback.errors(),
+                feedback.alignment(),
                 feedback.wrongWords(),
                 feedback.phonemeTips(),
                 speechRate == null ? SpeechRate.NORMAL : speechRate,

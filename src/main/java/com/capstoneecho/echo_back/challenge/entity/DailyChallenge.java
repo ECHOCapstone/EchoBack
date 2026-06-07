@@ -54,6 +54,14 @@ public class DailyChallenge {
     @Column(name = "deactivated_at")
     private Instant deactivatedAt;
 
+    // LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON.
+    @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
+    private String canonicalCachedJson;
+
+    // 1 = legacy g2p (없음), 2 = LLM 생성본.
+    @Column(name = "canonical_version", nullable = false)
+    private int canonicalVersion = 1;
+
     private DailyChallenge(String targetText, String koreanTranslation) {
         this.targetText = targetText;
         this.koreanTranslation = koreanTranslation;
@@ -82,6 +90,11 @@ public class DailyChallenge {
         this.active = true;
         this.activatedAt = Instant.now();
         this.deactivatedAt = null;
+    }
+
+    public void applyCanonicalCache(String json) {
+        this.canonicalCachedJson = (json == null || json.isBlank()) ? null : json;
+        this.canonicalVersion = 2;
     }
 
     // 챌린지를 비활성 상태로 전환한다. 이미 비활성이면 종료 시각은 갱신하지 않는다 (이중 종료 방지).

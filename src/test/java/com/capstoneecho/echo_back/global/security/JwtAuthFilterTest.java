@@ -160,7 +160,6 @@ class JwtAuthFilterTest {
                 new AppProperties.Jwt(SECRET, expirationMs),
                 null, null, null, null, null, null, null,
                 null,
-                null,
                 null, null, null, null, null, null);
         return new JwtProvider(props);
     }

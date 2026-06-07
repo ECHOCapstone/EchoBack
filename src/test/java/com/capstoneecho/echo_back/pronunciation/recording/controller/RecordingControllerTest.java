@@ -12,7 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
+import java.util.List;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
@@ -60,14 +64,18 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
 
     @MockitoBean private ModelServerClient modelServerClient;
     @MockitoBean private LlmClient llmClient;
+    @MockitoBean private CanonicalCacheService canonicalCacheService;
     @MockitoBean private RecordingStorage recordingStorage;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient, recordingStorage);
-        when(modelServerClient.g2p(anyString())).thenReturn(AnalyzeMockResponses.helloG2p());
-        when(modelServerClient.analyze(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.perfect());
+        Mockito.reset(modelServerClient, llmClient, canonicalCacheService, recordingStorage);
+        CanonicalResult canonical = new CanonicalResult(List.of(
+                new CanonicalWord("hello", List.of("HH", "AH", "L", "OW"))));
+        when(canonicalCacheService.resolveForStep(anyLong())).thenReturn(canonical);
+        when(canonicalCacheService.resolveForSentence(anyLong())).thenReturn(canonical);
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(AnalyzeMockResponses.perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.defaultStep());
         when(recordingStorage.save(anyLong(), any(byte[].class))).thenReturn("u/recordings/test.wav");
@@ -91,7 +99,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.stepId").value(f.stepId()))
                 .andExpect(jsonPath("$.data.sessionId").doesNotExist())
                 .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty())
-                .andExpect(jsonPath("$.data.stepScore").value(100.0))
+                .andExpect(jsonPath("$.data.stepScore").value(85.0))
                 .andExpect(jsonPath("$.data.wrongWords").isArray())
                 .andExpect(jsonPath("$.data.wrongWords").isEmpty())
                 .andDo(document("recordings/upload"));
@@ -103,8 +111,8 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
     @DisplayName("POST /api/recordings (script-flow with-error) → wrongWords[0].word/index 채움")
     void scriptFlowWithErrorReturnsTypedWrongWords() throws Exception {
         ScriptFlowFixture f = seedScriptFlow("recuser1b", "water bottle");
-        when(modelServerClient.analyze(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.withWaterError());
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
+                .thenReturn(AnalyzeMockResponses.misalignedTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.stepWithWrongWord("water", 0));
         String token = issueToken(f.user());
@@ -257,7 +265,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
     @DisplayName("POST /api/recordings 모델 서버 5xx → 502 MODEL_SERVER_ERROR")
     void modelServer5xxReturns502() throws Exception {
         ScriptFlowFixture f = seedScriptFlow("recuser10", "hi");
-        when(modelServerClient.g2p(anyString()))
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenThrow(new BusinessException(ErrorCode.MODEL_SERVER_ERROR, "upstream 5xx"));
         String token = issueToken(f.user());
 
@@ -274,7 +282,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
     @DisplayName("POST /api/recordings 모델 서버 응답 없음 → 503 MODEL_SERVER_UNAVAILABLE")
     void modelServerUnavailableReturns503() throws Exception {
         ScriptFlowFixture f = seedScriptFlow("recuser11", "hi");
-        when(modelServerClient.g2p(anyString()))
+        when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenThrow(new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, "timeout"));
         String token = issueToken(f.user());
 

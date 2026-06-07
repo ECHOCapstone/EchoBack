@@ -41,7 +41,6 @@ class OAuth2LoginSuccessHandlerTest {
                 null, null, null, null, null, null, null,
                 null,
                 null,
-                null,
                 new AppProperties.OAuth2(FRONTEND_URL, "http://localhost:3000/login", "http://localhost:3000/signup"),
                 null, null, null, null);
         handler = new OAuth2LoginSuccessHandler(jwtProvider, props);

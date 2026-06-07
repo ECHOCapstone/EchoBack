@@ -15,7 +15,6 @@ public class RuntimeSettings {
     public static final String STREAK_CAP = "gamification.streakCap";
     public static final String DAILY_RECOMMENDED = "gamification.dailyRecommended";
     public static final String PRIOR_ATTEMPTS_CAP = "gamification.priorAttemptsCap";
-    public static final String SCORE_FALLBACK_ON_ERROR = "gamification.scoreFallbackOnError";
     public static final String WEEKLY_TOP_N = "gamification.weeklyTopN";
     public static final String WEEKLY_WINDOW_DAYS = "gamification.weeklyWindowDays";
     public static final String DEFAULT_PRACTICE_WORD = "gamification.defaultPracticeWord";
@@ -79,10 +78,6 @@ public class RuntimeSettings {
     public int priorAttemptsCap() {
         // 최소 1 보장: 어드민이 0/음수를 넣어도 직전 시도 한 건은 LLM 입력에 포함되도록 클램프한다.
         return Math.max(1, settings.getInt(PRIOR_ATTEMPTS_CAP, gamification.priorAttemptsCap()));
-    }
-
-    public double scoreFallbackOnError() {
-        return settings.getDouble(SCORE_FALLBACK_ON_ERROR, gamification.scoreFallbackOnError());
     }
 
     public int weeklyTopN() {
