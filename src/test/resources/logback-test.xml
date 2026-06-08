@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  테스트 로깅의 단일 진실 공급원(SSOT).
+
+  Logback 은 클래스패스의 logback-test.xml 을 최우선으로 로드한다. 덕분에:
+    - 순수 단위 테스트(@ExtendWith(MockitoExtension.class) 등, Spring 컨텍스트 없음)에서도
+      Logback ContextInitializer 가 이 파일을 직접 발견해 적용한다. (Spring Boot 의
+      LoggingApplicationListener 가 동작하지 않아 application-*.yaml 의 logging.level.* 가
+      적용되지 않는 환경 — 사용자가 보고한 바로 그 상황.)
+    - Spring 테스트(@ActiveProfiles("test"))에서도 Spring Boot 의 LogbackLoggingSystem 이
+      이 파일을 표준 위치로 감지·존중한다.
+  → 모든 테스트 유형이 동일한 레벨·패턴으로 결정적으로 로깅한다.
+
+  Spring Boot 내부 리소스(defaults.xml 등) include 에 의존하지 않는 자체 완결형 설정으로,
+  Spring Boot 4.x 버전 간 리소스 경로 변경에도 안전하다.
+-->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+  <!-- 애플리케이션 코드는 테스트에서 DEBUG 까지 노출해 디버깅 가시성을 확보한다 (prod 는 INFO). -->
+  <logger name="com.capstoneecho" level="DEBUG"/>
+
+  <!-- 잡음이 큰 프레임워크 로거는 테스트에서 조용히. -->
+  <logger name="org.hibernate" level="WARN"/>
+  <logger name="org.springframework" level="WARN"/>
+  <logger name="org.testcontainers" level="WARN"/>
+  <logger name="com.zaxxer.hikari" level="WARN"/>
+</configuration>
