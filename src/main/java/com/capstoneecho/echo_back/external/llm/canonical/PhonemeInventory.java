@@ -52,6 +52,13 @@ public class PhonemeInventory {
         return phonemes;
     }
 
+    // 조음 안내(음차·설명·이미지)를 제공할 음소들. 실제 발음이 없는 SILENCE 토큰은 제외한다.
+    public List<Phoneme> articulationPhonemes() {
+        return phonemes.stream()
+                .filter(p -> !"SILENCE".equalsIgnoreCase(p.category()))
+                .toList();
+    }
+
     // LLM 프롬프트의 {{inventory}} 자리에 끼울 마크다운 테이블.
     // SIL / SP 같은 SILENCE 토큰은 제외 — canonical 출력에 절대 등장하면 안 되므로 모델 컨텍스트에도 노출하지 않는다.
     public String markdownTable() {
@@ -90,5 +97,5 @@ public class PhonemeInventory {
     private record InventoryFile(List<Phoneme> phonemes) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Phoneme(String code, String category, String koreanCue) {}
+    public record Phoneme(String code, String category, String koreanCue, String tip) {}
 }
