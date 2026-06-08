@@ -4,11 +4,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-// 한 번의 녹음 (step) 에 대해 LLM 이 돌려주는 구조화 결과.
+// 한 번의 녹음 (step) 채점 결과. canonical 은 Call 1 (LlmCanonicalGenerator) 가 만들고,
+// 본 응답은 alignment / errors / score / 피드백 만 다룬다.
 //   score              : 0~100 정수 (clamp 보장). 합격선 비교의 단일 출처.
 //   alignment          : canonical ↔ perceived 정렬 시퀀스 (MATCH 포함). FE 시각화 source.
-//   errors             : alignment 에서 추출한 비-MATCH 항목 (약점 추출 source).
-//   retryRecommended   : LLM 정성 판단 (점수만으로 못 잡는 케이스 보정).
+//   errors             : alignment 에서 추출한 비-MATCH 항목.
+//   retryRecommended   : LLM 정성 판단.
 //   guidanceKr / pronunciationGuide / strengths / weaknesses / wrongWords / phonemeTips : 학습자 노출.
 public record LlmStepFeedback(
         int score,

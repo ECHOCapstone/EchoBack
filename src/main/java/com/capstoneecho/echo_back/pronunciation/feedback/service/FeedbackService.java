@@ -10,6 +10,7 @@ import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
 import com.capstoneecho.echo_back.external.llm.PracticeItem;
 import com.capstoneecho.echo_back.external.llm.PriorAttempt;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
@@ -185,11 +186,11 @@ public class FeedbackService {
             boolean hasScript, String chapterTitle, String chapterContent,
             Aggregated aggregated, String seededPracticeWord) {}
 
-    // 단어 / 구 재시도. 한 단어 단위 canonical 은 매번 LLM 으로 생성 (단어 단위 캐시는 미정 — 단어가 임의).
     public RetryWordResult retryWord(Long userId, Long feedbackId, byte[] audioBytes) {
         return retryWord(userId, feedbackId, audioBytes, null);
     }
 
+    // 단어/구 재시도. canonical 은 LLM 응답으로 동일 호출에서 만들어진다.
     public RetryWordResult retryWord(
             Long userId, Long feedbackId, byte[] audioBytes, String overrideWord) {
         wavHeaderValidator.require(audioBytes);
@@ -204,21 +205,21 @@ public class FeedbackService {
             return new RetryPlan(word, priorAttemptAssembler.fromRetries(recent));
         });
 
-        // 단어 단위 canonical 은 LLM 호출. 단어 단위 캐시는 두지 않는다 — 사용자가 임의로 입력하는 word 도 받기 때문.
-        CanonicalResult canonicalResult = canonicalGenerator.generate(plan.word());
-        List<String> canonicalPhonemes = canonicalResult.flatPhonemes();
-        String canonicalSpaceSep = String.join(" ", canonicalPhonemes);
-
-        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, canonicalSpaceSep);
+        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
         List<String> perceived = transcribe.perceived();
+
+        // 단어/구 즉석 재시도는 lock 적용 대상이 아니므로 매번 Call 1 로 canonical 을 즉석 생성한다.
+        // perceived 는 null 로 넘겨 표준 발음을 기준으로 받는다 — 단어 단위에서는 연결 발음 반영이 의미가 적다.
+        CanonicalResult generated = canonicalGenerator.generate(plan.word(), null);
+        List<CanonicalWord> canonicalWords = generated.words();
 
         LlmRetryContext context = new LlmRetryContext(
                 plan.word(),
+                canonicalWords,
                 perceived,
-                canonicalPhonemes,
-                canonicalResult.words(),
                 plan.priorAttempts());
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
+        List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
         double score = llm.score();
         // 통과 판정은 점수 임계만 본다 — RuntimeSettings.passThreshold 가 SSOT.
         boolean passed = score >= settings.passThreshold();
@@ -241,6 +242,20 @@ public class FeedbackService {
     }
 
     private record RetryPlan(String word, List<PriorAttempt> priorAttempts) {}
+
+    // canonicalWords 의 음소를 단어 순서대로 평탄화. 스냅샷 직렬화에 쓰인다.
+    private static List<String> flattenCanonical(List<CanonicalWord> words) {
+        if (words == null || words.isEmpty()) {
+            return List.of();
+        }
+        List<String> flat = new ArrayList<>();
+        for (CanonicalWord w : words) {
+            if (w.phonemes() != null) {
+                flat.addAll(w.phonemes());
+            }
+        }
+        return flat;
+    }
 
     private String resolveRetryWord(PronunciationFeedback feedback, String overrideWord) {
         if (overrideWord != null && !overrideWord.isBlank()) {

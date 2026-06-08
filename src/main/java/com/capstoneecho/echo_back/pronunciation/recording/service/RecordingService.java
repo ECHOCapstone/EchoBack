@@ -4,8 +4,11 @@ import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PriorAttempt;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalTargetType;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
+import com.capstoneecho.echo_back.external.llm.canonical.UserCanonicalLockService;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
@@ -31,6 +34,7 @@ import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStora
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +59,8 @@ public class RecordingService {
     private final RecordingStorage recordingStorage;
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
-    private final CanonicalCacheService canonicalCacheService;
+    private final LlmCanonicalGenerator canonicalGenerator;
+    private final UserCanonicalLockService canonicalLockService;
     private final ObjectMapper objectMapper;
     private final WavHeaderValidator wavHeaderValidator;
     private final PriorAttemptAssembler priorAttemptAssembler;
@@ -77,7 +82,8 @@ public class RecordingService {
             RecordingStorage recordingStorage,
             ModelServerClient modelServerClient,
             LlmClient llmClient,
-            CanonicalCacheService canonicalCacheService,
+            LlmCanonicalGenerator canonicalGenerator,
+            UserCanonicalLockService canonicalLockService,
             ObjectMapper objectMapper,
             WavHeaderValidator wavHeaderValidator,
             PriorAttemptAssembler priorAttemptAssembler,
@@ -92,7 +98,8 @@ public class RecordingService {
         this.recordingStorage = recordingStorage;
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
-        this.canonicalCacheService = canonicalCacheService;
+        this.canonicalGenerator = canonicalGenerator;
+        this.canonicalLockService = canonicalLockService;
         this.objectMapper = objectMapper;
         this.wavHeaderValidator = wavHeaderValidator;
         this.priorAttemptAssembler = priorAttemptAssembler;
@@ -102,12 +109,14 @@ public class RecordingService {
         this.writeTx = new TransactionTemplate(txManager);
     }
 
-    // 녹음 1건 업로드 흐름. 느린 외부 호출이 DB 커넥션을 잡지 않도록 단계 분리:
-    //   (1) READ TX    — 부모 매핑/검증 + 입력 데이터 (targetText, priorAttempts) 추출
-    //   (2) CANONICAL  — 캐시 hit 면 즉시, miss 면 LlmCanonicalGenerator 호출 후 캐시
-    //   (3) MODEL HTTP — /transcribe 호출해 perceived 만 받는다
-    //   (4) LLM HTTP   — 한 번의 호출로 alignment + errors + score + tips + feedback 전부 받는다
-    //   (5) WRITE TX   — 오디오 디스크 저장 + Recording 영속화 (롤백 시 오디오도 정리)
+    // 녹음 1건 업로드 흐름. canonical 생성과 채점이 의미적으로 다른 일이므로 별도 LLM 호출로 분리한다.
+    //   (1) READ TX     — 부모 매핑/검증 + 입력 데이터 + canonical lock 조회
+    //   (2) MODEL HTTP  — /transcribe 호출해 perceived 만 받는다
+    //   (3) CALL 1      — lock 이 있으면 그 값을 사용. 없으면 LlmCanonicalGenerator 로 canonical 생성
+    //                      (이때 perceived 를 함께 넘겨 자연 연결 발음을 정답에 반영)
+    //   (4) LOCK 영속화  — 첫 시도였다면 새 canonical 을 REQUIRES_NEW 로 저장
+    //   (5) CALL 2      — LlmClient.stepFeedback 으로 alignment + score + 피드백
+    //   (6) WRITE TX    — 오디오 디스크 저장 + Recording 영속화
     public RecordingUploadResponse upload(
             Long userId, RecordingUploadRequest request, byte[] audioBytes) {
         if (request == null) {
@@ -116,7 +125,7 @@ public class RecordingService {
         wavHeaderValidator.require(audioBytes);
         Mode mode = detectMode(request);
 
-        // (1) 읽기 단계: 부모 엔티티 검증 + 입력 데이터 추출.
+        // (1) 읽기 단계: 부모 엔티티 검증 + 입력 데이터 + canonical lock 조회.
         PreparedInput prepared = readTx.execute(status -> {
             ResolvedParents parents = resolveParents(userId, request, mode);
             String targetText = resolveTargetText(parents);
@@ -129,38 +138,67 @@ public class RecordingService {
                     parents.step() == null ? null : parents.step().getId(),
                     parents.session() == null ? null : parents.session().getId(),
                     parents.sentence() == null ? null : parents.sentence().getId());
-            return new PreparedInput(targetText, chapterTitle, priorAttempts, ids);
+            CanonicalTargetType targetType = resolveTargetType(mode);
+            Long targetIdForLock = resolveTargetIdForLock(mode, ids);
+            List<CanonicalWord> locked = canonicalLockService
+                    .findLocked(userId, targetType, targetIdForLock)
+                    .orElse(List.of());
+            return new PreparedInput(
+                    targetText, chapterTitle, priorAttempts, ids, targetType, targetIdForLock, locked);
         });
 
-        // (2) canonical 조회/생성 — lazy backfill. LLM 실패 시 BusinessException 으로 사용자에게 명시 노출.
-        CanonicalResult canonicalResult = resolveCanonical(mode, prepared.parentIds());
-        List<String> canonicalPhonemes = canonicalResult.flatPhonemes();
-        String canonicalSpaceSep = String.join(" ", canonicalPhonemes);
+        // (2) 모델 서버 /transcribe.
+        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
 
-        // (3) 모델 서버 /transcribe.
-        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, canonicalSpaceSep);
+        // (3) Call 1 — canonical 결정. lock 이 있으면 그대로 사용, 없으면 perceived 와 함께 LLM 호출.
+        List<CanonicalWord> canonicalWords;
+        boolean newCanonical;
+        if (!prepared.lockedCanonicalWords().isEmpty()) {
+            canonicalWords = prepared.lockedCanonicalWords();
+            newCanonical = false;
+        } else {
+            CanonicalResult generated =
+                    canonicalGenerator.generate(prepared.targetText(), transcribe.perceived());
+            canonicalWords = generated.words();
+            newCanonical = true;
+        }
 
-        // (4) LLM 단일 호출 — alignment + score + errors + tips + feedback.
+        // (4) 첫 시도였다면 새 canonical 을 lock 에 저장. REQUIRES_NEW 라 이후 단계 롤백과 무관하게 보존.
+        if (newCanonical) {
+            canonicalLockService.lock(
+                    userId, prepared.targetType(), prepared.targetIdForLock(), canonicalWords);
+        }
+
+        // (5) Call 2 — 채점 + 피드백. canonical 은 입력으로 전달.
         LlmStepContext context = new LlmStepContext(
                 prepared.chapterTitle(),
                 prepared.targetText(),
+                canonicalWords,
                 transcribe.perceived(),
-                canonicalPhonemes,
-                canonicalResult.words(),
                 prepared.priorAttempts());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
         double stepScore = feedback.score();
+        List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
 
-        // (5) 쓰기 단계: 짧은 트랜잭션 안에서 오디오 저장 + Recording 영속화 + 응답 조립.
+        // (6) 쓰기 단계: 짧은 트랜잭션 안에서 오디오 저장 + Recording 영속화 + 응답 조립.
         return writeTx.execute(status ->
-                persist(mode, audioBytes, prepared, canonicalResult, canonicalPhonemes,
+                persist(mode, audioBytes, prepared, canonicalWords, canonicalPhonemes,
                         transcribe, stepScore, feedback));
     }
 
-    private CanonicalResult resolveCanonical(Mode mode, ParentIds ids) {
+    // mode 를 lock 의 target_type 으로 매핑한다.
+    private static CanonicalTargetType resolveTargetType(Mode mode) {
         return switch (mode) {
-            case SCRIPT_FLOW -> canonicalCacheService.resolveForStep(ids.stepId());
-            case SESSION_SENTENCE -> canonicalCacheService.resolveForSentence(ids.sentenceId());
+            case SCRIPT_FLOW -> CanonicalTargetType.STEP;
+            case SESSION_SENTENCE -> CanonicalTargetType.SESSION_SENTENCE;
+        };
+    }
+
+    // mode 별로 lock 의 target_id 로 쓸 자식 식별자 (step.id 또는 sentence.id).
+    private static Long resolveTargetIdForLock(Mode mode, ParentIds ids) {
+        return switch (mode) {
+            case SCRIPT_FLOW -> ids.stepId();
+            case SESSION_SENTENCE -> ids.sentenceId();
         };
     }
 
@@ -170,7 +208,7 @@ public class RecordingService {
             Mode mode,
             byte[] audioBytes,
             PreparedInput prepared,
-            CanonicalResult canonicalResult,
+            List<CanonicalWord> canonicalWords,
             List<String> canonicalPhonemes,
             TranscribeResult transcribe,
             Double stepScore,
@@ -203,8 +241,22 @@ public class RecordingService {
                 feedback,
                 passed,
                 transcribe.speechRate(),
-                canonicalResult.words(),
+                canonicalWords,
                 passThreshold);
+    }
+
+    // canonicalWords 의 음소를 단어 순서대로 평탄화. 채점/스냅샷 직렬화에 쓰인다.
+    private static List<String> flattenCanonical(List<CanonicalWord> words) {
+        if (words == null || words.isEmpty()) {
+            return List.of();
+        }
+        List<String> flat = new ArrayList<>();
+        for (CanonicalWord w : words) {
+            if (w.phonemes() != null) {
+                flat.addAll(w.phonemes());
+            }
+        }
+        return flat;
     }
 
     // READ TX 에서 추출해 이후 단계로 넘기는 순수 입력 데이터.
@@ -212,7 +264,10 @@ public class RecordingService {
             String targetText,
             String chapterTitle,
             List<PriorAttempt> priorAttempts,
-            ParentIds parentIds) {}
+            ParentIds parentIds,
+            CanonicalTargetType targetType,
+            Long targetIdForLock,
+            List<CanonicalWord> lockedCanonicalWords) {}
 
     // persist 단계에서 EntityManager.getReference 의 입력으로 쓰는 부모 ID 묶음.
     private record ParentIds(Long userId, Long scriptId, Long stepId, Long sessionId, Long sentenceId) {}

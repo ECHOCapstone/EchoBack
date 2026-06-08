@@ -17,13 +17,15 @@ import java.util.Properties;
 import tools.jackson.databind.ObjectMapper;
 
 // Spring 컨텍스트 없이 Gemini generateContent 를 호출해 응답을 출력하는 CLI.
-// 네 가지 모드를 지원한다:
+// 세 가지 모드를 지원한다:
 //   1) --prompt "<자유 텍스트>"
 //        -> 시스템 프롬프트 / 스키마 없이 평문 응답을 받는다.
-//   2) retry <word> <canonical> <perceived>
+//   2) retry <word> <perceived>
 //        -> system.md + retry-feedback.md + retryFeedback() 스키마.
-//   3) step <chapterTitle> <targetText> <canonical> <perceived>
+//        canonical 은 LLM 이 응답에 함께 생성한다.
+//   3) step <chapterTitle> <targetText> <perceived>
 //        -> system.md + step-feedback.md + stepFeedback() 스키마.
+//        canonical 은 LLM 이 응답에 함께 생성한다.
 //   4) comprehensive <chapterTitle> <chapterContent> <overallAccuracy> <dominantWeakPhoneme>
 //        -> system.md + comprehensive-feedback.md + comprehensiveFeedback() 스키마.
 //        stepSummaries / aggregatedErrors 는 비워서 호출하므로, 모델은 챕터 메타 정보만으로 추론한다.
@@ -40,7 +42,7 @@ public final class LlmFeedbackRunner {
     private static final String DEFAULT_MODEL = "gemini-2.0-flash";
     private static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
     private static final double TEMPERATURE = 0.4;
-    private static final int MAX_OUTPUT_TOKENS = 1024;
+    private static final int MAX_OUTPUT_TOKENS = 2048;
 
     private LlmFeedbackRunner() {}
 
@@ -68,20 +70,20 @@ public final class LlmFeedbackRunner {
                 yield freeFormBody(args[1]);
             }
             case "retry" -> {
+                if (args.length < 3) {
+                    printUsage();
+                    System.exit(1);
+                    yield Map.of();
+                }
+                yield retryBody(args[1], args[2]);
+            }
+            case "step" -> {
                 if (args.length < 4) {
                     printUsage();
                     System.exit(1);
                     yield Map.of();
                 }
-                yield retryBody(args[1], args[2], args[3]);
-            }
-            case "step" -> {
-                if (args.length < 5) {
-                    printUsage();
-                    System.exit(1);
-                    yield Map.of();
-                }
-                yield stepBody(args[1], args[2], args[3], args[4]);
+                yield stepBody(args[1], args[2], args[3]);
             }
             case "comprehensive" -> {
                 if (args.length < 5) {
@@ -117,28 +119,22 @@ public final class LlmFeedbackRunner {
         return body;
     }
 
-    private static Map<String, Object> retryBody(String word, String canonical, String perceived) throws IOException {
+    private static Map<String, Object> retryBody(String word, String perceived) throws IOException {
         String userPrompt = loadPrompt("retry-feedback")
                 .replace("{{word}}", word)
-                .replace("{{canonical}}", canonical)
                 .replace("{{perceived}}", perceived)
-                .replace("{{errors}}", "(생략)")
-                .replace("{{currentScore}}", "(미확정)")
-                .replace("{{weakPhoneme}}", "(미확정)")
+                .replace("{{canonicalWords}}", "(생략)")
                 .replace("{{priorAttempts}}", "(없음)");
         return structuredBody(userPrompt, LlmJsonSchemas.retryFeedback());
     }
 
     private static Map<String, Object> stepBody(String chapterTitle, String targetText,
-                                                String canonical, String perceived) throws IOException {
+                                                String perceived) throws IOException {
         String userPrompt = loadPrompt("step-feedback")
                 .replace("{{chapterTitle}}", chapterTitle)
                 .replace("{{targetText}}", targetText)
-                .replace("{{canonical}}", canonical)
                 .replace("{{perceived}}", perceived)
-                .replace("{{errors}}", "(생략)")
-                .replace("{{weakPhoneme}}", "(미확정)")
-                .replace("{{currentScore}}", "(미확정)")
+                .replace("{{canonicalWords}}", "(생략)")
                 .replace("{{priorAttempts}}", "(없음)");
         return structuredBody(userPrompt, LlmJsonSchemas.stepFeedback());
     }
@@ -269,14 +265,14 @@ public final class LlmFeedbackRunner {
     private static void printUsage() {
         System.err.println("Usage:");
         System.err.println("  --prompt \"<자유 텍스트>\"");
-        System.err.println("  retry         <word>          <canonical>      <perceived>");
-        System.err.println("  step          <chapterTitle>  <targetText>     <canonical>           <perceived>");
-        System.err.println("  comprehensive <chapterTitle>  <chapterContent> <overallAccuracy>     <dominantWeakPhoneme>");
+        System.err.println("  retry         <word>          <perceived>");
+        System.err.println("  step          <chapterTitle>  <targetText>          <perceived>");
+        System.err.println("  comprehensive <chapterTitle>  <chapterContent>      <overallAccuracy>     <dominantWeakPhoneme>");
         System.err.println();
         System.err.println("Examples:");
         System.err.println("  ./gradlew runLlmFeedback --args=\"--prompt '안녕이라고 답해줘'\"");
-        System.err.println("  ./gradlew runLlmFeedback --args=\"retry rabbit 'R AE B AH T' 'L AE B AH T'\"");
-        System.err.println("  ./gradlew runLlmFeedback --args=\"step '오늘의 인사' 'I love rabbits' 'AY L AH V R AE B AH T S' 'AY L AH V L AE B AH T S'\"");
+        System.err.println("  ./gradlew runLlmFeedback --args=\"retry rabbit 'L AE B AH T'\"");
+        System.err.println("  ./gradlew runLlmFeedback --args=\"step '오늘의 인사' 'I love rabbits' 'AY L AH V L AE B AH T S'\"");
         System.err.println("  ./gradlew runLlmFeedback --args=\"comprehensive '자음 R 연습' 'R 음소가 자주 등장하는 짧은 문장 모음' 72 R\"");
     }
 }

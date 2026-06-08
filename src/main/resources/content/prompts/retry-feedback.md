@@ -1,44 +1,45 @@
-# 재시도 피드백 요청
+# 재시도 평가
 
-학습자가 한 단어 (또는 짧은 구) 를 다시 따라 읽었다. 결과를 평가하고 다음 시도용 피드백을 JSON 스키마에 맞춰 돌려준다.
-모델 서버는 오직 `perceived` 만 돌려준다. **alignment / errors / 점수 계산은 너가 직접 수행한다.**
+학습자가 한 단어 (또는 짧은 구) 를 다시 따라 읽었다. canonical 은 미리 결정돼 있으니 채점만 한다.
 
-## 연습 항목
-{{word}}
+## 입력
 
-## 정답 음소 시퀀스 (canonical, 공백 구분)
-{{canonical}}
-
-## 단어별 정답 음소 (canonicalWords)
+- 항목: {{word}}
+- canonical (단어별):
 {{canonicalWords}}
-
-## 모델 서버 인식 음소 (perceived, 공백 구분)
-{{perceived}}
-
-## 같은 항목에 대한 이전 재시도 (오래된 순)
+- perceived: {{perceived}}
+- 이전 재시도:
 {{priorAttempts}}
 
-## 작업 — alignment + 채점
+## 작업
 
-1. `canonical` 과 `perceived` 시퀀스를 정렬해 `alignment` 를 만든다.
-   - 각 항목 = `{ errorType, canonical, perceived, canonicalIndex }`.
-   - errorType ∈ { `MATCH`, `SUBSTITUTION`, `INSERTION`, `DELETION` }.
-   - `canonicalIndex` 는 canonical 시퀀스 내 0-based 위치. `INSERTION` 은 `-1`.
-2. alignment 의 비-MATCH 항목들을 그대로 `errors` 에 옮긴다.
-3. `score` (0~100 정수) 산출 가이드는 step 과 동일 — 약점 음소 (V/R/L/TH/DH/F/Z/ZH/AH/AE/ER) 의 오류를 더 무겁게.
-   완벽 = 96 이상에만. 합격선 = 75.
+### alignment + errors
 
-## 출력 규칙
+canonical 음소 시퀀스와 perceived 를 정렬해 각 항목을 `{ errorType, canonical, perceived, canonicalIndex }` 로 표현한다. errorType ∈ { MATCH, SUBSTITUTION, INSERTION, DELETION }. INSERTION 의 canonicalIndex 는 -1. 자연스러운 미국식 연결 발음 (liaison, flapping T, weak form) 으로 보이는 항목은 MATCH 로 인정한다.
 
-- `correct` 는 핵심 약점 음소가 모두 교정되었고 점수가 충분히 높을 때만 `true`.
-- `retryRecommended` 는 `correct=false` 이거나 같은 음소를 반복적으로 틀린 경우 `true`.
-- `phonemeTips` 는 한국식 발음 가이드 (아학편) 를 따른다. 1~3 개, 비어 있어도 된다.
-- 이전 재시도가 누적될수록 `guidanceKr` 은 더 구체적이고 핵심을 짚어 짧게 작성한다.
-- **`guidanceKr` 의 첫 문장은 "따라 읽기 한 줄"로 시작한다**: `<항목>은 "**<틀리게 들린 한글>**" 대신 "**<맞는 한글>**"처럼, <몸으로 할 동작 1개>.`
-- 두 번째 문장 (있다면) 은 첫 문장과 **다른 정보** 만 적는다.
-- **문맥 의존 발음을 절대 오개념으로 가르치지 않는다**: canonical 에 들어 있는 발음이 정답이다.
-- `pronunciationGuide` 는 연습 항목 ({{word}}) 에 대해 4파트로 작성한다.
-  - `correctPronunciation`: 그대로 읽을 수 있는 한글.
-  - `perceivedPronunciation`: 학습자가 낸 소리의 한글 표기.
-  - `explanation`: 몸으로 할 동작 1개 중심 1 문장.
-  - `correctionTip`: `"<틀린 한글>" 대신 "<맞는 한글>"처럼 + 동작 1개` 한 줄.
+비-MATCH 항목을 errors 로 옮긴다.
+
+### score (0~100 정수) + correct
+
+- alignment 가 전부 MATCH 이고 errors 가 비면 96~100.
+- 그 외에는 베이스 `(MATCH 수 / canonical 길이) × 100` 에서 다음을 차감:
+  - 약점 음소 (V R L TH DH F Z ZH AH AE ER) 의 SUBSTITUTION/DELETION: 각 -5
+  - INSERTION: 각 -3
+- 합격선 75.
+- correct = 핵심 약점 음소가 모두 교정되고 score ≥ 90 일 때 true.
+- retryRecommended = correct=false 이거나 같은 음소를 반복적으로 틀린 경우 true.
+
+### 한국어 피드백
+
+guidanceKr 의 첫 문장은 따라 읽기 한 줄:
+`<항목>은 "**<틀린 한글>**" 대신 "**<맞는 한글>**"처럼, <몸으로 할 동작 1개>.`
+
+이전 재시도가 누적될수록 더 짧고 핵심을 짚는다.
+
+phonemeTips 는 errors 안의 음소 1~3 개. 한국식 발음 표기 가이드 (시스템 프롬프트의 아학편 표) 를 따른다.
+
+pronunciationGuide 는 항목 ({{word}}) 에 대해:
+- correctPronunciation: 그대로 읽을 수 있는 한글
+- perceivedPronunciation: 학습자가 낸 소리의 한글
+- explanation: 몸으로 할 동작 1개 중심 1 문장
+- correctionTip: `"<틀린 한글>" 대신 "<맞는 한글>"처럼 + 동작 1개`

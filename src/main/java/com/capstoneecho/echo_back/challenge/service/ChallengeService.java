@@ -2,6 +2,9 @@ package com.capstoneecho.echo_back.challenge.service;
 
 import com.capstoneecho.echo_back.challenge.entity.DailyChallenge;
 import com.capstoneecho.echo_back.challenge.repository.DailyChallengeRepository;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalJson;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import java.util.List;
@@ -10,31 +13,37 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // 챌린지의 라이프사이클 (생성 / 활성 / 종료) 을 단일 출처로 관리한다.
-// "한 번에 active=true 인 챌린지는 하나" 정책을 도메인 차원에서 보장하며, 새 챌린지 활성화 시
-// 기존 활성 챌린지가 자동으로 종료되도록 한다. 종료 시점에 등수별 배지 발급은
-// ChallengeRewardService 가 책임진다.
+// 생성 시점에 LlmCanonicalGenerator 로 canonical 을 만들어 영속화한다 — 모든 사용자가 같은 정답으로
+// 채점되어야 랭킹이 공정하기 때문이다. canonical 생성 실패 시 챌린지 등록 자체가 실패한다 (silent 폴백 금지).
 @Service
 @Transactional
 public class ChallengeService {
 
     private final DailyChallengeRepository challengeRepository;
     private final ChallengeRewardService rewardService;
+    private final LlmCanonicalGenerator canonicalGenerator;
+    private final CanonicalJson canonicalJson;
 
     public ChallengeService(
             DailyChallengeRepository challengeRepository,
-            ChallengeRewardService rewardService) {
+            ChallengeRewardService rewardService,
+            LlmCanonicalGenerator canonicalGenerator,
+            CanonicalJson canonicalJson) {
         this.challengeRepository = challengeRepository;
         this.rewardService = rewardService;
+        this.canonicalGenerator = canonicalGenerator;
+        this.canonicalJson = canonicalJson;
     }
 
     // 어드민 등록 진입점. activate=true 면 등록 직후 본 챌린지를 활성으로 띄우고 이전 활성 챌린지를 종료한다.
     public DailyChallenge create(String targetText, String koreanTranslation, boolean activate) {
-        DailyChallenge challenge = challengeRepository.save(
-                DailyChallenge.create(targetText, koreanTranslation));
+        DailyChallenge challenge = DailyChallenge.create(targetText, koreanTranslation);
+        applyGeneratedCanonical(challenge);
+        DailyChallenge saved = challengeRepository.save(challenge);
         if (activate) {
-            activate(challenge.getId());
+            activate(saved.getId());
         }
-        return challenge;
+        return saved;
     }
 
     // 챌린지를 활성으로 만든다. 기존 활성 챌린지가 있으면 종료 + 배지 발급 후 본 챌린지를 띄운다.
@@ -91,5 +100,16 @@ public class ChallengeService {
         }
         challenge.deactivate();
         rewardService.awardRanksForChallenge(challenge);
+    }
+
+    // 챌린지 등록 시점에 표준 발음으로 canonical 을 만들어 엔티티에 채워 둔다.
+    // perceived 는 admin 입력에 없으므로 null 을 넘긴다.
+    private void applyGeneratedCanonical(DailyChallenge challenge) {
+        CanonicalResult result = canonicalGenerator.generate(challenge.getTargetText(), null);
+        if (result == null || result.words().isEmpty()) {
+            throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED,
+                    "챌린지 canonical 생성 실패");
+        }
+        challenge.applyCanonical(canonicalJson.serialize(result.words()));
     }
 }

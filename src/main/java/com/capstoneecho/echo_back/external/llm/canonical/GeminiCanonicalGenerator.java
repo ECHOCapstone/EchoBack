@@ -12,8 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 // Gemini 의 구조화 출력으로 단어별 ARPABET 음소를 받는다. 인벤토리 외 토큰이 섞이면 1회 재시도하고,
-// 또 실패하면 BusinessException(CANONICAL_GENERATION_FAILED) 으로 변환해 사용자에게 명시적 에러를 노출한다.
-// silent 폴백 (g2p 옛 경로로 복귀 등) 은 의도적으로 차단한다 — 그게 오개념 누설의 근본 원인이었다.
+// 또 실패하면 BusinessException(CANONICAL_GENERATION_FAILED) 으로 변환한다 — silent 폴백 금지.
 @Component
 public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
 
@@ -34,7 +33,7 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
     }
 
     @Override
-    public CanonicalResult generate(String text) {
+    public CanonicalResult generate(String text, List<String> perceived) {
         if (text == null || text.isBlank()) {
             return new CanonicalResult(List.of());
         }
@@ -44,14 +43,14 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
             throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED, "Gemini provider 가 설정되지 않았습니다");
         }
 
-        CanonicalResult first = callOnce(text);
+        CanonicalResult first = callOnce(text, perceived);
         List<String> firstUnknown = unknownTokens(first);
         if (firstUnknown.isEmpty()) {
             return first;
         }
         log.warn("Gemini canonical 1차 응답에 비표준 음소 포함 unknown={} — 재시도", firstUnknown);
 
-        CanonicalResult second = callOnce(text);
+        CanonicalResult second = callOnce(text, perceived);
         List<String> secondUnknown = unknownTokens(second);
         if (secondUnknown.isEmpty()) {
             return second;
@@ -61,10 +60,11 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
                 "canonical 응답에 인벤토리 외 음소가 포함됨: " + secondUnknown);
     }
 
-    private CanonicalResult callOnce(String text) {
+    private CanonicalResult callOnce(String text, List<String> perceived) {
         String userPrompt = prompts.render(PROMPT_KEY, Map.of(
                 "text", text,
-                "inventory", inventory.promptListing()));
+                "perceivedSection", renderPerceivedSection(perceived),
+                "inventory", inventory.markdownTable()));
         try {
             CanonicalResult result = executor.callRequired(
                     prompts.raw("system"),
@@ -78,6 +78,14 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
         } catch (GeminiCallExecutor.GeminiCallException ex) {
             throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED, ex.getMessage());
         }
+    }
+
+    // perceived 가 있을 때만 별도 섹션을 렌더링한다. 없으면 빈 문자열을 넘겨 프롬프트 본문에서 자연히 빠지게 한다.
+    private static String renderPerceivedSection(List<String> perceived) {
+        if (perceived == null || perceived.isEmpty()) {
+            return "";
+        }
+        return "학습자가 실제로 발음한 음소: " + String.join(" ", perceived);
     }
 
     // 응답 시퀀스 안의 인벤토리 외 음소 토큰을 모은다. 빈 리스트면 통과.

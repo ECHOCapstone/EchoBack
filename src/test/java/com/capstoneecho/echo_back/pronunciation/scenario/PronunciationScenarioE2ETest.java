@@ -14,9 +14,9 @@ import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
@@ -48,7 +48,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-// 백엔드 책임 분기를 명시적으로 단언한다. 모델 서버 응답 / LLM 점수 / canonical 캐시를 mock 으로 주입.
+// 백엔드 책임 분기를 명시적으로 단언한다. 모델 서버 응답 / LLM 점수를 mock 으로 주입.
+// canonical 은 LLM 응답에 함께 들어 있다 (동일 호출이 생성).
 @SpringBootTest
 @ActiveProfiles("test")
 class PronunciationScenarioE2ETest {
@@ -66,16 +67,14 @@ class PronunciationScenarioE2ETest {
 
     @MockitoBean private ModelServerClient modelServerClient;
     @MockitoBean private LlmClient llmClient;
-    @MockitoBean private CanonicalCacheService canonicalCacheService;
+    @MockitoBean private LlmCanonicalGenerator canonicalGenerator;
     @MockitoBean private RecordingStorage recordingStorage;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient, canonicalCacheService, recordingStorage);
-        when(canonicalCacheService.resolveForStep(anyLong()))
-                .thenReturn(appleCanonical());
-        when(canonicalCacheService.resolveForSentence(anyLong()))
-                .thenReturn(appleCanonical());
+        Mockito.reset(modelServerClient, llmClient, canonicalGenerator, recordingStorage);
+        when(canonicalGenerator.generate(anyString(), any()))
+                .thenReturn(new CanonicalResult(appleCanonical()));
         when(recordingStorage.save(anyLong(), any(byte[].class)))
                 .thenReturn("u/202605/test.wav");
     }
@@ -227,9 +226,8 @@ class PronunciationScenarioE2ETest {
                 List.of(), List.of(), List.of(), List.of());
     }
 
-    private static CanonicalResult appleCanonical() {
-        return new CanonicalResult(List.of(
-                new CanonicalWord("apple", List.of("AE", "P", "AH", "L"))));
+    private static List<CanonicalWord> appleCanonical() {
+        return List.of(new CanonicalWord("apple", List.of("AE", "P", "AH", "L")));
     }
 
     private static TranscribeResult perfectTranscribe() {

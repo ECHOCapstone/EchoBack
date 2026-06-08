@@ -12,8 +12,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-// classpath:content/phoneme-inventory.json 을 로드해 ARPABET 41 음소의 단일 출처를 노출한다.
-// LLM canonical 프롬프트에 동적으로 주입할 인벤토리 문자열, ARPABET 검증을 위한 코드 Set,
+// classpath:content/phoneme-inventory.json 을 로드해 ARPABET 음소의 단일 출처를 노출한다.
+// LLM step/retry 프롬프트에 동적으로 주입할 인벤토리 마크다운 테이블, ARPABET 검증을 위한 코드 Set,
 // PhonemeMismatchInspector 와 PhonemeNormalizer 가 참조할 표준 코드 집합을 같은 파일에서 제공한다.
 @Component
 public class PhonemeInventory {
@@ -22,7 +22,7 @@ public class PhonemeInventory {
 
     private final List<Phoneme> phonemes;
     private final Set<String> codes;
-    private final String promptListing;
+    private final String markdownTable;
 
     public PhonemeInventory(ObjectMapper objectMapper) {
         InventoryFile file = readFile(objectMapper);
@@ -30,7 +30,7 @@ public class PhonemeInventory {
         this.codes = this.phonemes.stream()
                 .map(p -> p.code().toUpperCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
-        this.promptListing = renderPromptListing(this.phonemes);
+        this.markdownTable = renderMarkdownTable(this.phonemes);
     }
 
     // 알려진 표준 음소 코드 집합 (대문자). SIL / SP 등 비분석 토큰도 포함.
@@ -51,9 +51,10 @@ public class PhonemeInventory {
         return phonemes;
     }
 
-    // 프롬프트의 {{inventory}} 자리에 끼울 사람-가독성 목록. 카테고리 / 코드 / 한글 음차 한 줄씩.
-    public String promptListing() {
-        return promptListing;
+    // LLM 프롬프트의 {{inventory}} 자리에 끼울 마크다운 테이블.
+    // SIL / SP 같은 SILENCE 토큰은 제외 — canonical 출력에 절대 등장하면 안 되므로 모델 컨텍스트에도 노출하지 않는다.
+    public String markdownTable() {
+        return markdownTable;
     }
 
     private static InventoryFile readFile(ObjectMapper objectMapper) {
@@ -66,17 +67,20 @@ public class PhonemeInventory {
         }
     }
 
-    private static String renderPromptListing(List<Phoneme> phonemes) {
+    private static String renderMarkdownTable(List<Phoneme> phonemes) {
         StringBuilder sb = new StringBuilder();
+        sb.append("| ARPABET | category | 한글 음차 |\n");
+        sb.append("|---------|----------|----------|\n");
         for (Phoneme p : phonemes) {
-            sb.append("- ").append(p.code());
-            if (p.category() != null && !p.category().isBlank()) {
-                sb.append(" (").append(p.category()).append(")");
+            String category = p.category() == null ? "" : p.category();
+            if ("SILENCE".equalsIgnoreCase(category)) {
+                continue;
             }
-            if (p.koreanCue() != null && !p.koreanCue().isBlank()) {
-                sb.append(" — ").append(p.koreanCue());
-            }
-            sb.append('\n');
+            String cue = p.koreanCue() == null ? "" : p.koreanCue();
+            sb.append("| ").append(p.code())
+                    .append(" | ").append(category)
+                    .append(" | ").append(cue)
+                    .append(" |\n");
         }
         return sb.toString().stripTrailing();
     }

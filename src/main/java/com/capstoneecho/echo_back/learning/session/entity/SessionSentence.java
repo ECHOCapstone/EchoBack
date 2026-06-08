@@ -40,23 +40,10 @@ public class SessionSentence {
     @Column(name = "text", nullable = false, columnDefinition = "TEXT")
     private String text;
 
-    // LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON.
-    @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
-    private String canonicalCachedJson;
-
-    // 1 = legacy g2p (없음), 2 = LLM 생성본.
-    @Column(name = "canonical_version", nullable = false)
-    private int canonicalVersion = 1;
-
     private SessionSentence(Session session, int sentenceIndex, String text) {
         this.session = session;
         this.sentenceIndex = sentenceIndex;
         this.text = text;
-    }
-
-    public void applyCanonicalCache(String json) {
-        this.canonicalCachedJson = (json == null || json.isBlank()) ? null : json;
-        this.canonicalVersion = 2;
     }
 
     static SessionSentence of(Session session, int sentenceIndex, String text) {

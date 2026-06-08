@@ -7,9 +7,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-// LLM canonical 일괄 갱신 엔드포인트. canonical_version < 2 인 학습 단계 / 챌린지 row 를 페이지 단위로
-// LlmCanonicalGenerator 로 새로 만들어 캐시 컬럼에 저장한다. SecurityConfig 가 /api/admin/** 를
-// ROLE_ADMIN 으로 보호한다.
+// canonical 일괄 갱신 엔드포인트. 현재는 챌린지만 backfill 대상이다 — learning_steps / session_sentences 는
+// user-lock 기반이라 사용자가 시도하는 시점에 lazy 로 채워진다.
+// SecurityConfig 가 /api/admin/** 를 ROLE_ADMIN 으로 보호한다.
 @RestController
 @RequestMapping("/api/admin/canonical")
 public class AdminCanonicalController {
@@ -20,18 +20,11 @@ public class AdminCanonicalController {
         this.backfillService = backfillService;
     }
 
-    // 한 페이지 backfill. 응답의 nextPage 가 null 이 될 때까지 반복 호출.
-    //   target=steps      (기본) — learning_steps RECORD 단계
-    //   target=challenges       — daily_challenges (전체, 단일 페이지로 응답)
+    // target=challenges 만 지원한다. 다른 값을 받으면 challenges 로 처리한다.
     @PostMapping("/backfill")
     public ApiResponse<CanonicalBackfillService.BackfillResult> backfill(
-            @RequestParam(name = "target", defaultValue = "steps") String target,
-            @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "50") int size) {
-        CanonicalBackfillService.BackfillResult result = switch (target.toLowerCase()) {
-            case "challenges" -> backfillService.backfillChallenges();
-            default -> backfillService.backfillStepsPage(page, size);
-        };
-        return ApiResponse.success(result);
+            @RequestParam(name = "target", defaultValue = "challenges") String target) {
+        // target 인자는 향후 다른 도메인 확장 여지를 두려 받지만, 현재는 challenges 만 처리한다.
+        return ApiResponse.success(backfillService.backfillChallenges());
     }
 }

@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-// 규칙 기반 폴백 + LlmClient 어댑터가 구조화 record 를 그대로 채워 돌려주는지 검증한다.
-// AppProperties 는 외부 yaml 없이 fixture 만으로 구성한다 (단위 테스트).
+// 규칙 기반 폴백 + LlmClient 어댑터의 안전 디폴트 동작 검증.
+// canonical 은 서비스 레이어가 context 에 넣어주므로 본 폴백은 표준 Levenshtein DP 로 alignment 를 만든다.
 class RuleBasedLlmFeedbackGeneratorTest {
 
     private static final AppProperties FIXTURE = new AppProperties(
@@ -36,43 +36,40 @@ class RuleBasedLlmFeedbackGeneratorTest {
     private final RuleBasedLlmFeedbackGenerator generator = new RuleBasedLlmFeedbackGenerator(fallback);
 
     @Test
-    @DisplayName("stepFeedback: 정확 일치 → score 100, errors 비고, retry 없음")
+    @DisplayName("stepFeedback: canonical 과 perceived 가 정확히 일치하면 score=100, errors 비고, retry 없음")
     void stepPerfectMatchYieldsFullScore() {
         LlmStepContext context = new LlmStepContext(
-                "", "Hello world",
-                List.of("HH", "AH", "L", "OW", "W", "ER", "L", "D"),
-                List.of("HH", "AH", "L", "OW", "W", "ER", "L", "D"),
-                List.of(
-                        new CanonicalWord("Hello", List.of("HH", "AH", "L", "OW")),
-                        new CanonicalWord("world", List.of("W", "ER", "L", "D"))),
+                "", "Hello",
+                List.of(new CanonicalWord("hello", List.of("HH", "AH", "L", "OW"))),
+                List.of("HH", "AH", "L", "OW"),
                 List.of());
 
         LlmStepFeedback result = generator.stepFeedback(context);
 
         assertThat(result.score()).isEqualTo(100);
         assertThat(result.errors()).isEmpty();
-        assertThat(result.alignment()).hasSize(8);
-        assertThat(result.wrongWords()).isEmpty();
-        assertThat(result.guidanceKr()).isNotBlank();
+        assertThat(result.alignment()).hasSize(4);
         assertThat(result.retryRecommended()).isFalse();
+        assertThat(result.guidanceKr()).isNotBlank();
     }
 
     @Test
-    @DisplayName("stepFeedback: 인식 오류가 canonicalWords 단어 경계로 환원돼 wrongWords 채운다")
-    void errorsResolveToWordsViaCanonicalBoundaries() {
+    @DisplayName("stepFeedback: canonical 비어있고 perceived 만 있으면 모두 INSERTION + score=0 + retry 권고")
+    void stepEmptyCanonicalProducesInsertions() {
         LlmStepContext context = new LlmStepContext(
-                "", "Hello world",
-                List.of("HH", "AH", "L", "OW", "W", "EH", "L", "D"),
-                List.of("HH", "AH", "L", "OW", "W", "ER", "L", "D"),
-                List.of(
-                        new CanonicalWord("Hello", List.of("HH", "AH", "L", "OW")),
-                        new CanonicalWord("world", List.of("W", "ER", "L", "D"))),
+                "", "",
+                List.of(),
+                List.of("HH", "AH", "L", "OW"),
                 List.of());
 
         LlmStepFeedback result = generator.stepFeedback(context);
 
-        assertThat(result.wrongWords()).containsExactly(new WrongWord("world", 1));
-        assertThat(result.guidanceKr()).isNotBlank();
+        assertThat(result.score()).isZero();
+        assertThat(result.alignment()).hasSize(4);
+        assertThat(result.alignment())
+                .allMatch(op -> op.errorType() == AlignmentOp.ErrorType.INSERTION);
+        assertThat(result.errors()).hasSize(4);
+        assertThat(result.retryRecommended()).isTrue();
     }
 
     @Test
@@ -80,14 +77,17 @@ class RuleBasedLlmFeedbackGeneratorTest {
     void retryAndComprehensiveAlwaysNonEmpty() {
         LlmRetryContext retry = new LlmRetryContext(
                 "the",
-                List.of("DH", "AH"),
-                List.of("DH", "AH"),
                 List.of(new CanonicalWord("the", List.of("DH", "AH"))),
+                List.of("DH", "AH"),
                 List.of());
         LlmComprehensiveContext comp = new LlmComprehensiveContext(
                 "", "", List.of(), List.of(), null, 75.0);
 
-        assertThat(generator.retryFeedback(retry).guidanceKr()).isNotBlank();
+        LlmRetryFeedback retryResult = generator.retryFeedback(retry);
+        assertThat(retryResult.guidanceKr()).isNotBlank();
+        assertThat(retryResult.score()).isEqualTo(100);
+        assertThat(retryResult.correct()).isTrue();
+
         assertThat(generator.comprehensiveFeedback(comp).summaryKr()).isNotBlank();
     }
 

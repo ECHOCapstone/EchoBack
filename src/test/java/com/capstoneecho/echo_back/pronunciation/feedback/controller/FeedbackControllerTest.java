@@ -14,12 +14,8 @@ import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
-import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.support.LlmMockResponses;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import java.util.List;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.LearningStep;
@@ -64,14 +60,15 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
 
     @MockitoBean private ModelServerClient modelServerClient;
     @MockitoBean private LlmClient llmClient;
-    @MockitoBean private LlmCanonicalGenerator canonicalGenerator;
+    @MockitoBean private com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator canonicalGenerator;
 
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator);
-        when(canonicalGenerator.generate(anyString()))
-                .thenReturn(new CanonicalResult(List.of(
-                        new CanonicalWord("hello", List.of("HH", "AH", "L", "OW")))));
+        when(canonicalGenerator.generate(anyString(), any()))
+                .thenReturn(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult(
+                        java.util.List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
+                                "hello", java.util.List.of("HH", "AH", "L", "OW")))));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(AnalyzeMockResponses.perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))

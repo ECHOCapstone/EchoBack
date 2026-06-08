@@ -4,11 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-// 단어/구 재시도 단계의 LLM 구조화 결과.
-//   score / alignment / errors : step 과 동일한 의미.
-//   correct                   : LLM 정성 판정 (점수 임계만으로 부족한 케이스 보정).
-//   retryRecommended           : 추가 재시도 권고.
-//   guidanceKr / pronunciationGuide / phonemeTips : 학습자 노출.
+// 단어/구 재시도 채점 결과. canonical 은 Call 1 (LlmCanonicalGenerator) 가 만들고,
+// 본 응답은 alignment / errors / score / correct / 피드백 만 다룬다.
 public record LlmRetryFeedback(
         int score,
         List<AlignmentOp> alignment,

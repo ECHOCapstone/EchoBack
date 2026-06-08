@@ -3,21 +3,22 @@ package com.capstoneecho.echo_back.external.llm;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import java.util.List;
 
-// 단어/구 재시도 시 LLM 에 전달하는 입력.
-// canonicalWords 는 단어 자체의 LLM canonical (단일 단어 / 짧은 구 단위).
-// priorAttempts 는 같은 feedback 의 이전 재시도들 — LLM 이 같은 실수를 반복하는지 짚어준다.
+// 단어/구 재시도 채점 요청 시 LLM 에 전달하는 입력.
+//   - word          : 연습 항목 (단어 또는 짧은 구).
+//   - canonicalWords: 채점에 사용할 단어별 ARPABET 시퀀스. 서비스 레이어가 LlmCanonicalGenerator 호출로
+//                     매번 즉석 생성해 채워준다 (단어 단위는 lock 미적용).
+//   - perceived     : 모델 서버가 돌려준 ARPABET 음소 시퀀스.
+//   - priorAttempts : 같은 feedback 의 이전 재시도들.
 public record LlmRetryContext(
         String word,
-        List<String> perceived,
-        List<String> canonical,
         List<CanonicalWord> canonicalWords,
+        List<String> perceived,
         List<PriorAttempt> priorAttempts
 ) {
     public LlmRetryContext {
         word = word == null ? "" : word;
-        perceived = perceived == null ? List.of() : List.copyOf(perceived);
-        canonical = canonical == null ? List.of() : List.copyOf(canonical);
         canonicalWords = canonicalWords == null ? List.of() : List.copyOf(canonicalWords);
+        perceived = perceived == null ? List.of() : List.copyOf(perceived);
         priorAttempts = priorAttempts == null ? List.of() : List.copyOf(priorAttempts);
     }
 }

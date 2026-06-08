@@ -8,7 +8,7 @@ import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.List;
 
-// LlmClient mock 응답 모음.
+// LlmClient mock 응답 모음. canonical 은 Call 1 이 만들고, 본 응답은 채점/피드백만 포함한다.
 public final class LlmMockResponses {
 
     private LlmMockResponses() {

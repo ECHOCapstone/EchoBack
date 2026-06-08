@@ -19,9 +19,9 @@ import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PhonemeTip;
 import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
@@ -94,33 +94,27 @@ class RecordingServiceTest {
     private LlmClient llmClient;
 
     @MockitoBean
-    private CanonicalCacheService canonicalCacheService;
+    private LlmCanonicalGenerator canonicalGenerator;
 
     @MockitoBean
     private RecordingStorage recordingStorage;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient, canonicalCacheService, recordingStorage);
-        when(canonicalCacheService.resolveForStep(anyLong()))
-                .thenReturn(helloCanonical());
-        when(canonicalCacheService.resolveForSentence(anyLong()))
-                .thenReturn(helloCanonical());
+        Mockito.reset(modelServerClient, llmClient, canonicalGenerator, recordingStorage);
+        when(canonicalGenerator.generate(anyString(), any()))
+                .thenReturn(new CanonicalResult(helloCanonical()));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(new LlmStepFeedback(
-                        85, List.of(), List.of(), false,
-                        "발음을 더 또렷하게 따라 읽어 보세요.",
-                        PronunciationGuide.empty(),
-                        List.of(), List.of(), List.of(), List.of()));
+                .thenReturn(defaultStepFeedback());
         when(recordingStorage.save(anyLong(), any(byte[].class)))
                 .thenReturn("u/202605/test.wav");
     }
 
     @Test
-    @DisplayName("upload 는 canonical 캐시를 먼저 가져온 뒤 transcribe 에 그 canonical 을 그대로 넘긴다")
-    void uploadResolvesCanonicalThenCallsTranscribe() {
+    @DisplayName("upload 는 모델 서버 호출 시 canonical 힌트 없이 빈 문자열을 넘긴다 — canonical 은 LLM 응답으로 생성된다")
+    void uploadCallsTranscribeWithoutCanonicalHint() {
         Fixture f = seedScriptFlow("hello world");
 
         recordingService.upload(
@@ -128,9 +122,9 @@ class RecordingServiceTest {
                 new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null),
                 VALID_WAV);
 
-        verify(canonicalCacheService).resolveForStep(f.stepId());
         verify(modelServerClient).transcribe(any(byte[].class),
-                org.mockito.ArgumentMatchers.eq("HH AH L OW"));
+                org.mockito.ArgumentMatchers.eq(""));
+        verify(llmClient).stepFeedback(any(LlmStepContext.class));
     }
 
     @Test
@@ -299,9 +293,16 @@ class RecordingServiceTest {
         return userRepository.save(User.fromOAuth2(localPart + "@example.com", localPart));
     }
 
-    private static CanonicalResult helloCanonical() {
-        return new CanonicalResult(List.of(
-                new CanonicalWord("hello", List.of("HH", "AH", "L", "OW"))));
+    private static List<CanonicalWord> helloCanonical() {
+        return List.of(new CanonicalWord("hello", List.of("HH", "AH", "L", "OW")));
+    }
+
+    private static LlmStepFeedback defaultStepFeedback() {
+        return new LlmStepFeedback(
+                85, List.of(), List.of(), false,
+                "발음을 더 또렷하게 따라 읽어 보세요.",
+                PronunciationGuide.empty(),
+                List.of(), List.of(), List.of(), List.of());
     }
 
     private static TranscribeResult perfectTranscribe() {

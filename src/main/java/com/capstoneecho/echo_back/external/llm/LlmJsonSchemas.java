@@ -6,6 +6,8 @@ import java.util.Map;
 
 // Gemini structured output 으로 보낼 JSON Schema 들을 단일 출처에서 관리한다.
 // Gemini 2.5+ 는 properties 정의 순서대로 출력하므로 LinkedHashMap 으로 순서를 명시한다.
+//
+// canonical 자체는 별도 호출 (CanonicalSchema) 이 생성한다 — 본 schema 들은 채점/피드백 응답만 담당.
 public final class LlmJsonSchemas {
 
     private static final List<String> ERROR_TYPE_VALUES = List.of("MATCH", "SUBSTITUTION", "INSERTION", "DELETION");

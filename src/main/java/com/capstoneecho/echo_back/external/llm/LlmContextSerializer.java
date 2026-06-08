@@ -18,7 +18,7 @@ public final class LlmContextSerializer {
         return String.join(" ", values);
     }
 
-    // 단어별 canonical (LlmCanonicalGenerator 결과). LLM 이 alignment / wrongWords 단어 매핑에 쓴다.
+    // 채점용 canonical 을 프롬프트 본문에 끼울 텍스트로 직렬화한다. 단어 → 음소 라벨 줄로 나열한다.
     public static String canonicalWords(List<CanonicalWord> words) {
         if (words == null || words.isEmpty()) {
             return "(없음)";
@@ -26,7 +26,8 @@ public final class LlmContextSerializer {
         StringBuilder sb = new StringBuilder();
         int i = 0;
         for (CanonicalWord w : words) {
-            sb.append(String.format("  [%d] %s — %s%n", i++, w.word(), String.join(" ", w.phonemes())));
+            sb.append(String.format("  [%d] %s — %s%n",
+                    i++, nullable(w.word()), String.join(" ", w.phonemes())));
         }
         return sb.toString().stripTrailing();
     }

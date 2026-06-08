@@ -27,8 +27,8 @@ import org.springframework.web.client.RestClientResponseException;
 // 모델 서버의 새 contract:
 //   POST /transcribe (multipart: audio, canonical, model?, keep_silence?)
 //     -> { perceived, peak_softmax, duration_sec, speech_rate, speech_rate_ratio, model_id, model_type }
-// 옛 /analyze, /g2p 는 모두 삭제. canonical 은 LlmCanonicalGenerator 가 만들고,
-// alignment / errors / per / score 는 LLM 피드백 호출이 담당한다.
+// 옛 /analyze, /g2p 는 모두 삭제. canonical / alignment / errors / per / score 는 LLM step / retry 호출이
+// 동일 응답에서 함께 만든다 — 모델 서버는 perceived 만 돌려준다.
 @Component
 public class ModelServerClient {
 

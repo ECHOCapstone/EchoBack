@@ -54,13 +54,12 @@ public class DailyChallenge {
     @Column(name = "deactivated_at")
     private Instant deactivatedAt;
 
-    // LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON.
+    // 챌린지 생성 시점에 LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON.
+    // 모든 사용자가 같은 정답으로 채점되어야 랭킹이 공정하므로 챌린지는 user-lock 이 아니라
+    // 챌린지 엔티티에 한 번만 저장한다. NULL 이면 채점이 거부된다 (legacy / 생성 실패 직후 상태).
+    // 포맷: [{"word":"...","phonemes":[...]}].
     @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
     private String canonicalCachedJson;
-
-    // 1 = legacy g2p (없음), 2 = LLM 생성본.
-    @Column(name = "canonical_version", nullable = false)
-    private int canonicalVersion = 1;
 
     private DailyChallenge(String targetText, String koreanTranslation) {
         this.targetText = targetText;
@@ -92,11 +91,6 @@ public class DailyChallenge {
         this.deactivatedAt = null;
     }
 
-    public void applyCanonicalCache(String json) {
-        this.canonicalCachedJson = (json == null || json.isBlank()) ? null : json;
-        this.canonicalVersion = 2;
-    }
-
     // 챌린지를 비활성 상태로 전환한다. 이미 비활성이면 종료 시각은 갱신하지 않는다 (이중 종료 방지).
     public void deactivate() {
         if (!this.active) {
@@ -104,5 +98,12 @@ public class DailyChallenge {
         }
         this.active = false;
         this.deactivatedAt = Instant.now();
+    }
+
+    // 어드민이 LlmCanonicalGenerator 로 만든 canonicalWords JSON 을 영속화한다. 빈 입력은 컬럼을
+    // NULL 로 유지해 채점 단계에서 명시적 에러로 끊는다.
+    public void applyCanonical(String canonicalJson) {
+        this.canonicalCachedJson = (canonicalJson == null || canonicalJson.isBlank())
+                ? null : canonicalJson;
     }
 }

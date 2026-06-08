@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.external.llm;
 
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,19 @@ class LlmContextSerializerTest {
         assertThat(LlmContextSerializer.list(null)).isEqualTo("(없음)");
         assertThat(LlmContextSerializer.list(List.of())).isEqualTo("(없음)");
         assertThat(LlmContextSerializer.list(List.of("HH", "AH"))).isEqualTo("HH AH");
+    }
+
+    @Test
+    @DisplayName("canonicalWords: 비어 있으면 (없음), 채워지면 단어별 라벨링")
+    void canonicalWordsRenders() {
+        assertThat(LlmContextSerializer.canonicalWords(null)).isEqualTo("(없음)");
+        assertThat(LlmContextSerializer.canonicalWords(List.of())).isEqualTo("(없음)");
+        String body = LlmContextSerializer.canonicalWords(List.of(
+                new CanonicalWord("the", List.of("DH", "IY")),
+                new CanonicalWord("event", List.of("IH", "V", "EH", "N", "T"))));
+        assertThat(body)
+                .contains("[0]").contains("the").contains("DH IY")
+                .contains("[1]").contains("event").contains("IH V EH N T");
     }
 
     @Test

@@ -7,8 +7,8 @@ import com.capstoneecho.echo_back.challenge.repository.DailyChallengeAttemptRepo
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalJson;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
@@ -25,6 +25,7 @@ import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValid
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -34,7 +35,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 // 사용자가 활성 챌린지에 발음 도전한 결과를 채점하고 저장한다.
-// 흐름은 RecordingService 와 같다: canonical 캐시 → /transcribe → LLM step 호출 → 짧은 쓰기 트랜잭션.
+// 흐름은 RecordingService 와 같다: /transcribe → LLM step 호출 (canonical 까지 한 번에) → 짧은 쓰기 트랜잭션.
 @Service
 public class ChallengeAttemptService {
 
@@ -44,7 +45,7 @@ public class ChallengeAttemptService {
     private final WavHeaderValidator wavHeaderValidator;
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
-    private final CanonicalCacheService canonicalCacheService;
+    private final CanonicalJson canonicalJson;
     private final RecordingStorage recordingStorage;
     private final PriorAttemptAssembler priorAttemptAssembler;
     private final StatsZoneProvider statsZoneProvider;
@@ -59,7 +60,7 @@ public class ChallengeAttemptService {
             WavHeaderValidator wavHeaderValidator,
             ModelServerClient modelServerClient,
             LlmClient llmClient,
-            CanonicalCacheService canonicalCacheService,
+            CanonicalJson canonicalJson,
             RecordingStorage recordingStorage,
             PriorAttemptAssembler priorAttemptAssembler,
             StatsZoneProvider statsZoneProvider,
@@ -72,7 +73,7 @@ public class ChallengeAttemptService {
         this.wavHeaderValidator = wavHeaderValidator;
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
-        this.canonicalCacheService = canonicalCacheService;
+        this.canonicalJson = canonicalJson;
         this.recordingStorage = recordingStorage;
         this.priorAttemptAssembler = priorAttemptAssembler;
         this.statsZoneProvider = statsZoneProvider;
@@ -91,23 +92,26 @@ public class ChallengeAttemptService {
         DailyChallenge challenge = challengeService.requireActive();
         ensureDailyLimit(userId);
 
-        // canonical 조회/생성 — lazy backfill. LLM 실패 시 BusinessException 으로 사용자에게 명시 노출.
-        CanonicalResult canonicalResult = canonicalCacheService.resolveForChallenge(challenge.getId());
-        List<String> canonicalPhonemes = canonicalResult.flatPhonemes();
-        String canonicalSpaceSep = String.join(" ", canonicalPhonemes);
+        // 챌린지 canonical 은 어드민 등록 시점에 영속화돼 있다. 누락된 chunk 은 채점 실패로 끊는다.
+        List<CanonicalWord> canonicalWords = canonicalJson.deserialize(challenge.getCanonicalCachedJson());
+        if (canonicalWords.isEmpty()) {
+            throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED,
+                    "챌린지 canonical 이 비어 있습니다 — 어드민 backfill 이 필요합니다");
+        }
 
-        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, canonicalSpaceSep);
+        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
 
-        // 챌린지도 step 과 동일하게 LLM 단일 호출로 alignment + score + errors 까지 받는다.
+        // Call 2 — 채점 + 피드백. canonical 은 입력으로 전달.
         LlmStepContext context = new LlmStepContext(
                 "오늘의 챌린지",
                 challenge.getTargetText(),
+                canonicalWords,
                 transcribe.perceived(),
-                canonicalPhonemes,
-                canonicalResult.words(),
                 List.of());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
+        List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
         double score = feedback.score();
+
         Double previousBest = attemptRepository.findUserBestScore(challenge.getId(), userId);
         boolean isNewBest = previousBest == null || score > previousBest;
 
@@ -138,6 +142,20 @@ public class ChallengeAttemptService {
     @Transactional(readOnly = true)
     public Double findUserBestScore(Long challengeId, Long userId) {
         return attemptRepository.findUserBestScore(challengeId, userId);
+    }
+
+    // canonicalWords 의 음소를 단어 순서대로 평탄화한다.
+    private static List<String> flattenCanonical(List<CanonicalWord> words) {
+        if (words == null || words.isEmpty()) {
+            return List.of();
+        }
+        List<String> flat = new ArrayList<>();
+        for (CanonicalWord w : words) {
+            if (w.phonemes() != null) {
+                flat.addAll(w.phonemes());
+            }
+        }
+        return flat;
     }
 
     private ChallengeAttemptResponse persistAttempt(

@@ -3,23 +3,25 @@ package com.capstoneecho.echo_back.external.llm;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import java.util.List;
 
-// 한 step 분석 시 LLM 에 전달하는 입력. 모든 리스트는 null 입력 시 빈 리스트로 정규화.
-// canonicalWords 는 LlmCanonicalGenerator 가 만든 단어별 음소 시퀀스 (alignment / wrongWords 단어 매핑 source).
-// priorAttempts 는 같은 (사용자, step) 의 이전 시도들 — 누적 피드백을 위해 LLM 이 참조한다.
+// 한 step 채점 요청 시 LLM 에 전달하는 입력. 모든 리스트는 null 입력 시 빈 리스트로 정규화.
+//   - chapterTitle  : 챕터 제목 (피드백 톤 결정에 참고).
+//   - targetText    : 원문 영어 문장.
+//   - canonicalWords: 채점에 사용할 단어별 ARPABET 시퀀스. 호출 전에 서비스 레이어가 lock 조회 /
+//                     LlmCanonicalGenerator 호출로 결정해 채워준다. 채점 LLM 은 이 값을 그대로 신뢰한다.
+//   - perceived     : 모델 서버가 돌려준 ARPABET 음소 시퀀스 (강세/SIL/SP 제거된 상태).
+//   - priorAttempts : 같은 (사용자, step) 의 이전 시도들 (오래된 순).
 public record LlmStepContext(
         String chapterTitle,
         String targetText,
-        List<String> perceived,
-        List<String> canonical,
         List<CanonicalWord> canonicalWords,
+        List<String> perceived,
         List<PriorAttempt> priorAttempts
 ) {
     public LlmStepContext {
         chapterTitle = chapterTitle == null ? "" : chapterTitle;
         targetText = targetText == null ? "" : targetText;
-        perceived = perceived == null ? List.of() : List.copyOf(perceived);
-        canonical = canonical == null ? List.of() : List.copyOf(canonical);
         canonicalWords = canonicalWords == null ? List.of() : List.copyOf(canonicalWords);
+        perceived = perceived == null ? List.of() : List.copyOf(perceived);
         priorAttempts = priorAttempts == null ? List.of() : List.copyOf(priorAttempts);
     }
 }

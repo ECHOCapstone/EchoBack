@@ -10,9 +10,6 @@ import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmComprehensiveContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
-import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
@@ -92,14 +89,15 @@ class FeedbackServiceTest {
     private LlmClient llmClient;
 
     @MockitoBean
-    private LlmCanonicalGenerator canonicalGenerator;
+    private com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator canonicalGenerator;
 
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator);
-        when(canonicalGenerator.generate(anyString()))
-                .thenReturn(new CanonicalResult(List.of(
-                        new CanonicalWord("the", List.of("HH", "AH", "L", "OW")))));
+        when(canonicalGenerator.generate(anyString(), any()))
+                .thenReturn(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult(
+                        List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
+                                "hello", List.of("HH", "AH", "L", "OW")))));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))

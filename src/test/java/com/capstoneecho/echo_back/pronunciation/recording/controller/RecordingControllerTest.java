@@ -12,11 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalCacheService;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import java.util.List;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
@@ -64,16 +60,16 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
 
     @MockitoBean private ModelServerClient modelServerClient;
     @MockitoBean private LlmClient llmClient;
-    @MockitoBean private CanonicalCacheService canonicalCacheService;
+    @MockitoBean private com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator canonicalGenerator;
     @MockitoBean private RecordingStorage recordingStorage;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(modelServerClient, llmClient, canonicalCacheService, recordingStorage);
-        CanonicalResult canonical = new CanonicalResult(List.of(
-                new CanonicalWord("hello", List.of("HH", "AH", "L", "OW"))));
-        when(canonicalCacheService.resolveForStep(anyLong())).thenReturn(canonical);
-        when(canonicalCacheService.resolveForSentence(anyLong())).thenReturn(canonical);
+        Mockito.reset(modelServerClient, llmClient, canonicalGenerator, recordingStorage);
+        when(canonicalGenerator.generate(anyString(), any()))
+                .thenReturn(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult(
+                        java.util.List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
+                                "hello", java.util.List.of("HH", "AH", "L", "OW")))));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(AnalyzeMockResponses.perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
