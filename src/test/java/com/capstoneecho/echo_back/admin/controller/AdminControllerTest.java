@@ -35,7 +35,7 @@ class AdminControllerTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/admin/me USER 권한 토큰 → 403 FORBIDDEN")
+    @DisplayName("GET /api/admin/me USER 권한 토큰 → 403 + ApiResponse(FORBIDDEN) 봉투")
     void userRoleReturns403() throws Exception {
         User user = userRepository.save(User.signup(
                 "normal", "normal@test.com", passwordEncoder.encode("Password1!"), "Normal"));
@@ -43,7 +43,9 @@ class AdminControllerTest extends AbstractControllerIntegrationTest {
                 Map.of("username", "normal", "email", "normal@test.com", "role", "USER"));
 
         mockMvc.perform(get("/api/admin/me").header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
     }
 
     @Test
