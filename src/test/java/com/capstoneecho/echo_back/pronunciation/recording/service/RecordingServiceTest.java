@@ -113,8 +113,8 @@ class RecordingServiceTest {
     }
 
     @Test
-    @DisplayName("upload 는 모델 서버 transcribe 호출 시 canonical 힌트 없이 빈 문자열을 넘긴다 — canonical 은 콘텐츠 캐시 / LlmCanonicalGenerator 로 별도 확보한다")
-    void uploadCallsTranscribeWithoutCanonicalHint() {
+    @DisplayName("upload 는 해소한 canonical 음소열을 공백으로 이어 /transcribe 에 전달한다 — FiLM 모델의 변조 조건")
+    void uploadPassesResolvedCanonicalToTranscribe() {
         Fixture f = seedScriptFlow("hello world");
 
         recordingService.upload(
@@ -123,7 +123,7 @@ class RecordingServiceTest {
                 VALID_WAV);
 
         verify(modelServerClient).transcribe(any(byte[].class),
-                org.mockito.ArgumentMatchers.eq(""));
+                org.mockito.ArgumentMatchers.eq("HH AH L OW"));
         verify(llmClient).stepFeedback(any(LlmStepContext.class));
     }
 

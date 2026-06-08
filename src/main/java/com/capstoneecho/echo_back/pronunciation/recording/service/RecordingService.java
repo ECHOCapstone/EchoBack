@@ -9,7 +9,7 @@ import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
-import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
+import com.capstoneecho.echo_back.external.modelserver.PhonemeRecognizer;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
@@ -34,7 +34,6 @@ import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStora
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +58,7 @@ public class RecordingService {
     private final SessionSentenceRepository sentenceRepository;
     private final RecordingRepository recordingRepository;
     private final RecordingStorage recordingStorage;
-    private final ModelServerClient modelServerClient;
+    private final PhonemeRecognizer phonemeRecognizer;
     private final LlmClient llmClient;
     private final LlmCanonicalGenerator canonicalGenerator;
     private final CanonicalJson canonicalJson;
@@ -82,7 +81,7 @@ public class RecordingService {
             SessionSentenceRepository sentenceRepository,
             RecordingRepository recordingRepository,
             RecordingStorage recordingStorage,
-            ModelServerClient modelServerClient,
+            PhonemeRecognizer phonemeRecognizer,
             LlmClient llmClient,
             LlmCanonicalGenerator canonicalGenerator,
             CanonicalJson canonicalJson,
@@ -99,7 +98,7 @@ public class RecordingService {
         this.sentenceRepository = sentenceRepository;
         this.recordingRepository = recordingRepository;
         this.recordingStorage = recordingStorage;
-        this.modelServerClient = modelServerClient;
+        this.phonemeRecognizer = phonemeRecognizer;
         this.llmClient = llmClient;
         this.canonicalGenerator = canonicalGenerator;
         this.canonicalJson = canonicalJson;
@@ -115,11 +114,11 @@ public class RecordingService {
 
     // 녹음 1건 업로드 흐름:
     //   (1) READ TX     — 부모 매핑/검증 + 입력 데이터 + per-content canonical 캐시 조회
-    //   (2) LAZY CANONICAL — canonical 캐시가 비어 있으면 LlmCanonicalGenerator 로 즉시 생성하고 콘텐츠에 저장
-    //   (3) MODEL HTTP  — /transcribe → perceived
-    //   (4) CALL 2      — LlmClient.stepFeedback → alignment + 한국어 피드백
-    //   (5) SCORING     — 백엔드 ScoringService.compute(alignment, errors) → 결정적 점수
-    //   (6) WRITE TX    — 오디오 디스크 저장 + Recording 영속화
+    //   (2) RECOGNIZE   — canonical 확보(캐시 없으면 즉시 생성) + /transcribe → perceived.
+    //                     모델이 canonical 을 요구하지 않으면 transcribe 와 canonical 확보를 병렬 실행
+    //   (3) CALL 2      — LlmClient.stepFeedback → alignment + 한국어 피드백
+    //   (4) SCORING     — 백엔드 ScoringService.compute(alignment, errors) → 결정적 점수
+    //   (5) WRITE TX    — 오디오 디스크 저장 + Recording 영속화
     public RecordingUploadResponse upload(
             Long userId, RecordingUploadRequest request, byte[] audioBytes) {
         if (request == null) {
@@ -147,13 +146,16 @@ public class RecordingService {
             return new PreparedInput(targetText, chapterTitle, priorAttempts, ids, cachedJson);
         });
 
-        // (2) lazy canonical 생성 — 콘텐츠 엔티티에 캐시가 없으면 즉시 만들어 채운다.
-        List<CanonicalWord> canonicalWords = resolveCanonical(mode, prepared);
+        // (2) 인식 + canonical 확보. canonical 을 요구하는 모델(FiLM)은 canonical 을 먼저 만들어 변조
+        //     조건으로 주입하고, 그렇지 않은 모델은 /transcribe 를 canonical 확보와 병렬 실행한다.
+        //     lazy canonical: 콘텐츠 캐시가 비면 resolveCanonical 이 즉시 생성해 콘텐츠에 채운다.
+        PhonemeRecognizer.Recognized recognized =
+                phonemeRecognizer.recognize(audioBytes, () -> resolveCanonical(mode, prepared));
+        TranscribeResult transcribe = recognized.transcribe();
+        List<CanonicalWord> canonicalWords = recognized.canonicalWords();
+        List<String> canonicalPhonemes = recognized.canonicalPhonemes();
 
-        // (3) 모델 서버 /transcribe.
-        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
-
-        // (4) Call 2 — 채점 + 피드백.
+        // (3) Call 2 — 채점 + 피드백.
         LlmStepContext context = new LlmStepContext(
                 prepared.chapterTitle(),
                 prepared.targetText(),
@@ -162,11 +164,10 @@ public class RecordingService {
                 prepared.priorAttempts());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
 
-        // (5) 백엔드 결정적 점수.
+        // (4) 백엔드 결정적 점수.
         int stepScore = scoringService.compute(feedback.alignment(), feedback.errors());
-        List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
 
-        // (6) 쓰기 단계.
+        // (5) 쓰기 단계.
         return writeTx.execute(status ->
                 persist(mode, audioBytes, prepared, canonicalWords, canonicalPhonemes,
                         transcribe, (double) stepScore, feedback));
@@ -248,19 +249,6 @@ public class RecordingService {
                 transcribe.speechRate(),
                 canonicalWords,
                 passThreshold);
-    }
-
-    private static List<String> flattenCanonical(List<CanonicalWord> words) {
-        if (words == null || words.isEmpty()) {
-            return List.of();
-        }
-        List<String> flat = new ArrayList<>();
-        for (CanonicalWord w : words) {
-            if (w.phonemes() != null) {
-                flat.addAll(w.phonemes());
-            }
-        }
-        return flat;
     }
 
     private record PreparedInput(
