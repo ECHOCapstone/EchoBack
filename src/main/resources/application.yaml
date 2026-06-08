@@ -106,9 +106,11 @@ app:
     allowed-origins:
       - "http://localhost:3000"
       - "http://localhost:5173"
+      - "https://hufs-echo.com"
     # 와일드카드 패턴 (Cloudflare Tunnel 임시 도메인 등). 와일드카드는 allowed-origins 가 아닌
     # allowed-origin-patterns 에 두어야 Spring 이 정규식으로 매칭한다.
     allowed-origin-patterns:
+      - "https://*.hufs-echo.com"
       - "https://*.trycloudflare.com"
       - "https://*.loca.lt"
       - "https://*.ngrok-free.app"

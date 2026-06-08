@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.capstoneecho.echo_back.admin.dto.AdminStepRequest;
 import com.capstoneecho.echo_back.admin.dto.ScriptCreateRequest;
 import com.capstoneecho.echo_back.admin.service.AdminScriptService;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptDetailResponse;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.StepKind;
@@ -18,10 +21,15 @@ import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
 import com.capstoneecho.echo_back.support.AbstractAdminControllerIntegrationTest;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @Transactional
 class AdminScriptControllerTest extends AbstractAdminControllerIntegrationTest {
@@ -31,6 +39,15 @@ class AdminScriptControllerTest extends AbstractAdminControllerIntegrationTest {
 
     @Autowired
     private AdminScriptService adminScriptService;
+
+    @MockitoBean
+    private LlmCanonicalGenerator canonicalGenerator;
+
+    @BeforeEach
+    void stubCanonical() {
+        when(canonicalGenerator.generate(anyString())).thenReturn(new CanonicalResult(
+                List.of(new CanonicalWord("the", List.of("DH", "AH")))));
+    }
 
     private Track newTrack() {
         return trackRepository.save(Track.create("R 트랙", "설명", 1));

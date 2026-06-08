@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.capstoneecho.echo_back.global.jwt.JwtProvider;
+import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
 import java.io.File;
 import java.util.Map;
@@ -23,6 +25,9 @@ class TtsControllerTest extends AbstractControllerIntegrationTest {
 
     @Autowired
     private JwtProvider jwtProvider;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
     @DisplayName("POST /api/tts → 200 + audio/mpeg + non-empty MP3 with ID3 magic + REST Docs 스니펫")
@@ -62,9 +67,11 @@ class TtsControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
-    // TTS 는 인증된 사용자만 호출 가능하다. 엔드포인트가 사용자 식별자를 쓰지 않으므로 임의 userId 토큰으로 충분하다.
+    // TTS 는 인증된 사용자만 호출 가능하다. JwtAuthFilter 가 토큰의 userId 로 DB 를 조회해 검증하므로
+    // 테스트 사용자를 먼저 저장하고 그 id 로 토큰을 발급한다.
     private String bearerToken() {
-        return jwtProvider.issue(1L, Map.of("username", "tts-tester", "email", "tts@test.com"));
+        User saved = userRepository.save(User.fromOAuth2("tts" + System.nanoTime() + "@test.com", "tts-tester"));
+        return jwtProvider.issue(saved.getId(), Map.of("username", saved.getUsername(), "email", saved.getEmail()));
     }
 
     private static void assertSnippetCreated(String snippetId) {

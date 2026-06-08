@@ -56,7 +56,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class PronunciationScenarioE2ETest {
 
     private static final byte[] VALID_WAV =
-            new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E'};
+            com.capstoneecho.echo_back.support.WavFixtures.VALID_WAV;
 
     @Autowired private RecordingService recordingService;
     @Autowired private UserRepository userRepository;
@@ -116,13 +116,28 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트) → ScoringService 0점 + retryRecommended=true")
+    @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트) — alignment 비어도 errors 가 있으면 ScoringService 가 0점")
     void tc05_silentInputYieldsZeroScoreAndRetry() {
         ScriptFlowFixture f = seedScriptFlow("apple");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(silentTranscribe());
+        // 무음이면 LLM 이 canonical 전체를 DELETION 으로 잡고 errors 가 채워져야 한다는 시나리오.
+        // 4 음소 모두 DELETION 으로 마련해 base=0, penalty 누적 → 0 으로 떨어진다.
+        com.capstoneecho.echo_back.external.llm.AlignmentOp d0 = new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                AlignmentOp.ErrorType.DELETION, "AE", null, 0);
+        com.capstoneecho.echo_back.external.llm.AlignmentOp d1 = new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                AlignmentOp.ErrorType.DELETION, "P", null, 1);
+        com.capstoneecho.echo_back.external.llm.AlignmentOp d2 = new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                AlignmentOp.ErrorType.DELETION, "AH", null, 2);
+        com.capstoneecho.echo_back.external.llm.AlignmentOp d3 = new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                AlignmentOp.ErrorType.DELETION, "L", null, 3);
+        List<LlmPhonemeError> errs = List.of(
+                new LlmPhonemeError(AlignmentOp.ErrorType.DELETION, "AE", null, 0),
+                new LlmPhonemeError(AlignmentOp.ErrorType.DELETION, "P", null, 1),
+                new LlmPhonemeError(AlignmentOp.ErrorType.DELETION, "AH", null, 2),
+                new LlmPhonemeError(AlignmentOp.ErrorType.DELETION, "L", null, 3));
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(true, List.of()));
+                .thenReturn(stepLlmWithAlignment(true, List.of(d0, d1, d2, d3), errs));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -159,7 +174,7 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-09: 추천 학습 (script-flow) 점수 ≥ 75 → passed=true")
+    @DisplayName("TC-09: 추천 학습 (script-flow) errors 비면 ScoringService 100점 → passed=true")
     void tc09_scriptFlowPassesAtOrAbove75() {
         ScriptFlowFixture f = seedScriptFlow("apple");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
@@ -170,12 +185,12 @@ class PronunciationScenarioE2ETest {
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
 
-        assertThat(r.stepScore()).isEqualTo(80.0);
+        assertThat(r.stepScore()).isEqualTo(100.0);
         assertThat(r.passed()).isTrue();
     }
 
     @Test
-    @DisplayName("TC-10: 맞춤 학습 (session-sentence) 점수 ≥ 75 → passed=true")
+    @DisplayName("TC-10: 맞춤 학습 (session-sentence) errors 비면 ScoringService 100점 → passed=true")
     void tc10_sessionFlowPassesAtOrAbove75() {
         SessionFlowFixture f = seedSessionFlow("apple is red.");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
@@ -190,7 +205,7 @@ class PronunciationScenarioE2ETest {
 
         assertThat(r.sessionId()).isEqualTo(f.sessionId());
         assertThat(r.sessionSentenceId()).isEqualTo(f.sentenceId());
-        assertThat(r.stepScore()).isEqualTo(85.0);
+        assertThat(r.stepScore()).isEqualTo(100.0);
         assertThat(r.passed()).isTrue();
     }
 
@@ -223,6 +238,16 @@ class PronunciationScenarioE2ETest {
     private static LlmStepFeedback stepLlm(boolean retry, List<LlmPhonemeError> errors) {
         return new LlmStepFeedback(
                 List.of(), errors, retry, "ok",
+                PronunciationGuide.empty(),
+                List.of(), List.of(), List.of(), List.of());
+    }
+
+    private static LlmStepFeedback stepLlmWithAlignment(
+            boolean retry,
+            List<AlignmentOp> alignment,
+            List<LlmPhonemeError> errors) {
+        return new LlmStepFeedback(
+                alignment, errors, retry, "ok",
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
     }

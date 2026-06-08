@@ -55,7 +55,7 @@ app:
     secret: ${JWT_SECRET}
   cors:
     allowed-origins:
-      - ${APP_CORS_ALLOWED_ORIGIN:https://echo.example.com}
+      - ${APP_CORS_ALLOWED_ORIGIN:https://hufs-echo.com}
   model-server:
     # 운영 환경에서는 default 없이 강제 — 미설정 시 부팅 자체가 실패해 잘못된 fallback 호출을 막는다.
     base-url: ${MODEL_SERVER_BASE_URL}

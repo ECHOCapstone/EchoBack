@@ -34,13 +34,23 @@ class OAuth2LoginFailureHandlerTest {
         handler = new OAuth2LoginFailureHandler(props, pendingTokenService);
     }
 
+    // FrontendUrlResolver 가 incoming request 의 scheme + host + port 로 redirect 를 합성하므로
+    // 운영에서 X-Forwarded-Port 로 들어오는 3000 을 테스트가 동일하게 재현한다.
+    private static MockHttpServletRequest frontendRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("http");
+        request.setServerName("localhost");
+        request.setServerPort(3000);
+        return request;
+    }
+
     @Test
     @DisplayName("OAuth2AuthenticationException 의 errorCode 를 oauthError 쿼리로 실어 redirect 한다")
     void redirectsWithOauthErrorCode() throws Exception {
         OAuth2AuthenticationException ex = new OAuth2AuthenticationException(
                 new OAuth2Error("access_denied", "user canceled", null));
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletRequest request = frontendRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationFailure(request, response, ex);
@@ -56,7 +66,7 @@ class OAuth2LoginFailureHandlerTest {
         OAuth2AuthenticationException ex = new OAuth2AuthenticationException(
                 new OAuth2Error("invalid_email"));
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletRequest request = frontendRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationFailure(request, response, ex);
@@ -68,7 +78,7 @@ class OAuth2LoginFailureHandlerTest {
     @Test
     @DisplayName("OAuth2AuthenticationException 이 아닌 경우 기본 코드 oauth2_failure 를 사용한다")
     void fallsBackToDefaultCodeForNonOAuth2Exception() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletRequest request = frontendRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationFailure(request, response, new BadCredentialsException("nope"));

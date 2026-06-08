@@ -150,7 +150,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.perceived[0]").value("HH"))
                 .andExpect(jsonPath("$.data.canonical").isArray())
                 .andExpect(jsonPath("$.data.canonical[0]").value("HH"))
-                .andExpect(jsonPath("$.data.score").value(85.0))
+                .andExpect(jsonPath("$.data.score").value(100.0))
                 .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty())
                 .andExpect(jsonPath("$.data.id").doesNotExist())
                 .andExpect(jsonPath("$.data.accuracy").doesNotExist())
@@ -170,9 +170,28 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                                 user, script, "RetryScriptWrong", 60.0, "AH", "water", "old")));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(TranscribeMockResponses.misalignedTranscribe());
+        // ScoringService 가 errors 가 비면 100 으로 단축하므로, score<100 시나리오를 위해 1건의 SUBSTITUTION 을
+        // 명시한다. alignment 는 4 음소 중 3 MATCH + 1 SUBSTITUTION → 베이스 75. 약점 외 음소라 페널티 0 → 75.
+        com.capstoneecho.echo_back.external.llm.AlignmentOp m0 =
+                new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                        com.capstoneecho.echo_back.external.llm.AlignmentOp.ErrorType.MATCH, "HH", "HH", 0);
+        com.capstoneecho.echo_back.external.llm.AlignmentOp m1 =
+                new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                        com.capstoneecho.echo_back.external.llm.AlignmentOp.ErrorType.MATCH, "AH", "AH", 1);
+        com.capstoneecho.echo_back.external.llm.AlignmentOp m2 =
+                new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                        com.capstoneecho.echo_back.external.llm.AlignmentOp.ErrorType.MATCH, "L", "L", 2);
+        com.capstoneecho.echo_back.external.llm.AlignmentOp sub =
+                new com.capstoneecho.echo_back.external.llm.AlignmentOp(
+                        com.capstoneecho.echo_back.external.llm.AlignmentOp.ErrorType.SUBSTITUTION, "OW", "K", 3);
+        com.capstoneecho.echo_back.external.llm.LlmPhonemeError err =
+                new com.capstoneecho.echo_back.external.llm.LlmPhonemeError(
+                        com.capstoneecho.echo_back.external.llm.AlignmentOp.ErrorType.SUBSTITUTION, "OW", "K", 3);
+
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.LlmRetryFeedback(
-                        java.util.List.of(), java.util.List.of(),
+                        java.util.List.of(m0, m1, m2, sub),
+                        java.util.List.of(err),
                         false, true, "둥글게 발음해 보세요.",
                         com.capstoneecho.echo_back.external.llm.PronunciationGuide.empty(),
                         java.util.List.of()));

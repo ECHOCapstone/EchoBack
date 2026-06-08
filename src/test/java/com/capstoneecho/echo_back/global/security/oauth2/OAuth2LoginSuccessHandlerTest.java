@@ -64,12 +64,22 @@ class OAuth2LoginSuccessHandlerTest {
         );
     }
 
+    // FrontendUrlResolver 가 incoming request 의 scheme + host + port 로 redirect 를 합성한다.
+    // 운영 흐름 (Cloudflare Tunnel → X-Forwarded-Port=3000) 을 테스트에서 재현.
+    private static MockHttpServletRequest frontendRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("http");
+        request.setServerName("localhost");
+        request.setServerPort(3000);
+        return request;
+    }
+
     @Test
     @DisplayName("성공 시 JWT 를 fragment 로 실어 frontendRedirectUri 로 302 redirect 한다")
     void issuesJwtAndRedirectsToFrontendWithFragment() throws Exception {
         when(jwtProvider.issue(eq(42L), any())).thenReturn("fake-jwt-value");
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletRequest request = frontendRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(request, response, token(42L, "alice@gmail.com", "alice@gmail.com"));
@@ -95,7 +105,7 @@ class OAuth2LoginSuccessHandlerTest {
                 "google"
         );
 
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletRequest request = frontendRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         assertThatThrownBy(() ->
