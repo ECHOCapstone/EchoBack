@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.capstoneecho.echo_back.global.content.PersistableContentStore;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,5 +73,26 @@ class PromptCatalogTest {
         reloaded.reset("system");
         assertThat(reloaded.get("system").overridden()).isFalse();
         assertThat(reloaded.raw("system")).contains("아학편");
+    }
+
+    @Test
+    @DisplayName("hot-reload: 오버라이드 파일을 직접 수정/삭제하면 재시작 없이 즉시 반영된다")
+    void hotReloadsOverrideFileEdits() throws Exception {
+        Path promptsDir = contentDir.resolve("prompts");
+        Files.createDirectories(promptsDir);
+        Path file = promptsDir.resolve("system.md");
+
+        // 1) 구동 후 파일을 직접 생성 → 다음 사용에서 즉시 반영
+        Files.writeString(file, "손편집 V1");
+        assertThat(catalog.raw("system")).isEqualTo("손편집 V1");
+
+        // 2) 직접 수정 (mtime 을 명시적으로 올려 파일시스템 해상도와 무관하게 변경 감지)
+        Files.writeString(file, "손편집 V2");
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 5000));
+        assertThat(catalog.raw("system")).isEqualTo("손편집 V2");
+
+        // 3) 파일 삭제 → 기본값으로 복원
+        Files.delete(file);
+        assertThat(catalog.raw("system")).contains("아학편");
     }
 }

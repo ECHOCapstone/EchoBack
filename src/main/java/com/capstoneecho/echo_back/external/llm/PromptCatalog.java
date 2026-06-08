@@ -53,6 +53,9 @@ public class PromptCatalog implements PersistableSeed {
     // 부팅 시 디스크에 발견됐으나 알려진 키가 아닌 .md 파일들. 어드민 응답에 노출해 운영자가
     // 의도된 편집인지 확인할 수 있게 한다.
     private final List<String> unknownOverrideKeys;
+    // 활성 오버라이드 파일의 마지막 반영 mtime (key→millis). raw()/view() 가 파일 변경을 감지해
+    // 재시작 없이 즉시 다시 읽도록 하는 hot-reload 기준값이다.
+    private final Map<String, Long> overrideMtime = new ConcurrentHashMap<>();
 
     public PromptCatalog(
             @Value("${app.content.dir}") String contentDir,
@@ -81,6 +84,7 @@ public class PromptCatalog implements PersistableSeed {
                 String key = name.substring(0, name.length() - 3);
                 if (defaults.containsKey(key)) {
                     effective.put(key, readFile(file));
+                    overrideMtime.put(key, mtimeMillis(file));
                 } else {
                     log.warn("Unknown prompt override file ignored: {} (key={} not in defaults {})",
                             file, key, defaults.keySet());
@@ -99,6 +103,7 @@ public class PromptCatalog implements PersistableSeed {
     }
 
     public String raw(String key) {
+        refreshOverride(key);
         String template = effective.get(key);
         if (template == null) {
             throw new IllegalArgumentException("prompt key not found: " + key);
@@ -185,6 +190,7 @@ public class PromptCatalog implements PersistableSeed {
     }
 
     private PromptView view(String key) {
+        refreshOverride(key);
         String content = effective.get(key);
         return new PromptView(key, content, !content.equals(defaults.get(key)));
     }
@@ -207,6 +213,39 @@ public class PromptCatalog implements PersistableSeed {
 
     private void deleteFile(String key) {
         contentStore.delete(SeedFileLocations.PROMPTS_DIR + "/" + key + ".md");
+    }
+
+    // data/content/prompts/<key>.md 를 손으로 수정/삭제해도 재시작 없이 즉시 반영한다.
+    // 파일 mtime 이 마지막 반영분과 다르면 다시 읽어 effective 를 갱신하고, 파일이 사라졌으면 기본값으로 되돌린다.
+    // (어드민 API 편집은 파일+메모리를 함께 바꾸므로, 그 다음 호출에서 같은 내용을 한 번 더 읽을 뿐 부작용은 없다.)
+    private void refreshOverride(String key) {
+        if (!defaults.containsKey(key)) {
+            return;
+        }
+        Path file = overrideDir.resolve(key + ".md");
+        try {
+            if (Files.isRegularFile(file)) {
+                long mtime = Files.getLastModifiedTime(file).toMillis();
+                Long seen = overrideMtime.get(key);
+                if (seen == null || seen != mtime) {
+                    effective.put(key, Files.readString(file, StandardCharsets.UTF_8));
+                    overrideMtime.put(key, mtime);
+                }
+            } else if (overrideMtime.remove(key) != null) {
+                effective.put(key, defaults.get(key));
+            }
+        } catch (IOException e) {
+            // 파일시스템 일시 오류는 무시하고 현재 메모리 값을 유지해 LLM 호출이 끊기지 않게 한다.
+            log.warn("프롬프트 오버라이드 갱신 확인 실패 (key={}): {}", key, e.toString());
+        }
+    }
+
+    private static long mtimeMillis(Path file) {
+        try {
+            return Files.getLastModifiedTime(file).toMillis();
+        } catch (IOException e) {
+            return 0L;  // 알 수 없으면 0 — 다음 raw()/view() 에서 변경으로 보고 다시 읽는다.
+        }
     }
 
     private static String readFile(Path file) {
