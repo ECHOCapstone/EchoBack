@@ -9,12 +9,10 @@ import com.capstoneecho.echo_back.external.llm.LlmRetryContext;
 import com.capstoneecho.echo_back.external.llm.LlmRetryFeedback;
 import com.capstoneecho.echo_back.external.llm.PracticeItem;
 import com.capstoneecho.echo_back.external.llm.PriorAttempt;
-import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
-import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
-import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
+import com.capstoneecho.echo_back.external.modelserver.PhonemeRecognizer;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
@@ -75,7 +73,7 @@ public class FeedbackService {
     private final RecordingRepository recordingRepository;
     private final FeedbackRepository feedbackRepository;
     private final RetryAttemptRepository retryAttemptRepository;
-    private final ModelServerClient modelServerClient;
+    private final PhonemeRecognizer phonemeRecognizer;
     private final LlmClient llmClient;
     private final LlmCanonicalGenerator canonicalGenerator;
     private final ScoringService scoringService;
@@ -95,7 +93,7 @@ public class FeedbackService {
             RecordingRepository recordingRepository,
             FeedbackRepository feedbackRepository,
             RetryAttemptRepository retryAttemptRepository,
-            ModelServerClient modelServerClient,
+            PhonemeRecognizer phonemeRecognizer,
             LlmClient llmClient,
             LlmCanonicalGenerator canonicalGenerator,
             ScoringService scoringService,
@@ -112,7 +110,7 @@ public class FeedbackService {
         this.recordingRepository = recordingRepository;
         this.feedbackRepository = feedbackRepository;
         this.retryAttemptRepository = retryAttemptRepository;
-        this.modelServerClient = modelServerClient;
+        this.phonemeRecognizer = phonemeRecognizer;
         this.llmClient = llmClient;
         this.canonicalGenerator = canonicalGenerator;
         this.scoringService = scoringService;
@@ -263,12 +261,14 @@ public class FeedbackService {
             return new RetryPlan(word, priorAttemptAssembler.fromRetries(recent));
         });
 
-        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
-        List<String> perceived = transcribe.perceived();
-
-        // 단어/구 즉석 재시도는 콘텐츠 캐시가 없으므로 매번 Call 1 로 canonical 을 만든다.
-        CanonicalResult generated = canonicalGenerator.generate(plan.word());
-        List<CanonicalWord> canonicalWords = generated.words();
+        // 단어/구 즉석 재시도는 콘텐츠 캐시가 없으므로 매번 canonical 을 LLM 으로 생성한다.
+        // canonical 을 요구하는 모델(FiLM)은 이를 변조 조건으로 주입하고(순차), 그렇지 않은 모델은
+        // /transcribe 를 canonical 생성과 병렬 실행한다.
+        PhonemeRecognizer.Recognized recognized = phonemeRecognizer.recognize(
+                audioBytes, () -> canonicalGenerator.generate(plan.word()).words());
+        List<CanonicalWord> canonicalWords = recognized.canonicalWords();
+        List<String> canonicalPhonemes = recognized.canonicalPhonemes();
+        List<String> perceived = recognized.transcribe().perceived();
 
         LlmRetryContext context = new LlmRetryContext(
                 plan.word(),
@@ -276,7 +276,6 @@ public class FeedbackService {
                 perceived,
                 plan.priorAttempts());
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
-        List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
         int score = scoringService.compute(llm.alignment(), llm.errors());
         boolean passed = score >= settings.passThreshold();
 
@@ -299,20 +298,6 @@ public class FeedbackService {
     }
 
     private record RetryPlan(String word, List<PriorAttempt> priorAttempts) {}
-
-    // canonicalWords 의 음소를 단어 순서대로 평탄화. 스냅샷 직렬화에 쓰인다.
-    private static List<String> flattenCanonical(List<CanonicalWord> words) {
-        if (words == null || words.isEmpty()) {
-            return List.of();
-        }
-        List<String> flat = new ArrayList<>();
-        for (CanonicalWord w : words) {
-            if (w.phonemes() != null) {
-                flat.addAll(w.phonemes());
-            }
-        }
-        return flat;
-    }
 
     private String resolveRetryWord(PronunciationFeedback feedback, String overrideWord) {
         if (overrideWord != null && !overrideWord.isBlank()) {

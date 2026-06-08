@@ -10,7 +10,7 @@ import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalJson;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.AnalysisSnapshotFormat;
-import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
+import com.capstoneecho.echo_back.external.modelserver.PhonemeRecognizer;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
@@ -26,7 +26,6 @@ import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValid
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -46,7 +45,7 @@ public class ChallengeAttemptService {
     private final DailyChallengeAttemptRepository attemptRepository;
     private final UserRepository userRepository;
     private final WavHeaderValidator wavHeaderValidator;
-    private final ModelServerClient modelServerClient;
+    private final PhonemeRecognizer phonemeRecognizer;
     private final LlmClient llmClient;
     private final CanonicalJson canonicalJson;
     private final ScoringService scoringService;
@@ -62,7 +61,7 @@ public class ChallengeAttemptService {
             DailyChallengeAttemptRepository attemptRepository,
             UserRepository userRepository,
             WavHeaderValidator wavHeaderValidator,
-            ModelServerClient modelServerClient,
+            PhonemeRecognizer phonemeRecognizer,
             LlmClient llmClient,
             CanonicalJson canonicalJson,
             ScoringService scoringService,
@@ -76,7 +75,7 @@ public class ChallengeAttemptService {
         this.attemptRepository = attemptRepository;
         this.userRepository = userRepository;
         this.wavHeaderValidator = wavHeaderValidator;
-        this.modelServerClient = modelServerClient;
+        this.phonemeRecognizer = phonemeRecognizer;
         this.llmClient = llmClient;
         this.canonicalJson = canonicalJson;
         this.scoringService = scoringService;
@@ -104,10 +103,14 @@ public class ChallengeAttemptService {
             throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED,
                     "챌린지 canonical 이 비어 있습니다 — 어드민 backfill 이 필요합니다");
         }
+        // Call 1 — 인식. canonical 을 요구하는 모델(FiLM)에만 변조 조건으로 주입하고, 그렇지 않은
+        // 모델은 /transcribe 를 병렬 실행한다. 챌린지 canonical 은 이미 확보돼 있다.
+        PhonemeRecognizer.Recognized recognized =
+                phonemeRecognizer.recognize(audioBytes, () -> canonicalWords);
+        TranscribeResult transcribe = recognized.transcribe();
+        List<String> canonicalPhonemes = recognized.canonicalPhonemes();
 
-        TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
-
-        // Call 2 — 채점 + 피드백. canonical 은 입력으로 전달.
+        // Call 2 — 채점 + 피드백. canonical 단어열을 LLM 컨텍스트로 전달.
         LlmStepContext context = new LlmStepContext(
                 "오늘의 챌린지",
                 challenge.getTargetText(),
@@ -115,7 +118,6 @@ public class ChallengeAttemptService {
                 transcribe.perceived(),
                 List.of());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
-        List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
         double score = scoringService.compute(feedback.alignment(), feedback.errors());
 
         Double previousBest = attemptRepository.findUserBestScore(challenge.getId(), userId);
@@ -148,20 +150,6 @@ public class ChallengeAttemptService {
     @Transactional(readOnly = true)
     public Double findUserBestScore(Long challengeId, Long userId) {
         return attemptRepository.findUserBestScore(challengeId, userId);
-    }
-
-    // canonicalWords 의 음소를 단어 순서대로 평탄화한다.
-    private static List<String> flattenCanonical(List<CanonicalWord> words) {
-        if (words == null || words.isEmpty()) {
-            return List.of();
-        }
-        List<String> flat = new ArrayList<>();
-        for (CanonicalWord w : words) {
-            if (w.phonemes() != null) {
-                flat.addAll(w.phonemes());
-            }
-        }
-        return flat;
     }
 
     private ChallengeAttemptResponse persistAttempt(

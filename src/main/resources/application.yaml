@@ -134,6 +134,14 @@ app:
     # 일반 채점 경로는 canonical 캐시 hit 이면 /transcribe 만 호출하지만, 캐시 miss + 첫 모델 warm-up
     # 시점에는 10초로는 잦은 타임아웃이 발생한다. 30초까지 늘려 정상 응답이 끊기지 않게 한다.
     timeout-ms: 30000
+  recognition:
+    # canonical 을 요구하지 않는 모델(baseline·slplab)에서 /transcribe 를 canonical 확보와
+    # 병렬 실행하는 전용 풀. 포화 시 호출 스레드가 직접 실행한다(CallerRunsPolicy).
+    transcribe-pool-core: 4
+    transcribe-pool-max: 16
+    transcribe-queue-capacity: 64
+    # 모델별 canonical 요구 여부(/models)를 다시 읽기까지의 캐시 수명(ms).
+    catalog-cache-ttl-ms: 5000
   llm:
     # rule-based (기본, 외부 호출 없음) | gemini (Google Generative AI 호출)
     provider: ${APP_LLM_PROVIDER:rule-based}
