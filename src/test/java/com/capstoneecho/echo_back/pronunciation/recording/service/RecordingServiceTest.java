@@ -113,7 +113,7 @@ class RecordingServiceTest {
     }
 
     @Test
-    @DisplayName("upload 는 모델 서버 호출 시 canonical 힌트 없이 빈 문자열을 넘긴다 — canonical 은 LLM 응답으로 생성된다")
+    @DisplayName("upload 는 모델 서버 transcribe 호출 시 canonical 힌트 없이 빈 문자열을 넘긴다 — canonical 은 콘텐츠 캐시 / LlmCanonicalGenerator 로 별도 확보한다")
     void uploadCallsTranscribeWithoutCanonicalHint() {
         Fixture f = seedScriptFlow("hello world");
 

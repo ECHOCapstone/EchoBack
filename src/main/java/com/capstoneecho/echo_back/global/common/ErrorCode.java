@@ -40,8 +40,8 @@ public enum ErrorCode {
     MODEL_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "모델 서버에서 오류가 발생했습니다."),
     MODEL_SERVER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "모델 서버가 응답하지 않습니다."),
 
-    // LLM 이 canonical 음소 시퀀스를 생성하지 못한 상태. silent g2p 폴백을 의도적으로 차단해
-    // 사용자가 "the" 같은 문맥 의존 발음을 잘못된 정답과 비교하는 채점 오인지를 막는다.
+    // LLM canonical 생성 실패. silent fallback 을 의도적으로 차단해 사용자가 "the" 같은 문맥 의존
+    // 발음을 잘못된 정답과 비교하는 채점 오인지를 막는다.
     CANONICAL_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "발음 정답을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;

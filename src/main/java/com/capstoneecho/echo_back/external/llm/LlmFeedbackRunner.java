@@ -16,22 +16,19 @@ import java.util.Map;
 import java.util.Properties;
 import tools.jackson.databind.ObjectMapper;
 
-// Spring 컨텍스트 없이 Gemini generateContent 를 호출해 응답을 출력하는 CLI.
-// 세 가지 모드를 지원한다:
+// Spring 컨텍스트 없이 Gemini generateContent 를 호출해 응답을 출력하는 운영/디버깅 CLI.
+// 두 가지 모드만 지원한다:
 //   1) --prompt "<자유 텍스트>"
-//        -> 시스템 프롬프트 / 스키마 없이 평문 응답을 받는다.
-//   2) retry <word> <perceived>
-//        -> system.md + retry-feedback.md + retryFeedback() 스키마.
-//        canonical 은 LLM 이 응답에 함께 생성한다.
-//   3) step <chapterTitle> <targetText> <perceived>
-//        -> system.md + step-feedback.md + stepFeedback() 스키마.
-//        canonical 은 LLM 이 응답에 함께 생성한다.
-//   4) comprehensive <chapterTitle> <chapterContent> <overallAccuracy> <dominantWeakPhoneme>
-//        -> system.md + comprehensive-feedback.md + comprehensiveFeedback() 스키마.
-//        stepSummaries / aggregatedErrors 는 비워서 호출하므로, 모델은 챕터 메타 정보만으로 추론한다.
+//        시스템 프롬프트 / 스키마 없이 평문 응답을 받는다.
+//   2) comprehensive <chapterTitle> <chapterContent> <overallAccuracy> <dominantWeakPhoneme>
+//        system.md + comprehensive-feedback.md + comprehensiveFeedback() 스키마.
+//        stepSummaries / aggregatedErrors 를 비워서 호출하므로 챕터 메타만으로 추론한다.
+//
+// step / retry 모드는 canonical 시퀀스를 실제 데이터로 주입해야 결과가 의미를 갖는다. CLI 에서는
+// 그 흐름을 재현할 수 없어 의도적으로 노출하지 않는다 — 필요하면 단위 테스트나 운영 호출 경로를 쓴다.
 //
 // 환경 (앞에서부터 읽고, 뒤가 덮어쓴다): .env -> .env.local -> 프로세스 환경변수.
-// .env.local 에 있는 'export ' 접두사와 따옴표는 자동으로 벗겨낸다.
+// .env.local 의 'export ' 접두사와 따옴표는 자동으로 벗긴다.
 //
 // 키 매핑:
 //   GEMINI_API_KEY            (필수)
@@ -69,22 +66,6 @@ public final class LlmFeedbackRunner {
                 }
                 yield freeFormBody(args[1]);
             }
-            case "retry" -> {
-                if (args.length < 3) {
-                    printUsage();
-                    System.exit(1);
-                    yield Map.of();
-                }
-                yield retryBody(args[1], args[2]);
-            }
-            case "step" -> {
-                if (args.length < 4) {
-                    printUsage();
-                    System.exit(1);
-                    yield Map.of();
-                }
-                yield stepBody(args[1], args[2], args[3]);
-            }
             case "comprehensive" -> {
                 if (args.length < 5) {
                     printUsage();
@@ -117,26 +98,6 @@ public final class LlmFeedbackRunner {
         body.put("contents", List.of(userContent));
         body.put("generationConfig", generationConfig);
         return body;
-    }
-
-    private static Map<String, Object> retryBody(String word, String perceived) throws IOException {
-        String userPrompt = loadPrompt("retry-feedback")
-                .replace("{{word}}", word)
-                .replace("{{perceived}}", perceived)
-                .replace("{{canonicalWords}}", "(생략)")
-                .replace("{{priorAttempts}}", "(없음)");
-        return structuredBody(userPrompt, LlmJsonSchemas.retryFeedback());
-    }
-
-    private static Map<String, Object> stepBody(String chapterTitle, String targetText,
-                                                String perceived) throws IOException {
-        String userPrompt = loadPrompt("step-feedback")
-                .replace("{{chapterTitle}}", chapterTitle)
-                .replace("{{targetText}}", targetText)
-                .replace("{{perceived}}", perceived)
-                .replace("{{canonicalWords}}", "(생략)")
-                .replace("{{priorAttempts}}", "(없음)");
-        return structuredBody(userPrompt, LlmJsonSchemas.stepFeedback());
     }
 
     private static Map<String, Object> comprehensiveBody(String chapterTitle, String chapterContent,
@@ -265,14 +226,10 @@ public final class LlmFeedbackRunner {
     private static void printUsage() {
         System.err.println("Usage:");
         System.err.println("  --prompt \"<자유 텍스트>\"");
-        System.err.println("  retry         <word>          <perceived>");
-        System.err.println("  step          <chapterTitle>  <targetText>          <perceived>");
         System.err.println("  comprehensive <chapterTitle>  <chapterContent>      <overallAccuracy>     <dominantWeakPhoneme>");
         System.err.println();
         System.err.println("Examples:");
         System.err.println("  ./gradlew runLlmFeedback --args=\"--prompt '안녕이라고 답해줘'\"");
-        System.err.println("  ./gradlew runLlmFeedback --args=\"retry rabbit 'L AE B AH T'\"");
-        System.err.println("  ./gradlew runLlmFeedback --args=\"step '오늘의 인사' 'I love rabbits' 'AY L AH V L AE B AH T S'\"");
         System.err.println("  ./gradlew runLlmFeedback --args=\"comprehensive '자음 R 연습' 'R 음소가 자주 등장하는 짧은 문장 모음' 72 R\"");
     }
 }

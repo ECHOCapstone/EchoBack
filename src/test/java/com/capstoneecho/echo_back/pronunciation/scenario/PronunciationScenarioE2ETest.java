@@ -48,8 +48,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-// 백엔드 책임 분기를 명시적으로 단언한다. 모델 서버 응답 / LLM 점수를 mock 으로 주입.
-// canonical 은 LLM 응답에 함께 들어 있다 (동일 호출이 생성).
+// 백엔드 책임 분기를 명시적으로 단언한다. 흐름은 모델 서버 transcribe (Call 1) → LlmCanonicalGenerator 로
+// canonical 확보 (캐시 hit 시 호출 생략) → LlmClient.stepFeedback (Call 2) → ScoringService 가 점수와
+// passed / retryRecommended 를 결정. mock 으로는 transcribe / LLM 응답 / canonical 만 주입한다.
 @SpringBootTest
 @ActiveProfiles("test")
 class PronunciationScenarioE2ETest {
@@ -80,7 +81,7 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-01: LLM 점수 ≥ 임계 + 권고 없음 → 응답 passed=true / retryRecommended=false")
+    @DisplayName("TC-01: ScoringService 점수 ≥ 임계 + LLM 권고 없음 → 응답 passed=true / retryRecommended=false")
     void tc01_normalPronunciationIsMarkedPassed() {
         ScriptFlowFixture f = seedScriptFlow("apple");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
@@ -97,7 +98,7 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-02: 오발음 errors + LLM 재학습 권고 → 응답 retryRecommended=true / passed=false")
+    @DisplayName("TC-02: 오발음 errors + LLM 재학습 권고 → ScoringService 점수 낮춰 passed=false / retryRecommended=true")
     void tc02_misPronunciationTriggersRetryRecommendation() {
         ScriptFlowFixture f = seedScriptFlow("apple");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
@@ -115,7 +116,7 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트) → LLM 0점 + retryRecommended=true")
+    @DisplayName("TC-05: 무음 입력 (perceived 빈 리스트) → ScoringService 0점 + retryRecommended=true")
     void tc05_silentInputYieldsZeroScoreAndRetry() {
         ScriptFlowFixture f = seedScriptFlow("apple");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))

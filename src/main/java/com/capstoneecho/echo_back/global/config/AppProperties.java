@@ -120,7 +120,8 @@ public record AppProperties(
     //   completionExp / streakCap   : 챕터 완료 보상 EXP, streak 상한.
     //   dailyRecommended            : 메인 화면 "오늘의 추천 학습" 개수.
     //   weeklyTopN / weeklyWindowDays : 통계 화면의 주간 윈도 (랭킹과 무관).
-    //   passThreshold               : step 통과 여부 판정 (0~100). 어드민이 런타임에 조정 가능.
+    //   passThreshold               : step 통과 여부 판정 임계 (0~100). ScoringService 가 산출한 점수와
+    //                                 비교한다. 어드민이 런타임에 조정 가능.
     //   priorAttemptsCap            : LLM 호출에 묶는 이전 시도 최대 개수 (토큰 폭증 방지).
     public record Gamification(
             int completionExp,

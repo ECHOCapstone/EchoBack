@@ -55,8 +55,9 @@ public class DailyChallenge {
     private Instant deactivatedAt;
 
     // 챌린지 생성 시점에 LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON.
-    // 모든 사용자가 같은 정답으로 채점되어야 랭킹이 공정하므로 챌린지는 user-lock 이 아니라
-    // 챌린지 엔티티에 한 번만 저장한다. NULL 이면 채점이 거부된다 (legacy / 생성 실패 직후 상태).
+    // 모든 사용자가 동일한 정답으로 채점되어 랭킹 공정성을 유지한다 — 챌린지 엔티티에 한 번 저장하고
+    // 모든 시도가 이 캐시를 공유한다. NULL 이면 채점 시점에 즉석 생성을 시도하고, 그래도 실패하면
+    // BusinessException 으로 거절한다 (silent fallback 금지).
     // 포맷: [{"word":"...","phonemes":[...]}].
     @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
     private String canonicalCachedJson;

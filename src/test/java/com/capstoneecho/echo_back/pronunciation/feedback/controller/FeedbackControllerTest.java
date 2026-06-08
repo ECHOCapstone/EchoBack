@@ -31,7 +31,7 @@ import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepo
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
-import com.capstoneecho.echo_back.support.AnalyzeMockResponses;
+import com.capstoneecho.echo_back.support.TranscribeMockResponses;
 import com.capstoneecho.echo_back.support.WavFixtures;
 import java.io.File;
 import java.util.Map;
@@ -70,7 +70,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                         java.util.List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
                                 "hello", java.util.List.of("HH", "AH", "L", "OW")))));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.perfectTranscribe());
+                .thenReturn(TranscribeMockResponses.perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.defaultStep());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
@@ -169,7 +169,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                         PronunciationFeedback.forScript(
                                 user, script, "RetryScriptWrong", 60.0, "AH", "water", "old")));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.misalignedTranscribe());
+                .thenReturn(TranscribeMockResponses.misalignedTranscribe());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.LlmRetryFeedback(
                         java.util.List.of(), java.util.List.of(),

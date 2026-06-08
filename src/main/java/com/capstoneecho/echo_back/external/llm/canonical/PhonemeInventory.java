@@ -13,8 +13,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 // classpath:content/phoneme-inventory.json 을 로드해 ARPABET 음소의 단일 출처를 노출한다.
-// LLM step/retry 프롬프트에 동적으로 주입할 인벤토리 마크다운 테이블, ARPABET 검증을 위한 코드 Set,
-// PhonemeMismatchInspector 와 PhonemeNormalizer 가 참조할 표준 코드 집합을 같은 파일에서 제공한다.
+// 두 곳에서 사용한다:
+//   - canonical 프롬프트에 끼울 인벤토리 마크다운 테이블 (markdownTable()) — LLM 이 모르는 음소를 만들지 않게.
+//   - 모델 서버 응답 토큰의 표준 여부 판정 — PhonemeMismatchInspector 가 codes() 를 SSOT 로 참조한다.
 @Component
 public class PhonemeInventory {
 

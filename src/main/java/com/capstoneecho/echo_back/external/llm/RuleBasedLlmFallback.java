@@ -60,13 +60,6 @@ public class RuleBasedLlmFallback {
         return flat;
     }
 
-    private static int baselineScore(int matches, int canonicalSize) {
-        if (canonicalSize <= 0) {
-            return 0;
-        }
-        return roundScore(100.0 * matches / canonicalSize);
-    }
-
     private static int roundScore(double v) {
         if (v < 0) return 0;
         if (v > 100) return 100;
@@ -102,11 +95,9 @@ public class RuleBasedLlmFallback {
         List<LlmPhonemeError> errors = new ArrayList<>();
         int i = n;
         int j = m;
-        int matches = 0;
         while (i > 0 || j > 0) {
             if (i > 0 && j > 0 && equalsPhoneme(c.get(i - 1), p.get(j - 1))) {
                 ops.add(0, new AlignmentOp(AlignmentOp.ErrorType.MATCH, c.get(i - 1), p.get(j - 1), i - 1));
-                matches++;
                 i--; j--;
             } else if (i > 0 && j > 0 && dp[i][j] == dp[i - 1][j - 1] + 1) {
                 ops.add(0, new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, c.get(i - 1), p.get(j - 1), i - 1));
@@ -125,7 +116,7 @@ public class RuleBasedLlmFallback {
                 j--;
             }
         }
-        return new AlignmentResult(ops, errors, matches);
+        return new AlignmentResult(ops, errors);
     }
 
     private static boolean equalsPhoneme(String a, String b) {
@@ -133,5 +124,5 @@ public class RuleBasedLlmFallback {
         return a.trim().equalsIgnoreCase(b.trim()) && !a.trim().isEmpty();
     }
 
-    record AlignmentResult(List<AlignmentOp> ops, List<LlmPhonemeError> errors, int matchCount) {}
+    record AlignmentResult(List<AlignmentOp> ops, List<LlmPhonemeError> errors) {}
 }

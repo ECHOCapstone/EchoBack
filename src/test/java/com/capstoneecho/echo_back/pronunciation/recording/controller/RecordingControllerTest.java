@@ -30,7 +30,7 @@ import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
 import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
-import com.capstoneecho.echo_back.support.AnalyzeMockResponses;
+import com.capstoneecho.echo_back.support.TranscribeMockResponses;
 import com.capstoneecho.echo_back.support.LlmMockResponses;
 import com.capstoneecho.echo_back.support.WavFixtures;
 import java.io.File;
@@ -71,7 +71,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                         java.util.List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
                                 "hello", java.util.List.of("HH", "AH", "L", "OW")))));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.perfectTranscribe());
+                .thenReturn(TranscribeMockResponses.perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.defaultStep());
         when(recordingStorage.save(anyLong(), any(byte[].class))).thenReturn("u/recordings/test.wav");
@@ -108,7 +108,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
     void scriptFlowWithErrorReturnsTypedWrongWords() throws Exception {
         ScriptFlowFixture f = seedScriptFlow("recuser1b", "water bottle");
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
-                .thenReturn(AnalyzeMockResponses.misalignedTranscribe());
+                .thenReturn(TranscribeMockResponses.misalignedTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(LlmMockResponses.stepWithWrongWord("water", 0));
         String token = issueToken(f.user());

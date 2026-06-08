@@ -128,8 +128,9 @@ app:
     max-age-sec: 3600
   model-server:
     base-url: "http://localhost:8001"
-    # 모델 서버는 g2p + audio analyze + LLM 호출이 한 요청에 묶여 처리되므로 10초로는 첫 호출 시 모델
-    # warm-up 직후 타임아웃이 자주 발생한다. 30초까지 늘려 정상 응답이 끊기지 않게 한다.
+    # 모델 서버는 /g2p (canonical 시드용) 와 /transcribe (오디오 → ARPABET) 두 엔드포인트를 노출한다.
+    # 일반 채점 경로는 canonical 캐시 hit 이면 /transcribe 만 호출하지만, 캐시 miss + 첫 모델 warm-up
+    # 시점에는 10초로는 잦은 타임아웃이 발생한다. 30초까지 늘려 정상 응답이 끊기지 않게 한다.
     timeout-ms: 30000
   llm:
     # rule-based (기본, 외부 호출 없음) | gemini (Google Generative AI 호출)
@@ -181,7 +182,8 @@ app:
     # 통계 화면에서 사용하는 주간 윈도 일수 / 상위 노출 개수. 챌린지 랭킹과는 무관하다.
     weekly-top-n: 5
     weekly-window-days: 7
-    # 단어 / 문장 통과 점수 임계. LLM 이 결정성 있게 0~100 점수를 돌려주고, 이 값 이상이면 통과.
+    # 단어 / 문장 통과 점수 임계. ScoringService 가 alignment 와 약점 음소 정책으로 0~100 점수를
+    # 산출하고, 이 값 이상이면 통과로 판정한다.
     pass-threshold: 75.0
     prior-attempts-cap: 10
     default-practice-word: "the"

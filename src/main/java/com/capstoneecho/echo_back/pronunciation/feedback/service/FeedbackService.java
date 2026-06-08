@@ -194,7 +194,8 @@ public class FeedbackService {
         return retryWord(userId, feedbackId, audioBytes, null);
     }
 
-    // 단어/구 재시도. canonical 은 LLM 응답으로 동일 호출에서 만들어진다.
+    // 단어/구 재시도. canonical 은 매 호출마다 LlmCanonicalGenerator.generate(word) 로 즉석 생성한다
+    // (단어 단위 콘텐츠 캐시 없음). 이후 LlmClient.retryFeedback 호출과 ScoringService 채점이 이어진다.
     public RetryWordResult retryWord(
             Long userId, Long feedbackId, byte[] audioBytes, String overrideWord) {
         wavHeaderValidator.require(audioBytes);

@@ -52,9 +52,8 @@ comprehensive feedback을 생성할 때, 만약 한글 음차 열에 단어 발�
 
 
 
-## 평가 기준
+## 출력 책임 범위
 
-- `score`: 0~100. PER (phoneme error rate) 와 약점 음소 빈도를 함께 본다. **퍼펙트는 96 이상에만**.
-- `retryRecommended`: 점수가 통과 임계 미만이거나, 핵심 음소를 반복적으로 틀린 경우 `true`.
-- `correct` (재시도 단계): 핵심 약점 음소가 모두 교정됐고 점수가 통과 임계 이상이면 `true`.
+- LLM 은 정렬 결과 (`alignment`) 와 한국어 피드백 (`guidanceKr`, `summaryKr`, `phonemeTips`, `nextPracticeItems` 등) 만 작성한다.
+- 점수 (`score`), 통과 / 재시도 여부는 백엔드 ScoringService 가 alignment 와 약점 음소 정책으로 계산한다 — 프롬프트 출력에는 포함하지 않는다.
 - `nextPracticeItems` (종합 단계): 챕터 약점에 맞춰 단어 / 구 / 문장을 섞어 3~5개 추천한다.

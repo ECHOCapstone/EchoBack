@@ -36,7 +36,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 // 사용자가 활성 챌린지에 발음 도전한 결과를 채점하고 저장한다.
-// 흐름은 RecordingService 와 같다: /transcribe → LLM step 호출 (canonical 까지 한 번에) → 짧은 쓰기 트랜잭션.
+// 흐름은 RecordingService 와 같다: /transcribe (Call 1) → 챌린지 엔티티에 캐시된 canonical 로드
+// (cache miss 면 즉석 LlmCanonicalGenerator 호출) → LlmClient.stepFeedback (Call 2) → ScoringService 가
+// 점수 / passed / retryRecommended 산출 → 짧은 쓰기 트랜잭션.
 @Service
 public class ChallengeAttemptService {
 

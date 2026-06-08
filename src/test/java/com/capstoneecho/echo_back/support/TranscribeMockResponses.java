@@ -4,8 +4,8 @@ import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import java.util.List;
 
-// RecordingController / Service 테스트에서 재사용하는 ModelServerClient mock 응답 모음.
-public final class AnalyzeMockResponses {
+// RecordingController / Service 테스트에서 재사용하는 ModelServerClient.transcribe mock 응답 모음.
+public final class TranscribeMockResponses {
 
     public static TranscribeResult perfectTranscribe() {
         return new TranscribeResult(
@@ -29,6 +29,6 @@ public final class AnalyzeMockResponses {
                 "echo");
     }
 
-    private AnalyzeMockResponses() {
+    private TranscribeMockResponses() {
     }
 }

@@ -6,10 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
+import com.capstoneecho.echo_back.external.llm.canonical.PhonemeInventory;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
+import tools.jackson.databind.ObjectMapper;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
@@ -80,7 +82,8 @@ class ModelServerClientTest {
                 null, null, null, null, null, null, null);
         return new ModelServerClient(
                 restClient, props, settings,
-                new PhonemeNormalizer(), new PhonemeMismatchInspector());
+                new PhonemeNormalizer(),
+                new PhonemeMismatchInspector(new PhonemeInventory(new ObjectMapper())));
     }
 
     private static void respondJson(HttpExchange exchange, int status, String json) throws IOException {
