@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.external.modelserver;
 
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
@@ -11,7 +12,9 @@ import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.settings.SettingsService;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpEntity;
@@ -24,11 +27,13 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-// 모델 서버의 새 contract:
+// 모델 서버 contract:
 //   POST /transcribe (multipart: audio, canonical, model?, keep_silence?)
 //     -> { perceived, peak_softmax, duration_sec, speech_rate, speech_rate_ratio, model_id, model_type }
-// 옛 /analyze, /g2p 는 모두 삭제. canonical / alignment / errors / per / score 는 LLM step / retry 호출이
-// 동일 응답에서 함께 만든다 — 모델 서버는 perceived 만 돌려준다.
+//   POST /g2p (application/json: { text })
+//     -> { words: [{ word, phonemes: [...] }] }
+// /g2p 는 CMU 기반 결정적 baseline canonical 을 돌려준다. 강세 strip + 39 productive 인벤토리 정규화는
+// 모델 서버 책임. 백엔드는 이 baseline 을 LLM refine 단계의 입력으로 흘려보낸다.
 @Component
 public class ModelServerClient {
 
@@ -108,6 +113,44 @@ public class ModelServerClient {
         return List.of(canonical.trim().split("\\s+"));
     }
 
+    // CMU 기반 baseline canonical 을 단어 단위로 받는다. 강세는 제거된 상태, 음소는 39 productive 인벤토리
+    // 안의 코드 (모델 서버 책임). text 가 비면 빈 리스트를 돌려준다 — 호출 측이 generate 단축 분기에서 처리한다.
+    public List<CanonicalWord> g2p(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        String url = appProperties.modelServer().baseUrl() + "/g2p";
+        G2pWire wire;
+        try {
+            wire = restClient.post()
+                    .uri(url)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("text", text))
+                    .retrieve()
+                    .body(G2pWire.class);
+        } catch (ResourceAccessException ex) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+        } catch (RestClientResponseException ex) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+        }
+        if (wire == null || wire.words() == null || wire.words().isEmpty()) {
+            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, "empty /g2p response");
+        }
+        return toCanonicalWords(wire.words());
+    }
+
+    // wire 항목을 CanonicalWord 로 옮긴다. word 가 비거나 phonemes 가 비어도 항목은 보존해
+    // 호출 측 (LLM refine) 이 단어 위치 정보를 그대로 사용할 수 있게 한다.
+    private static List<CanonicalWord> toCanonicalWords(List<G2pWord> wireWords) {
+        List<CanonicalWord> out = new ArrayList<>(wireWords.size());
+        for (G2pWord w : wireWords) {
+            String word = w.word() == null ? "" : w.word();
+            List<String> phonemes = w.phonemes() == null ? List.of() : List.copyOf(w.phonemes());
+            out.add(new CanonicalWord(word, phonemes));
+        }
+        return out;
+    }
+
     // 선택 가능한 음소인식 모델 후보 + 활성 모델 (모델 서버 /models).
     public ModelCatalog models() {
         String url = appProperties.modelServer().baseUrl() + "/models";
@@ -175,4 +218,11 @@ public class ModelServerClient {
             @JsonAlias("model_id") String modelId,
             @JsonAlias("model_type") String modelType
     ) {}
+
+    // /g2p 응답 wire 포맷.
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record G2pWire(List<G2pWord> words) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record G2pWord(String word, List<String> phonemes) {}
 }

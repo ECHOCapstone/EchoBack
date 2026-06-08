@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
@@ -22,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -180,6 +182,90 @@ class ModelServerClientTest {
 
         assertThat(capturedBody.get()).contains("name=\"keep_silence\"");
         assertThat(capturedBody.get()).contains("true");
+    }
+
+    @Test
+    @DisplayName("g2p 는 JSON {text} 를 보내고 words[] 를 CanonicalWord 로 매핑한다")
+    void g2pPostsJsonAndMapsCanonicalWords() {
+        AtomicReference<String> capturedBody = new AtomicReference<>();
+        AtomicReference<String> capturedContentType = new AtomicReference<>();
+        server.createContext("/g2p", exchange -> {
+            capturedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            capturedContentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+            respondJson(exchange, 200,
+                    "{\"words\":["
+                            + "{\"word\":\"the\",\"phonemes\":[\"DH\",\"AH\"]},"
+                            + "{\"word\":\"event\",\"phonemes\":[\"IH\",\"V\",\"EH\",\"N\",\"T\"]}]}");
+        });
+
+        ModelServerClient client = newClient(5000);
+        List<CanonicalWord> baseline = client.g2p("the event");
+
+        assertThat(capturedContentType.get()).contains("application/json");
+        assertThat(capturedBody.get()).contains("\"text\"").contains("the event");
+        assertThat(baseline).hasSize(2);
+        assertThat(baseline.get(0).word()).isEqualTo("the");
+        assertThat(baseline.get(0).phonemes()).containsExactly("DH", "AH");
+        assertThat(baseline.get(1).word()).isEqualTo("event");
+        assertThat(baseline.get(1).phonemes()).containsExactly("IH", "V", "EH", "N", "T");
+    }
+
+    @Test
+    @DisplayName("g2p 는 빈 text 면 /g2p 를 호출하지 않고 빈 리스트를 돌려준다")
+    void g2pSkipsWhenBlank() {
+        ModelServerClient client = newClient(5000);
+        assertThat(client.g2p("")).isEmpty();
+        assertThat(client.g2p(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("g2p 응답에 words 가 비면 MODEL_SERVER_ERROR")
+    void g2pEmptyWordsMapsToServerError() {
+        server.createContext("/g2p", exchange -> respondJson(exchange, 200, "{\"words\":[]}"));
+
+        ModelServerClient client = newClient(5000);
+        assertThatThrownBy(() -> client.g2p("hi"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getCode()).isEqualTo(ErrorCode.MODEL_SERVER_ERROR));
+    }
+
+    @Test
+    @DisplayName("g2p 5xx 는 BusinessException(MODEL_SERVER_ERROR, 502) 로 매핑된다")
+    void g2pServerErrorMapsTo502() {
+        server.createContext("/g2p", (HttpHandler) exchange -> {
+            byte[] body = "boom".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(500, body.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(body);
+            }
+        });
+
+        ModelServerClient client = newClient(5000);
+        assertThatThrownBy(() -> client.g2p("hi"))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo(ErrorCode.MODEL_SERVER_ERROR);
+                    assertThat(ex.getCode().getStatusCode()).isEqualTo(502);
+                });
+    }
+
+    @Test
+    @DisplayName("g2p 읽기 타임아웃은 BusinessException(MODEL_SERVER_UNAVAILABLE, 503) 로 매핑된다")
+    void g2pTimeoutMapsTo503() {
+        server.createContext("/g2p", exchange -> {
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            respondJson(exchange, 200, "{\"words\":[]}");
+        });
+
+        ModelServerClient client = newClient(200);
+        assertThatThrownBy(() -> client.g2p("hi"))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo(ErrorCode.MODEL_SERVER_UNAVAILABLE);
+                    assertThat(ex.getCode().getStatusCode()).isEqualTo(503);
+                });
     }
 
     @Test
