@@ -45,6 +45,8 @@ public class GeminiTranslationClient implements TranslationClient {
     private final SettingsService settings;
     private final String apiKey;
     private final String defaultModel;
+    // 어드민이 고를 수 있는 허용 모델 집합 (app.llm.gemini.models). 런타임 설정값 검증에 쓴다.
+    private final java.util.Set<String> allowedModels;
     private final boolean available;
 
     public GeminiTranslationClient(
@@ -62,6 +64,7 @@ public class GeminiTranslationClient implements TranslationClient {
         this.apiKey = key == null ? "" : key;
         this.defaultModel = (configuredModel == null || configuredModel.isBlank())
                 ? firstAllowedModel(g) : configuredModel;
+        this.allowedModels = g == null ? java.util.Set.of() : java.util.Set.copyOf(g.safeModels());
         this.available = !this.apiKey.isBlank();
 
         Duration timeout = Duration.ofMillis(timeoutMs <= 0 ? 10_000 : timeoutMs);
@@ -80,6 +83,18 @@ public class GeminiTranslationClient implements TranslationClient {
     // 모델 기본값을 허용 모델 목록의 첫 항목에서 도출한다. yaml 의 models 목록이 단일 출처.
     private static String firstAllowedModel(AppProperties.Llm.Gemini gemini) {
         return gemini == null ? "" : gemini.safeModels().stream().findFirst().orElse("");
+    }
+
+    // 활성 모델 id (어드민 런타임 설정 우선). 설정이 허용 목록에 없으면(오타·제거·중단된 모델 등)
+    // 기본값으로 폴백해 잘못된 모델 ID 하나로 번역 호출이 404 로 죽는 것을 막는다.
+    private String activeModel() {
+        String configured = settings.getOrDefault(LlmSettingKeys.GEMINI_MODEL, defaultModel);
+        if (allowedModels.isEmpty() || allowedModels.contains(configured)) {
+            return configured;
+        }
+        log.warn("설정된 Gemini 모델 '{}' 이(가) 허용 목록 {} 에 없어 기본값 '{}' 로 폴백합니다.",
+                configured, allowedModels, defaultModel);
+        return defaultModel;
     }
 
     // apiKey 가 설정돼 호출 가능한 상태인지. DispatchingTranslationClient 가 라우팅 판단에 쓴다.
@@ -139,7 +154,7 @@ public class GeminiTranslationClient implements TranslationClient {
 
     // Gemini generateContent 호출. 실패 시 null 을 돌려 호출 측이 폴백 (빈 결과) 으로 떨어진다.
     private String call(String userPrompt) {
-        String model = settings.getOrDefault(LlmSettingKeys.GEMINI_MODEL, defaultModel);
+        String model = activeModel();
         Map<String, Object> body = buildBody(userPrompt);
         try {
             GeminiResponse response = restClient.post()
