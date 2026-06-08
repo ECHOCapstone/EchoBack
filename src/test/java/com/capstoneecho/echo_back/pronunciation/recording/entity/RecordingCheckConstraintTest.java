@@ -8,13 +8,13 @@ import com.capstoneecho.echo_back.learning.script.entity.Script;
 import com.capstoneecho.echo_back.learning.session.entity.Session;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.support.DataJpaMySqlTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
-@DataJpaTest
+@DataJpaMySqlTest
 class RecordingCheckConstraintTest {
 
     @Autowired

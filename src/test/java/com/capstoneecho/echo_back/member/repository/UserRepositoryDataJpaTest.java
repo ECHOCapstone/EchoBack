@@ -3,13 +3,13 @@ package com.capstoneecho.echo_back.member.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.capstoneecho.echo_back.member.entity.User;
+import com.capstoneecho.echo_back.support.DataJpaMySqlTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 
-@DataJpaTest
+@DataJpaMySqlTest
 class UserRepositoryDataJpaTest {
 
     private static final String VALID_BCRYPT =
