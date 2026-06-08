@@ -65,6 +65,29 @@ tasks.named('test') {
     outputs.dir snippetsDir
     useJUnitPlatform()
     finalizedBy jacocoTestReport
+
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+        showStackTraces true
+    }
+
+    // 표준 출력/에러는 기본적으로 삼키되, 실패한 테스트에 한해서만 콘솔로 흘린다.
+    // (전역 showStandardStreams = true 는 통과 테스트 로그까지 쏟아져 CI 로그가 비대해지므로
+    //  테스트별 출력을 버퍼링했다가 실패 시에만 flush 한다.)
+    def perTestOutput = new java.util.concurrent.ConcurrentHashMap<String, StringBuilder>()
+    onOutput { descriptor, event ->
+        perTestOutput.computeIfAbsent(descriptor.toString()) { new StringBuilder() }
+                .append(event.message)
+    }
+    afterTest { descriptor, result ->
+        def buffered = perTestOutput.remove(descriptor.toString())
+        if (buffered != null && result.resultType == TestResult.ResultType.FAILURE) {
+            println "--- stdout/stderr: ${descriptor} ---"
+            print buffered.toString()
+            println "--- end: ${descriptor} ---"
+        }
+    }
 }
 
 // ---- JaCoCo coverage gate ------------------------------------------------
