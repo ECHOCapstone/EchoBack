@@ -40,6 +40,11 @@ public class SessionSentence {
     @Column(name = "text", nullable = false, columnDefinition = "TEXT")
     private String text;
 
+    // LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON. 모든 사용자가 같은 정답을 본다.
+    // NULL = 부팅 backfill / lazy 호출 실패 → 채점 시점에 다시 시도.
+    @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
+    private String canonicalCachedJson;
+
     private SessionSentence(Session session, int sentenceIndex, String text) {
         this.session = session;
         this.sentenceIndex = sentenceIndex;
@@ -54,5 +59,11 @@ public class SessionSentence {
             throw new IllegalArgumentException("text is required");
         }
         return new SessionSentence(session, sentenceIndex, text);
+    }
+
+    // canonical JSON 본문을 영속화한다. 빈 입력은 컬럼을 NULL 로 유지.
+    public void applyCanonical(String canonicalJson) {
+        this.canonicalCachedJson = (canonicalJson == null || canonicalJson.isBlank())
+                ? null : canonicalJson;
     }
 }

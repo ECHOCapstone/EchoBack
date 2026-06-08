@@ -94,7 +94,7 @@ class FeedbackServiceTest {
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator);
-        when(canonicalGenerator.generate(anyString(), any()))
+        when(canonicalGenerator.generate(anyString()))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult(
                         List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
                                 "hello", List.of("HH", "AH", "L", "OW")))));

@@ -20,6 +20,7 @@ import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringService;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
 import java.time.Instant;
@@ -46,6 +47,7 @@ public class ChallengeAttemptService {
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
     private final CanonicalJson canonicalJson;
+    private final ScoringService scoringService;
     private final RecordingStorage recordingStorage;
     private final PriorAttemptAssembler priorAttemptAssembler;
     private final StatsZoneProvider statsZoneProvider;
@@ -61,6 +63,7 @@ public class ChallengeAttemptService {
             ModelServerClient modelServerClient,
             LlmClient llmClient,
             CanonicalJson canonicalJson,
+            ScoringService scoringService,
             RecordingStorage recordingStorage,
             PriorAttemptAssembler priorAttemptAssembler,
             StatsZoneProvider statsZoneProvider,
@@ -74,6 +77,7 @@ public class ChallengeAttemptService {
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
         this.canonicalJson = canonicalJson;
+        this.scoringService = scoringService;
         this.recordingStorage = recordingStorage;
         this.priorAttemptAssembler = priorAttemptAssembler;
         this.statsZoneProvider = statsZoneProvider;
@@ -110,7 +114,7 @@ public class ChallengeAttemptService {
                 List.of());
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
         List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
-        double score = feedback.score();
+        double score = scoringService.compute(feedback.alignment(), feedback.errors());
 
         Double previousBest = attemptRepository.findUserBestScore(challenge.getId(), userId);
         boolean isNewBest = previousBest == null || score > previousBest;

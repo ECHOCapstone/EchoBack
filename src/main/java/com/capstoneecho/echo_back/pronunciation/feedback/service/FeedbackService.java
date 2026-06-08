@@ -37,6 +37,7 @@ import com.capstoneecho.echo_back.pronunciation.feedback.entity.RetryAttempt;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.RetryAttemptRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringService;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
@@ -68,6 +69,7 @@ public class FeedbackService {
     private final ModelServerClient modelServerClient;
     private final LlmClient llmClient;
     private final LlmCanonicalGenerator canonicalGenerator;
+    private final ScoringService scoringService;
     private final PriorAttemptAssembler priorAttemptAssembler;
     private final MemberService memberService;
     private final WavHeaderValidator wavHeaderValidator;
@@ -87,6 +89,7 @@ public class FeedbackService {
             ModelServerClient modelServerClient,
             LlmClient llmClient,
             LlmCanonicalGenerator canonicalGenerator,
+            ScoringService scoringService,
             PriorAttemptAssembler priorAttemptAssembler,
             MemberService memberService,
             WavHeaderValidator wavHeaderValidator,
@@ -103,6 +106,7 @@ public class FeedbackService {
         this.modelServerClient = modelServerClient;
         this.llmClient = llmClient;
         this.canonicalGenerator = canonicalGenerator;
+        this.scoringService = scoringService;
         this.priorAttemptAssembler = priorAttemptAssembler;
         this.memberService = memberService;
         this.wavHeaderValidator = wavHeaderValidator;
@@ -208,9 +212,8 @@ public class FeedbackService {
         TranscribeResult transcribe = modelServerClient.transcribe(audioBytes, "");
         List<String> perceived = transcribe.perceived();
 
-        // 단어/구 즉석 재시도는 lock 적용 대상이 아니므로 매번 Call 1 로 canonical 을 즉석 생성한다.
-        // perceived 는 null 로 넘겨 표준 발음을 기준으로 받는다 — 단어 단위에서는 연결 발음 반영이 의미가 적다.
-        CanonicalResult generated = canonicalGenerator.generate(plan.word(), null);
+        // 단어/구 즉석 재시도는 콘텐츠 캐시가 없으므로 매번 Call 1 로 canonical 을 만든다.
+        CanonicalResult generated = canonicalGenerator.generate(plan.word());
         List<CanonicalWord> canonicalWords = generated.words();
 
         LlmRetryContext context = new LlmRetryContext(
@@ -220,14 +223,14 @@ public class FeedbackService {
                 plan.priorAttempts());
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
         List<String> canonicalPhonemes = flattenCanonical(canonicalWords);
-        double score = llm.score();
-        // 통과 판정은 점수 임계만 본다 — RuntimeSettings.passThreshold 가 SSOT.
+        int score = scoringService.compute(llm.alignment(), llm.errors());
         boolean passed = score >= settings.passThreshold();
 
+        int finalScore = score;
         writeTx.executeWithoutResult(status -> {
             PronunciationFeedback feedback = feedbackRepository.findByIdAndUser_Id(feedbackId, userId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FEEDBACK_NOT_FOUND));
-            persistRetryAttempt(feedback, plan.word(), perceived, canonicalPhonemes, llm);
+            persistRetryAttempt(feedback, plan.word(), perceived, canonicalPhonemes, llm, finalScore);
         });
 
         return new RetryWordResult(
@@ -236,7 +239,7 @@ public class FeedbackService {
                 llm.retryRecommended(),
                 perceived,
                 canonicalPhonemes,
-                score,
+                (double) score,
                 llm.guidanceKr(),
                 llm.phonemeTips());
     }
@@ -273,14 +276,15 @@ public class FeedbackService {
             String word,
             List<String> perceived,
             List<String> canonical,
-            LlmRetryFeedback llm) {
+            LlmRetryFeedback llm,
+            int score) {
         RetryAttempt attempt = RetryAttempt.create(
                 feedback,
                 word,
                 AnalysisSnapshotFormat.joinTokens(perceived),
                 AnalysisSnapshotFormat.joinTokens(canonical),
                 priorAttemptAssembler.toErrorsJson(llm.errors()),
-                (double) llm.score(),
+                (double) score,
                 llm.guidanceKr(),
                 llm.correct());
         retryAttemptRepository.save(attempt);

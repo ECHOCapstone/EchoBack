@@ -21,10 +21,9 @@ public class RuleBasedLlmFallback {
     public LlmStepFeedback stepFeedback(LlmStepContext context) {
         List<String> canonical = flatten(context.canonicalWords());
         AlignmentResult result = align(canonical, context.perceived());
-        int score = baselineScore(result.matchCount, canonical.size());
-        boolean retry = score < settings.passThreshold();
+        boolean retry = !result.errors.isEmpty();
         return new LlmStepFeedback(
-                score, result.ops, result.errors, retry,
+                result.ops, result.errors, retry,
                 safeMessage(settings.recordingGuidanceFallback()),
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
@@ -33,10 +32,9 @@ public class RuleBasedLlmFallback {
     public LlmRetryFeedback retryFeedback(LlmRetryContext context) {
         List<String> canonical = flatten(context.canonicalWords());
         AlignmentResult result = align(canonical, context.perceived());
-        int score = baselineScore(result.matchCount, canonical.size());
-        boolean correct = score >= settings.passThreshold() && result.errors.isEmpty();
+        boolean correct = result.errors.isEmpty();
         return new LlmRetryFeedback(
-                score, result.ops, result.errors, correct, !correct,
+                result.ops, result.errors, correct, !correct,
                 safeMessage(settings.retryGuidanceFallback()),
                 PronunciationGuide.empty(), List.of());
     }

@@ -4,15 +4,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-// 한 번의 녹음 (step) 채점 결과. canonical 은 Call 1 (LlmCanonicalGenerator) 가 만들고,
-// 본 응답은 alignment / errors / score / 피드백 만 다룬다.
-//   score              : 0~100 정수 (clamp 보장). 합격선 비교의 단일 출처.
+// 한 번의 녹음 (step) 채점 결과. LLM 은 alignment 와 한국어 피드백만 책임지고,
+// 점수는 백엔드 ScoringService 가 alignment + errors 로부터 결정적으로 계산한다.
 //   alignment          : canonical ↔ perceived 정렬 시퀀스 (MATCH 포함). FE 시각화 source.
 //   errors             : alignment 에서 추출한 비-MATCH 항목.
 //   retryRecommended   : LLM 정성 판단.
 //   guidanceKr / pronunciationGuide / strengths / weaknesses / wrongWords / phonemeTips : 학습자 노출.
 public record LlmStepFeedback(
-        int score,
         List<AlignmentOp> alignment,
         List<LlmPhonemeError> errors,
         boolean retryRecommended,
@@ -26,7 +24,6 @@ public record LlmStepFeedback(
 
     @JsonCreator
     public LlmStepFeedback(
-            @JsonProperty("score") int score,
             @JsonProperty("alignment") List<AlignmentOp> alignment,
             @JsonProperty("errors") List<LlmPhonemeError> errors,
             @JsonProperty("retryRecommended") boolean retryRecommended,
@@ -36,7 +33,6 @@ public record LlmStepFeedback(
             @JsonProperty("weaknesses") List<String> weaknesses,
             @JsonProperty("wrongWords") List<WrongWord> wrongWords,
             @JsonProperty("phonemeTips") List<PhonemeTip> phonemeTips) {
-        this.score = LlmScores.clampScore(score);
         this.alignment = alignment == null ? List.of() : List.copyOf(alignment);
         this.errors = errors == null ? List.of() : List.copyOf(errors);
         this.retryRecommended = retryRecommended;

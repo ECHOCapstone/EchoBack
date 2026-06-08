@@ -18,14 +18,6 @@ canonical 음소 시퀀스와 perceived 를 정렬해 각 항목을 `{ errorType
 
 비-MATCH 항목을 errors 로 옮긴다.
 
-### score (0~100 정수)
-
-- alignment 가 전부 MATCH 이고 errors 가 비면 96~100.
-- 그 외에는 베이스 `(MATCH 수 / canonical 길이) × 100` 에서 다음을 차감:
-  - 약점 음소 (V R L TH DH F Z ZH AH AE ER) 의 SUBSTITUTION/DELETION: 각 -5
-  - INSERTION: 각 -3
-- 0~100 정수로 정리. 합격선 75.
-
 ### 한국어 피드백
 
 guidanceKr 의 첫 문장은 가장 약한 단어의 따라 읽기 한 줄:
@@ -41,4 +33,4 @@ pronunciationGuide 는 가장 두드러진 약점 단어 1개:
 - explanation: 몸으로 할 동작 1개 중심 1 문장
 - correctionTip: `"<틀린 한글>" 대신 "<맞는 한글>"처럼 + 동작 1개`
 
-retryRecommended = score < 75 이거나 같은 약점 음소가 여러 번 반복 등장하면 true.
+retryRecommended 는 errors 가 많거나 같은 약점 음소가 여러 번 반복 등장할 때 true.

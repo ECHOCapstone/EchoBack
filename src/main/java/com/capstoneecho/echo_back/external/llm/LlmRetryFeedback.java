@@ -4,10 +4,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-// 단어/구 재시도 채점 결과. canonical 은 Call 1 (LlmCanonicalGenerator) 가 만들고,
-// 본 응답은 alignment / errors / score / correct / 피드백 만 다룬다.
+// 단어/구 재시도 채점 결과. LLM 은 alignment / correct / 피드백만 책임지고,
+// 점수는 백엔드 ScoringService 가 alignment + errors 로부터 결정적으로 계산한다.
 public record LlmRetryFeedback(
-        int score,
         List<AlignmentOp> alignment,
         List<LlmPhonemeError> errors,
         boolean correct,
@@ -19,7 +18,6 @@ public record LlmRetryFeedback(
 
     @JsonCreator
     public LlmRetryFeedback(
-            @JsonProperty("score") int score,
             @JsonProperty("alignment") List<AlignmentOp> alignment,
             @JsonProperty("errors") List<LlmPhonemeError> errors,
             @JsonProperty("correct") boolean correct,
@@ -27,7 +25,6 @@ public record LlmRetryFeedback(
             @JsonProperty("guidanceKr") String guidanceKr,
             @JsonProperty("pronunciationGuide") PronunciationGuide pronunciationGuide,
             @JsonProperty("phonemeTips") List<PhonemeTip> phonemeTips) {
-        this.score = LlmScores.clampScore(score);
         this.alignment = alignment == null ? List.of() : List.copyOf(alignment);
         this.errors = errors == null ? List.of() : List.copyOf(errors);
         this.correct = correct;

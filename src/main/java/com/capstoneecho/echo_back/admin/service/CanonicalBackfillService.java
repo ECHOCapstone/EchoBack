@@ -45,7 +45,7 @@ public class CanonicalBackfillService {
         BackfillTally tally = new BackfillTally();
         for (DailyChallenge challenge : all) {
             try {
-                CanonicalResult result = generator.generate(challenge.getTargetText(), null);
+                CanonicalResult result = generator.generate(challenge.getTargetText());
                 if (result == null || result.words().isEmpty()) {
                     throw new BusinessException(
                             com.capstoneecho.echo_back.global.common.ErrorCode.CANONICAL_GENERATION_FAILED,

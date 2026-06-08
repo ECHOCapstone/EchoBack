@@ -8,8 +8,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-// CanonicalWord 리스트 ↔ JSON 변환의 단일 출처. user_canonical_locks 와 daily_challenges 의
-// canonical_cached_json 컬럼이 같은 포맷을 공유하므로 동일 직렬화 경로를 쓴다.
+// CanonicalWord 리스트 ↔ JSON 변환의 단일 출처. learning_steps / session_sentences /
+// daily_challenges 의 canonical_cached_json 컬럼이 같은 포맷을 공유한다.
 // 실패 시 BusinessException(CANONICAL_GENERATION_FAILED) — silent 폴백 금지.
 @Component
 public class CanonicalJson {

@@ -219,3 +219,15 @@ app:
     retry-guidance-fallback: "해당 단어를 한 번 더 천천히 따라 읽어 보세요."
     upload-too-large: "업로드 가능한 파일 크기를 초과했습니다."
     tts-text-required: "text 는 비어 있을 수 없습니다."
+  scoring:
+    # 한국인 학습자가 자주 틀리는 음소. SUBSTITUTION / DELETION 마다 weak-penalty 차감.
+    weak-phonemes: [V, R, L, TH, DH, F, Z, ZH, AH, AE, ER]
+    weak-penalty: 5
+    insertion-penalty: 3
+    # 약점 외 음소 SUBSTITUTION / DELETION 추가 페널티. 베이스 점수에 이미 반영되므로 보통 0.
+    regular-penalty: 0
+  canonical:
+    # 부팅 시 콘텐츠 (steps / sentences / challenges) 의 누락된 canonical 을 비동기 backfill.
+    # 시드 직후 첫 부팅 / 모델 정책 변경 직후 한 번 켜고 끄는 운영 토글.
+    bootstrap-on-startup: ${APP_CANONICAL_BOOTSTRAP:false}
+    bootstrap-page-size: 50

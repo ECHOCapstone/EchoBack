@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 // CMU 기반 baseline + Gemini refine 하이브리드 canonical 생성기.
 //   1단계 — ModelServerClient.g2p(text) 가 결정적 CMU baseline 을 돌려준다.
-//   2단계 — Gemini refine 호출이 baseline 을 문맥 의존 발음 / 학습자 연결 발음에 맞게 보정해 최종 canonical 을 만든다.
+//   2단계 — Gemini refine 호출이 baseline 을 문맥 의존 발음에 맞게 보정해 최종 canonical 을 만든다.
 // 인벤토리 외 토큰이 LLM 응답에 섞이면 1회 재시도, 그래도 있으면 BusinessException(CANONICAL_GENERATION_FAILED).
 // silent fallback 금지 — 모델 서버 /g2p 실패도, Gemini 실패도 사용자에게 명시적 에러로 노출된다.
 @Component
@@ -40,7 +40,7 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
     }
 
     @Override
-    public CanonicalResult generate(String text, List<String> perceived) {
+    public CanonicalResult generate(String text) {
         if (text == null || text.isBlank()) {
             return new CanonicalResult(List.of());
         }
@@ -51,14 +51,14 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
 
         List<CanonicalWord> baseline = modelServerClient.g2p(text);
 
-        CanonicalResult first = refine(text, baseline, perceived);
+        CanonicalResult first = refine(text, baseline);
         List<String> firstUnknown = unknownTokens(first);
         if (firstUnknown.isEmpty()) {
             return first;
         }
         log.warn("Gemini canonical refine 1차 응답에 비표준 음소 포함 unknown={} — 재시도", firstUnknown);
 
-        CanonicalResult second = refine(text, baseline, perceived);
+        CanonicalResult second = refine(text, baseline);
         List<String> secondUnknown = unknownTokens(second);
         if (secondUnknown.isEmpty()) {
             return second;
@@ -68,11 +68,10 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
                 "canonical 응답에 인벤토리 외 음소가 포함됨: " + secondUnknown);
     }
 
-    private CanonicalResult refine(String text, List<CanonicalWord> baseline, List<String> perceived) {
+    private CanonicalResult refine(String text, List<CanonicalWord> baseline) {
         String userPrompt = prompts.render(PROMPT_KEY, Map.of(
                 "text", text,
                 "baseline", renderBaseline(baseline),
-                "perceivedSection", renderPerceivedSection(perceived),
                 "inventory", inventory.markdownTable()));
         try {
             CanonicalResult result = executor.callRequired(
@@ -103,14 +102,6 @@ public class GeminiCanonicalGenerator implements LlmCanonicalGenerator {
                     String.join(" ", w.phonemes())));
         }
         return sb.toString().stripTrailing();
-    }
-
-    // perceived 가 있을 때만 학습자 발음 섹션을 채운다. 비면 빈 문자열 — PromptCatalog 가 placeholder 정리.
-    private static String renderPerceivedSection(List<String> perceived) {
-        if (perceived == null || perceived.isEmpty()) {
-            return "";
-        }
-        return "학습자가 실제로 발음한 음소: " + String.join(" ", perceived);
     }
 
     // LLM refine 응답 안의 인벤토리 외 음소 토큰. 빈 리스트면 통과.

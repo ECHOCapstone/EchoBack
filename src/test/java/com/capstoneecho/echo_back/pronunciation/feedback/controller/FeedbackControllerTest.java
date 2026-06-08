@@ -65,7 +65,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator);
-        when(canonicalGenerator.generate(anyString(), any()))
+        when(canonicalGenerator.generate(anyString()))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult(
                         java.util.List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
                                 "hello", java.util.List.of("HH", "AH", "L", "OW")))));
@@ -172,7 +172,7 @@ class FeedbackControllerTest extends AbstractControllerIntegrationTest {
                 .thenReturn(AnalyzeMockResponses.misalignedTranscribe());
         when(llmClient.retryFeedback(any(LlmRetryContext.class)))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.LlmRetryFeedback(
-                        75, java.util.List.of(), java.util.List.of(),
+                        java.util.List.of(), java.util.List.of(),
                         false, true, "둥글게 발음해 보세요.",
                         com.capstoneecho.echo_back.external.llm.PronunciationGuide.empty(),
                         java.util.List.of()));

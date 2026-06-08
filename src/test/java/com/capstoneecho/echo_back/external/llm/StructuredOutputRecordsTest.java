@@ -8,34 +8,31 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// LLM 구조화 출력에 쓰이는 record 들의 정규화 / 검증 / clamp 동작 확인.
+// LLM 구조화 출력에 쓰이는 record 들의 정규화 / 검증 동작 확인.
+// score 는 백엔드 ScoringService 가 결정하므로 LLM record 에는 더 이상 포함되지 않는다.
 class StructuredOutputRecordsTest {
 
     @Test
-    @DisplayName("LlmStepFeedback: score 는 0~100 으로 clamp, 리스트는 null-safe")
+    @DisplayName("LlmStepFeedback: 리스트는 null-safe, guidanceKr/PronunciationGuide null 도 빈 값으로 정규화")
     void stepFeedbackNormalizes() {
-        LlmStepFeedback over = new LlmStepFeedback(
-                150, null, null, true, "g", PronunciationGuide.empty(), null, null, null, null);
-        LlmStepFeedback under = new LlmStepFeedback(
-                -10, null, null, false, "g", PronunciationGuide.empty(), null, null, null, null);
-        assertThat(over.score()).isEqualTo(100);
-        assertThat(under.score()).isEqualTo(0);
-        assertThat(over.strengths()).isEmpty();
-        assertThat(over.wrongWords()).isEmpty();
-        assertThat(over.phonemeTips()).isEmpty();
-        assertThat(over.alignment()).isEmpty();
-        assertThat(over.errors()).isEmpty();
+        LlmStepFeedback f = new LlmStepFeedback(
+                null, null, true, null, null, null, null, null, null);
+        assertThat(f.alignment()).isEmpty();
+        assertThat(f.errors()).isEmpty();
+        assertThat(f.strengths()).isEmpty();
+        assertThat(f.wrongWords()).isEmpty();
+        assertThat(f.phonemeTips()).isEmpty();
+        assertThat(f.guidanceKr()).isEmpty();
     }
 
     @Test
-    @DisplayName("LlmRetryFeedback: score clamp + 빈 phonemeTips 폴백")
+    @DisplayName("LlmRetryFeedback: 리스트는 null-safe")
     void retryFeedbackNormalizes() {
         LlmRetryFeedback f = new LlmRetryFeedback(
-                200, null, null, true, false, "ok", PronunciationGuide.empty(), null);
-        assertThat(f.score()).isEqualTo(100);
-        assertThat(f.phonemeTips()).isEmpty();
+                null, null, true, false, "ok", PronunciationGuide.empty(), null);
         assertThat(f.alignment()).isEmpty();
         assertThat(f.errors()).isEmpty();
+        assertThat(f.phonemeTips()).isEmpty();
     }
 
     @Test

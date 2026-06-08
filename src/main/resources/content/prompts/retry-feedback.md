@@ -1,6 +1,6 @@
 # 재시도 평가
 
-학습자가 한 단어 (또는 짧은 구) 를 다시 따라 읽었다. canonical 은 미리 결정돼 있으니 채점만 한다.
+학습자가 한 단어 (또는 짧은 구) 를 다시 따라 읽었다. canonical 은 미리 결정돼 있으니 alignment 와 피드백만 작성한다.
 
 ## 입력
 
@@ -19,14 +19,9 @@ canonical 음소 시퀀스와 perceived 를 정렬해 각 항목을 `{ errorType
 
 비-MATCH 항목을 errors 로 옮긴다.
 
-### score (0~100 정수) + correct
+### correct + retryRecommended
 
-- alignment 가 전부 MATCH 이고 errors 가 비면 96~100.
-- 그 외에는 베이스 `(MATCH 수 / canonical 길이) × 100` 에서 다음을 차감:
-  - 약점 음소 (V R L TH DH F Z ZH AH AE ER) 의 SUBSTITUTION/DELETION: 각 -5
-  - INSERTION: 각 -3
-- 합격선 75.
-- correct = 핵심 약점 음소가 모두 교정되고 score ≥ 90 일 때 true.
+- correct = 핵심 약점 음소가 모두 교정되고 errors 가 비거나 사소한 정도일 때 true.
 - retryRecommended = correct=false 이거나 같은 음소를 반복적으로 틀린 경우 true.
 
 ### 한국어 피드백

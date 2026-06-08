@@ -73,7 +73,7 @@ class PronunciationScenarioE2ETest {
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator, recordingStorage);
-        when(canonicalGenerator.generate(anyString(), any()))
+        when(canonicalGenerator.generate(anyString()))
                 .thenReturn(new CanonicalResult(appleCanonical()));
         when(recordingStorage.save(anyLong(), any(byte[].class)))
                 .thenReturn("u/202605/test.wav");
@@ -86,7 +86,7 @@ class PronunciationScenarioE2ETest {
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(92, false, List.of()));
+                .thenReturn(stepLlm(false, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -104,7 +104,7 @@ class PronunciationScenarioE2ETest {
                 .thenReturn(perfectTranscribe());
         LlmPhonemeError err = new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "AE", "AH", 0);
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(65, true, List.of(err)));
+                .thenReturn(stepLlm(true, List.of(err)));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -121,7 +121,7 @@ class PronunciationScenarioE2ETest {
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(silentTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(0, true, List.of()));
+                .thenReturn(stepLlm(true, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -139,7 +139,7 @@ class PronunciationScenarioE2ETest {
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(70, true, List.of()));
+                .thenReturn(stepLlm(true, List.of()));
 
         recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -164,7 +164,7 @@ class PronunciationScenarioE2ETest {
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(80, false, List.of()));
+                .thenReturn(stepLlm(false, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(), new RecordingUploadRequest(f.scriptId(), f.stepId(), null, null), VALID_WAV);
@@ -180,7 +180,7 @@ class PronunciationScenarioE2ETest {
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
-                .thenReturn(stepLlm(85, false, List.of()));
+                .thenReturn(stepLlm(false, List.of()));
 
         RecordingUploadResponse r = recordingService.upload(
                 f.userId(),
@@ -219,9 +219,9 @@ class PronunciationScenarioE2ETest {
         return new SessionFlowFixture(user.getId(), saved.getId(), sentence.getId());
     }
 
-    private static LlmStepFeedback stepLlm(int score, boolean retry, List<LlmPhonemeError> errors) {
+    private static LlmStepFeedback stepLlm(boolean retry, List<LlmPhonemeError> errors) {
         return new LlmStepFeedback(
-                score, List.of(), errors, retry, "ok",
+                List.of(), errors, retry, "ok",
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
     }

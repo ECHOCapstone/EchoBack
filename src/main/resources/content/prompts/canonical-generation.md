@@ -9,8 +9,6 @@ CMU 사전 기반의 단어 단위 baseline canonical 이 함께 주어진다. �
 baseline (CMU 단어 단위):
 {{baseline}}
 
-{{perceivedSection}}
-
 ## 인벤토리
 
 {{inventory}}
@@ -19,8 +17,7 @@ baseline (CMU 단어 단위):
 
 1. baseline 의 각 단어 음소를 검토하고 문맥에 따라 보정한다 — 모음 앞 the (DH AH → DH IY), 강조 a (AH → EY), 약화된 function word 등.
 2. baseline 에 빠진 단어가 있으면 인벤토리 안의 음소로 채운다.
-3. perceived 가 함께 주어졌다면 (= 연습 첫 시도), 학습자가 자연스러운 연결 발음 (liaison / weak form / flapping T) 으로 발음한 부분은 canonical 에 반영해 학습자 스타일을 정답으로 받아준다.
-4. 출력은 baseline 과 같은 단어 순서를 유지하고, 강세 숫자 없이 베이스 코드만 사용한다.
+3. 출력은 baseline 과 같은 단어 순서를 유지하고, 강세 숫자 없이 베이스 코드만 사용한다.
 
 ## 출력
 

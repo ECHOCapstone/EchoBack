@@ -66,7 +66,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator, recordingStorage);
-        when(canonicalGenerator.generate(anyString(), any()))
+        when(canonicalGenerator.generate(anyString()))
                 .thenReturn(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult(
                         java.util.List.of(new com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord(
                                 "hello", java.util.List.of("HH", "AH", "L", "OW")))));

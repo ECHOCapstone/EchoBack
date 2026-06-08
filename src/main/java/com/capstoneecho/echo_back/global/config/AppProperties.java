@@ -21,7 +21,9 @@ public record AppProperties(
         Admin admin,
         Auth auth,
         Legal legal,
-        Member member
+        Member member,
+        Scoring scoring,
+        Canonical canonical
 ) {
 
     // 회원가입 시 강제되는 비밀번호 정책. 백엔드 validator 와 프론트 안내가 같은 출처를 공유한다.
@@ -151,4 +153,25 @@ public record AppProperties(
             String uploadTooLarge,
             String ttsTextRequired
     ) {}
+
+    // 결정적 채점 정책. ScoringService 가 이 값을 SSOT 로 본다.
+    //   weakPhonemes        : 한국인 학습자 약점 음소 (SUBSTITUTION / DELETION 마다 weakPenalty 차감).
+    //   weakPenalty         : 약점 음소 오류 1개당 -점.
+    //   insertionPenalty    : INSERTION 1개당 -점.
+    //   regularPenalty      : 약점 외 음소 SUBSTITUTION / DELETION 1개당 추가 -점 (베이스에 이미 반영되므로 보통 0).
+    public record Scoring(
+            List<String> weakPhonemes,
+            int weakPenalty,
+            int insertionPenalty,
+            int regularPenalty
+    ) {
+        public List<String> safeWeakPhonemes() {
+            return weakPhonemes == null ? List.of() : weakPhonemes;
+        }
+    }
+
+    // canonical 사전 생성 정책.
+    //   bootstrapOnStartup : 부팅 시 콘텐츠 테이블의 누락된 canonical 을 비동기로 채울지 여부.
+    //   bootstrapPageSize  : 한 페이지 처리 건수.
+    public record Canonical(boolean bootstrapOnStartup, int bootstrapPageSize) {}
 }

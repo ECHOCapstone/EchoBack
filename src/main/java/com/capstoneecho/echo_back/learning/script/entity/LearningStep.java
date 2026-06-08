@@ -39,6 +39,12 @@ public class LearningStep {
     @Column(name = "target_text", columnDefinition = "TEXT")
     private String targetText;
 
+    // LlmCanonicalGenerator 가 만든 단어별 ARPABET 시퀀스 JSON. 모든 사용자가 같은 정답을 본다.
+    // NULL = admin 저장 / 부팅 backfill 실패 → 채점 시점에 lazy 로 다시 시도.
+    // 포맷: [{"word":"...","phonemes":[...]}].
+    @Column(name = "canonical_cached_json", columnDefinition = "LONGTEXT")
+    private String canonicalCachedJson;
+
     private LearningStep(Script script, StepKind kind, String prompt, String targetText) {
         this.script = script;
         this.kind = kind;
@@ -57,6 +63,12 @@ public class LearningStep {
         requireNonBlank(prompt, "prompt");
         requireNonBlank(targetText, "targetText");
         return new LearningStep(script, StepKind.RECORD, prompt, targetText);
+    }
+
+    // canonical JSON 본문을 영속화한다. 빈 입력은 컬럼을 NULL 로 유지.
+    public void applyCanonical(String canonicalJson) {
+        this.canonicalCachedJson = (canonicalJson == null || canonicalJson.isBlank())
+                ? null : canonicalJson;
     }
 
     private static void requireScript(Script script) {

@@ -16,4 +16,7 @@ public interface DailyChallengeRepository extends JpaRepository<DailyChallenge, 
 
     // 히스토리 페이지: 활성 여부와 무관하게 최신순.
     Page<DailyChallenge> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // CanonicalBootstrapper 페이지 단위 backfill — canonical 이 비어 있는 행만.
+    Page<DailyChallenge> findByCanonicalCachedJsonIsNullOrderByIdAsc(Pageable pageable);
 }

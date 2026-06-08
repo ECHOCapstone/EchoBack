@@ -8,7 +8,7 @@ import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.llm.WrongWord;
 import java.util.List;
 
-// LlmClient mock 응답 모음. canonical 은 Call 1 이 만들고, 본 응답은 채점/피드백만 포함한다.
+// LlmClient mock 응답 모음. score 는 더 이상 LLM 출력에 포함되지 않으므로 mock 도 score 필드를 갖지 않는다.
 public final class LlmMockResponses {
 
     private LlmMockResponses() {
@@ -16,7 +16,7 @@ public final class LlmMockResponses {
 
     public static LlmStepFeedback defaultStep() {
         return new LlmStepFeedback(
-                85, List.of(), List.of(), false,
+                List.of(), List.of(), false,
                 "발음을 더 또렷하게 따라 읽어 보세요.",
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());
@@ -24,7 +24,7 @@ public final class LlmMockResponses {
 
     public static LlmStepFeedback stepWithWrongWord(String word, int index) {
         return new LlmStepFeedback(
-                70, List.of(), List.of(), true,
+                List.of(), List.of(), true,
                 "ɔ 모음을 더 둥글게 발음해 보세요.",
                 PronunciationGuide.empty(),
                 List.of(), List.of(),
@@ -34,7 +34,7 @@ public final class LlmMockResponses {
 
     public static LlmRetryFeedback defaultRetry() {
         return new LlmRetryFeedback(
-                85, List.of(), List.of(), true, false,
+                List.of(), List.of(), true, false,
                 "잘 했어요.", PronunciationGuide.empty(), List.of());
     }
 

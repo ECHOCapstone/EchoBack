@@ -77,7 +77,7 @@ class ModelServerClientTest {
                 null,
                 null,
                 null,
-                null, null, null, null, null);
+                null, null, null, null, null, null, null);
         return new ModelServerClient(
                 restClient, props, settings,
                 new PhonemeNormalizer(), new PhonemeMismatchInspector());

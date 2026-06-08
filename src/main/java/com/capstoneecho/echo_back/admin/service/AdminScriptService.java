@@ -3,6 +3,9 @@ package com.capstoneecho.echo_back.admin.service;
 import com.capstoneecho.echo_back.admin.dto.AdminStepRequest;
 import com.capstoneecho.echo_back.admin.dto.ScriptCreateRequest;
 import com.capstoneecho.echo_back.admin.dto.ScriptUpdateRequest;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalJson;
+import com.capstoneecho.echo_back.external.llm.canonical.CanonicalResult;
+import com.capstoneecho.echo_back.external.llm.canonical.LlmCanonicalGenerator;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptDetailResponse;
@@ -19,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // 트랙 챕터 스크립트의 생성 / 수정 / 삭제. 스텝은 스크립트가 소유하므로 수정 시 통째로 교체한다.
+// RECORD 스텝 저장 시 LlmCanonicalGenerator 로 canonical 을 동기 생성해 영속한다 — 실패하면
+// 스크립트 저장 자체 실패 (silent fallback 금지).
 @Service
 @Transactional
 public class AdminScriptService {
@@ -26,14 +31,20 @@ public class AdminScriptService {
     private final ScriptRepository scriptRepository;
     private final LearningStepRepository learningStepRepository;
     private final TrackRepository trackRepository;
+    private final LlmCanonicalGenerator canonicalGenerator;
+    private final CanonicalJson canonicalJson;
 
     public AdminScriptService(
             ScriptRepository scriptRepository,
             LearningStepRepository learningStepRepository,
-            TrackRepository trackRepository) {
+            TrackRepository trackRepository,
+            LlmCanonicalGenerator canonicalGenerator,
+            CanonicalJson canonicalJson) {
         this.scriptRepository = scriptRepository;
         this.learningStepRepository = learningStepRepository;
         this.trackRepository = trackRepository;
+        this.canonicalGenerator = canonicalGenerator;
+        this.canonicalJson = canonicalJson;
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +89,7 @@ public class AdminScriptService {
     }
 
     // 기존 스텝을 모두 지우고 요청 순서대로 다시 저장한다 (id 오름차순 = 학습 순서).
+    // RECORD 스텝은 저장 시점에 canonical 을 함께 채운다.
     private List<LearningStep> replaceSteps(Script script, List<AdminStepRequest> requests) {
         learningStepRepository.deleteByScript_Id(script.getId());
         List<LearningStep> steps = requests.stream()
@@ -91,8 +103,20 @@ public class AdminScriptService {
                 && (request.targetText() == null || request.targetText().isBlank())) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "RECORD 단계는 targetText 가 필요합니다.");
         }
-        return request.kind() == StepKind.RECORD
-                ? LearningStep.record(script, request.prompt(), request.targetText())
-                : LearningStep.intro(script, request.prompt());
+        if (request.kind() == StepKind.RECORD) {
+            LearningStep step = LearningStep.record(script, request.prompt(), request.targetText());
+            step.applyCanonical(buildCanonicalJson(request.targetText()));
+            return step;
+        }
+        return LearningStep.intro(script, request.prompt());
+    }
+
+    private String buildCanonicalJson(String text) {
+        CanonicalResult result = canonicalGenerator.generate(text);
+        if (result == null || result.words().isEmpty()) {
+            throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED,
+                    "스크립트 canonical 생성 실패: " + text);
+        }
+        return canonicalJson.serialize(result.words());
     }
 }

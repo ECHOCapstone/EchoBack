@@ -102,10 +102,9 @@ public class ChallengeService {
         rewardService.awardRanksForChallenge(challenge);
     }
 
-    // 챌린지 등록 시점에 표준 발음으로 canonical 을 만들어 엔티티에 채워 둔다.
-    // perceived 는 admin 입력에 없으므로 null 을 넘긴다.
+    // 챌린지 등록 시점에 canonical 을 만들어 엔티티에 채워 둔다.
     private void applyGeneratedCanonical(DailyChallenge challenge) {
-        CanonicalResult result = canonicalGenerator.generate(challenge.getTargetText(), null);
+        CanonicalResult result = canonicalGenerator.generate(challenge.getTargetText());
         if (result == null || result.words().isEmpty()) {
             throw new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED,
                     "챌린지 canonical 생성 실패");

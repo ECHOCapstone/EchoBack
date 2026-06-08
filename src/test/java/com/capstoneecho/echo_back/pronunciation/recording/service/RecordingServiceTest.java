@@ -102,7 +102,7 @@ class RecordingServiceTest {
     @BeforeEach
     void setUp() {
         Mockito.reset(modelServerClient, llmClient, canonicalGenerator, recordingStorage);
-        when(canonicalGenerator.generate(anyString(), any()))
+        when(canonicalGenerator.generate(anyString()))
                 .thenReturn(new CanonicalResult(helloCanonical()));
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(perfectTranscribe());
@@ -210,7 +210,6 @@ class RecordingServiceTest {
 
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(new LlmStepFeedback(
-                        72,
                         List.of(),
                         List.of(new LlmPhonemeError(
                                 AlignmentOp.ErrorType.SUBSTITUTION, "AO", "AH", 1)),
@@ -238,7 +237,7 @@ class RecordingServiceTest {
 
         when(llmClient.stepFeedback(any(LlmStepContext.class)))
                 .thenReturn(new LlmStepFeedback(
-                        92, List.of(), List.of(), false,
+                        List.of(), List.of(), false,
                         "좋아요.",
                         PronunciationGuide.empty(),
                         List.of(), List.of(), List.of(), List.of()));
@@ -299,7 +298,7 @@ class RecordingServiceTest {
 
     private static LlmStepFeedback defaultStepFeedback() {
         return new LlmStepFeedback(
-                85, List.of(), List.of(), false,
+                List.of(), List.of(), false,
                 "발음을 더 또렷하게 따라 읽어 보세요.",
                 PronunciationGuide.empty(),
                 List.of(), List.of(), List.of(), List.of());

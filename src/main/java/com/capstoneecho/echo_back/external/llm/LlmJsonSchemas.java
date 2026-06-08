@@ -31,7 +31,6 @@ public final class LlmJsonSchemas {
 
         return object(
                 ordered(
-                        entry("score", typedRange("integer", "0~100 점수", 0, 100)),
                         entry("alignment", array(alignmentOpItem(),
                                 "canonical ↔ perceived 정렬 시퀀스 (MATCH 포함)")),
                         entry("errors", array(phonemeErrorItem(),
@@ -43,7 +42,7 @@ public final class LlmJsonSchemas {
                         entry("weaknesses", array(typed("string", null), "보완할 점 1~3개")),
                         entry("wrongWords", array(wrongWord, "약점이 두드러진 단어 목록")),
                         entry("phonemeTips", array(phonemeTip, "약점 음소별 한국식 단서 1~3개"))),
-                List.of("score", "alignment", "errors", "retryRecommended",
+                List.of("alignment", "errors", "retryRecommended",
                         "guidanceKr", "pronunciationGuide"));
     }
 
@@ -57,7 +56,6 @@ public final class LlmJsonSchemas {
 
         return object(
                 ordered(
-                        entry("score", typedRange("integer", "0~100 점수", 0, 100)),
                         entry("alignment", array(alignmentOpItem(),
                                 "canonical ↔ perceived 정렬 시퀀스 (MATCH 포함)")),
                         entry("errors", array(phonemeErrorItem(),
@@ -67,7 +65,7 @@ public final class LlmJsonSchemas {
                         entry("guidanceKr", typed("string", "한국어 1~2 문장 피드백")),
                         entry("pronunciationGuide", pronunciationGuide()),
                         entry("phonemeTips", array(phonemeTip, "약점 음소별 단서"))),
-                List.of("score", "alignment", "errors", "correct", "retryRecommended",
+                List.of("alignment", "errors", "correct", "retryRecommended",
                         "guidanceKr", "pronunciationGuide"));
     }
 

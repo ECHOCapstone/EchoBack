@@ -50,8 +50,8 @@ class GeminiCanonicalGeneratorTest {
     }
 
     @Test
-    @DisplayName("perceived 없이 호출: /g2p baseline 을 받아 refine 한 결과를 그대로 돌려준다")
-    void generateWithoutPerceivedCallsG2pThenRefine() {
+    @DisplayName("generate(text): /g2p baseline 을 받아 refine 한 결과를 그대로 돌려준다")
+    void generateCallsG2pThenRefine() {
         List<CanonicalWord> baseline = List.of(
                 new CanonicalWord("the", List.of("DH", "AH")),
                 new CanonicalWord("event", List.of("IH", "V", "EH", "N", "T")));
@@ -62,7 +62,7 @@ class GeminiCanonicalGeneratorTest {
         when(executor.callRequired(anyString(), anyString(), any(), eq(CanonicalResult.class)))
                 .thenReturn(refined);
 
-        CanonicalResult got = generator.generate("the event", null);
+        CanonicalResult got = generator.generate("the event");
 
         assertThat(got).isEqualTo(refined);
         verify(modelServerClient, times(1)).g2p("the event");
@@ -71,25 +71,20 @@ class GeminiCanonicalGeneratorTest {
     }
 
     @Test
-    @DisplayName("perceived 와 함께 호출: refine 프롬프트에 baseline 줄과 학습자 발음 섹션이 모두 들어간다")
-    void generateWithPerceivedRendersBaselineAndPerceivedSection() {
+    @DisplayName("generate(text): refine 프롬프트에 baseline 줄이 들어간다")
+    void generateRendersBaseline() {
         List<CanonicalWord> baseline = List.of(
                 new CanonicalWord("water", List.of("W", "AO", "T", "ER")));
         when(modelServerClient.g2p("water")).thenReturn(baseline);
         CanonicalResult refined = new CanonicalResult(baseline);
         when(executor.callRequired(anyString(),
-                contains("학습자가 실제로 발음한 음소: W AO D ER"),
+                contains("water — W AO T ER"),
                 any(), eq(CanonicalResult.class)))
                 .thenReturn(refined);
 
-        CanonicalResult got = generator.generate("water", List.of("W", "AO", "D", "ER"));
+        CanonicalResult got = generator.generate("water");
 
         assertThat(got).isEqualTo(refined);
-        verify(executor, times(1))
-                .callRequired(anyString(),
-                        contains("water — W AO T ER"),
-                        any(Map.class),
-                        eq(CanonicalResult.class));
     }
 
     @Test
@@ -102,7 +97,7 @@ class GeminiCanonicalGeneratorTest {
         when(executor.callRequired(anyString(), anyString(), any(), eq(CanonicalResult.class)))
                 .thenReturn(bad);
 
-        assertThatThrownBy(() -> generator.generate("foo", null))
+        assertThatThrownBy(() -> generator.generate("foo"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.CANONICAL_GENERATION_FAILED);
@@ -116,7 +111,7 @@ class GeminiCanonicalGeneratorTest {
     void unavailableExecutorFailsFastWithoutG2p() {
         when(executor.isAvailable()).thenReturn(false);
 
-        assertThatThrownBy(() -> generator.generate("the", null))
+        assertThatThrownBy(() -> generator.generate("the"))
                 .isInstanceOf(BusinessException.class);
 
         verify(modelServerClient, times(0)).g2p(anyString());
@@ -128,7 +123,7 @@ class GeminiCanonicalGeneratorTest {
         when(modelServerClient.g2p("the")).thenThrow(
                 new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, "down"));
 
-        assertThatThrownBy(() -> generator.generate("the", null))
+        assertThatThrownBy(() -> generator.generate("the"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         ex -> assertThat(ex.getCode()).isEqualTo(ErrorCode.MODEL_SERVER_UNAVAILABLE));
         verify(executor, times(0))
@@ -138,7 +133,7 @@ class GeminiCanonicalGeneratorTest {
     @Test
     @DisplayName("빈 입력은 빈 결과를 그대로 돌려준다 (/g2p, executor 모두 호출 없음)")
     void blankInputShortCircuits() {
-        CanonicalResult got = generator.generate("  ", null);
+        CanonicalResult got = generator.generate("  ");
         assertThat(got.words()).isEmpty();
         verify(modelServerClient, times(0)).g2p(anyString());
     }

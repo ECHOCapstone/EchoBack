@@ -26,7 +26,7 @@ class AdminBootstrapTest {
                 null, null, null, null, null, null, null, null,
                 null,
                 null, null,
-                new AppProperties.Admin(bootstrapUsername, seed), null, null, null);
+                new AppProperties.Admin(bootstrapUsername, seed), null, null, null, null, null);
     }
 
     private AdminBootstrap bootstrap(String bootstrapUsername) {
@@ -179,7 +179,7 @@ class AdminBootstrapTest {
                 null, null, null, null, null, null, null, null,
                 null,
                 null, null,
-                new AppProperties.Admin("root", seed), null, null, null);
+                new AppProperties.Admin("root", seed), null, null, null, null, null);
         when(userRepository.findByUsername(eq("admin"))).thenReturn(Optional.empty());
         when(passwordEncoder.encode("secret123"))
                 .thenReturn("$2a$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV12345");

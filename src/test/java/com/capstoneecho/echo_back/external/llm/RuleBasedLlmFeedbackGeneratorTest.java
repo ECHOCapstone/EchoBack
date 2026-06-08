@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 // 규칙 기반 폴백 + LlmClient 어댑터의 안전 디폴트 동작 검증.
-// canonical 은 서비스 레이어가 context 에 넣어주므로 본 폴백은 표준 Levenshtein DP 로 alignment 를 만든다.
+// canonical 은 서비스 레이어가 context 에 넣어주므로 본 폴백은 표준 Levenshtein DP 로 alignment 만 만든다.
+// score 는 더 이상 LLM 출력에 포함되지 않으므로 본 테스트에서도 검증하지 않는다.
 class RuleBasedLlmFeedbackGeneratorTest {
 
     private static final AppProperties FIXTURE = new AppProperties(
@@ -27,17 +28,16 @@ class RuleBasedLlmFeedbackGeneratorTest {
                     "해당 단어를 한 번 더 천천히 따라 읽어 보세요.",
                     "업로드 가능한 파일 크기를 초과했습니다.",
                     "text 는 비어 있을 수 없습니다."),
-            null, null, null, null, null);
+            null, null, null, null, null, null, null);
 
-    // 오버라이드 없는 SettingsService → RuntimeSettings 가 FIXTURE 의 yaml 기본값을 그대로 돌려준다.
     private final RuntimeSettings runtimeSettings =
             new RuntimeSettings(new SettingsService(mock(AppSettingRepository.class)), FIXTURE);
     private final RuleBasedLlmFallback fallback = new RuleBasedLlmFallback(runtimeSettings);
     private final RuleBasedLlmFeedbackGenerator generator = new RuleBasedLlmFeedbackGenerator(fallback);
 
     @Test
-    @DisplayName("stepFeedback: canonical 과 perceived 가 정확히 일치하면 score=100, errors 비고, retry 없음")
-    void stepPerfectMatchYieldsFullScore() {
+    @DisplayName("stepFeedback: canonical 과 perceived 가 정확히 일치하면 errors 비고 retryRecommended=false")
+    void stepPerfectMatchYieldsNoErrors() {
         LlmStepContext context = new LlmStepContext(
                 "", "Hello",
                 List.of(new CanonicalWord("hello", List.of("HH", "AH", "L", "OW"))),
@@ -46,7 +46,6 @@ class RuleBasedLlmFeedbackGeneratorTest {
 
         LlmStepFeedback result = generator.stepFeedback(context);
 
-        assertThat(result.score()).isEqualTo(100);
         assertThat(result.errors()).isEmpty();
         assertThat(result.alignment()).hasSize(4);
         assertThat(result.retryRecommended()).isFalse();
@@ -54,7 +53,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
     }
 
     @Test
-    @DisplayName("stepFeedback: canonical 비어있고 perceived 만 있으면 모두 INSERTION + score=0 + retry 권고")
+    @DisplayName("stepFeedback: canonical 비어있고 perceived 만 있으면 모두 INSERTION + retry 권고")
     void stepEmptyCanonicalProducesInsertions() {
         LlmStepContext context = new LlmStepContext(
                 "", "",
@@ -64,7 +63,6 @@ class RuleBasedLlmFeedbackGeneratorTest {
 
         LlmStepFeedback result = generator.stepFeedback(context);
 
-        assertThat(result.score()).isZero();
         assertThat(result.alignment()).hasSize(4);
         assertThat(result.alignment())
                 .allMatch(op -> op.errorType() == AlignmentOp.ErrorType.INSERTION);
@@ -85,7 +83,6 @@ class RuleBasedLlmFeedbackGeneratorTest {
 
         LlmRetryFeedback retryResult = generator.retryFeedback(retry);
         assertThat(retryResult.guidanceKr()).isNotBlank();
-        assertThat(retryResult.score()).isEqualTo(100);
         assertThat(retryResult.correct()).isTrue();
 
         assertThat(generator.comprehensiveFeedback(comp).summaryKr()).isNotBlank();
