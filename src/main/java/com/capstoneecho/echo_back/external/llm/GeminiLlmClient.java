@@ -36,7 +36,8 @@ public class GeminiLlmClient implements LlmClient {
                 "targetText", context.targetText(),
                 "canonicalWords", LlmContextSerializer.canonicalWords(context.canonicalWords()),
                 "perceived", LlmContextSerializer.list(context.perceived()),
-                "priorAttempts", LlmContextSerializer.priorAttempts(context.priorAttempts())));
+                "priorAttempts", LlmContextSerializer.priorAttempts(context.priorAttempts()),
+                "alignment", LlmContextSerializer.alignment(context.referenceAlignment())));
         LlmStepFeedback parsed = executor.callOrNull(
                 prompts.raw("system"), userPrompt, LlmJsonSchemas.stepFeedback(), LlmStepFeedback.class);
         return parsed != null ? parsed : fallback.stepFeedback(context);
@@ -48,7 +49,8 @@ public class GeminiLlmClient implements LlmClient {
                 "word", context.word(),
                 "canonicalWords", LlmContextSerializer.canonicalWords(context.canonicalWords()),
                 "perceived", LlmContextSerializer.list(context.perceived()),
-                "priorAttempts", LlmContextSerializer.priorAttempts(context.priorAttempts())));
+                "priorAttempts", LlmContextSerializer.priorAttempts(context.priorAttempts()),
+                "alignment", LlmContextSerializer.alignment(context.referenceAlignment())));
         LlmRetryFeedback parsed = executor.callOrNull(
                 prompts.raw("system"), userPrompt, LlmJsonSchemas.retryFeedback(), LlmRetryFeedback.class);
         return parsed != null ? parsed : fallback.retryFeedback(context);

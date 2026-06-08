@@ -9,12 +9,17 @@
 - perceived: {{perceived}}
 - 이전 시도:
 {{priorAttempts}}
+- 참고 정렬 (알고리즘 결정적 정렬 — 점수 산출의 기준):
+{{alignment}}
 
 ## 작업
 
 ### alignment + errors
 
-canonical 음소 시퀀스와 perceived 를 정렬해 각 항목을 `{ errorType, canonical, perceived, canonicalIndex }` 로 표현한다. errorType ∈ { MATCH, SUBSTITUTION, INSERTION, DELETION }. INSERTION 의 canonicalIndex 는 -1. 자연스러운 미국식 연결 발음 (liaison, flapping T, weak form) 으로 보이는 항목은 MATCH 로 인정한다.
+위 **참고 정렬**을 핵심 근거로 삼아 각 항목을 `{ errorType, canonical, perceived, canonicalIndex }` 로 표현한다. errorType ∈ { MATCH, SUBSTITUTION, INSERTION, DELETION }. INSERTION 의 canonicalIndex 는 -1.
+
+- 참고 정렬의 비-MATCH(특히 약점 음소)는 **빠뜨리지 말고 반영**한다 — 학습자가 본 피드백과 화면 표시가 어긋나지 않게.
+- 다만 명백히 주변 잡음이 음소로 오인식된 군더더기(불필요한 INSERTION)는 정리할 수 있고, 자연스러운 미국식 연결 발음(liaison, flapping T, weak form)은 MATCH 로 둘 수 있다.
 
 비-MATCH 항목을 errors 로 옮긴다.
 

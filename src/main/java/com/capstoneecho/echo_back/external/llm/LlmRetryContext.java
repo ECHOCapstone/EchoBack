@@ -13,12 +13,14 @@ public record LlmRetryContext(
         String word,
         List<CanonicalWord> canonicalWords,
         List<String> perceived,
-        List<PriorAttempt> priorAttempts
+        List<PriorAttempt> priorAttempts,
+        List<AlignmentOp> referenceAlignment
 ) {
     public LlmRetryContext {
         word = word == null ? "" : word;
         canonicalWords = canonicalWords == null ? List.of() : List.copyOf(canonicalWords);
         perceived = perceived == null ? List.of() : List.copyOf(perceived);
         priorAttempts = priorAttempts == null ? List.of() : List.copyOf(priorAttempts);
+        referenceAlignment = referenceAlignment == null ? List.of() : List.copyOf(referenceAlignment);
     }
 }

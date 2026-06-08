@@ -11,12 +11,15 @@ import java.util.List;
 //                     LlmCanonicalGenerator 로 즉석 생성해 채워준다. 채점 LLM 은 이 값을 그대로 신뢰한다.
 //   - perceived     : 모델 서버가 돌려준 ARPABET 음소 시퀀스 (강세/SIL/SP 제거된 상태).
 //   - priorAttempts : 같은 (사용자, step) 의 이전 시도들 (오래된 순).
+//   - referenceAlignment : canonical↔perceived 의 결정적 정렬(PhonemeAligner). LLM 이 화면용 정렬/피드백을
+//                     만들 때 근거로 삼는다(grounding). 점수는 이 정렬에서만 계산된다.
 public record LlmStepContext(
         String chapterTitle,
         String targetText,
         List<CanonicalWord> canonicalWords,
         List<String> perceived,
-        List<PriorAttempt> priorAttempts
+        List<PriorAttempt> priorAttempts,
+        List<AlignmentOp> referenceAlignment
 ) {
     public LlmStepContext {
         chapterTitle = chapterTitle == null ? "" : chapterTitle;
@@ -24,5 +27,6 @@ public record LlmStepContext(
         canonicalWords = canonicalWords == null ? List.of() : List.copyOf(canonicalWords);
         perceived = perceived == null ? List.of() : List.copyOf(perceived);
         priorAttempts = priorAttempts == null ? List.of() : List.copyOf(priorAttempts);
+        referenceAlignment = referenceAlignment == null ? List.of() : List.copyOf(referenceAlignment);
     }
 }

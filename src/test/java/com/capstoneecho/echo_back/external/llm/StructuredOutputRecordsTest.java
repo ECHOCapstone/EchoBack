@@ -82,14 +82,15 @@ class StructuredOutputRecordsTest {
     @Test
     @DisplayName("Context records: 입력 null 은 모두 빈 값으로 정규화")
     void contextRecordsAreDefensive() {
-        LlmStepContext step = new LlmStepContext(null, null, null, null, null);
+        LlmStepContext step = new LlmStepContext(null, null, null, null, null, null);
         assertThat(step.chapterTitle()).isEmpty();
         assertThat(step.targetText()).isEmpty();
         assertThat(step.canonicalWords()).isEmpty();
         assertThat(step.perceived()).isEmpty();
         assertThat(step.priorAttempts()).isEmpty();
+        assertThat(step.referenceAlignment()).isEmpty();
 
-        LlmRetryContext retry = new LlmRetryContext(null, null, null, null);
+        LlmRetryContext retry = new LlmRetryContext(null, null, null, null, null);
         assertThat(retry.word()).isEmpty();
         assertThat(retry.canonicalWords()).isEmpty();
         assertThat(retry.perceived()).isEmpty();

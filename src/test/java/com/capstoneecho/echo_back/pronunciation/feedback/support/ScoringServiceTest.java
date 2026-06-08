@@ -3,18 +3,16 @@ package com.capstoneecho.echo_back.pronunciation.feedback.support;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.capstoneecho.echo_back.external.llm.AlignmentOp;
-import com.capstoneecho.echo_back.external.llm.LlmPhonemeError;
 import com.capstoneecho.echo_back.global.config.AppProperties;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-// ScoringService 의 결정적 점수 환산 동작을 검증한다.
-//   - errors 가 비면 100.
-//   - 약점 음소 SUBSTITUTION/DELETION -5.
-//   - INSERTION -3.
-//   - canonical 길이는 alignment 의 비-INSERTION 항목 수.
-//   - 0..100 으로 clamp.
+// ScoringService 의 결정적 점수 환산 동작을 검증한다. 입력은 결정적 정렬(AlignmentOp 리스트)뿐이며,
+// 오류는 비-MATCH 항목에서 직접 파생한다.
+//   - 오류 없으면 100.
+//   - 약점 음소 SUBSTITUTION/DELETION -5, INSERTION -3, 그 외 0.
+//   - canonical 길이는 비-INSERTION 항목 수, 점수는 0..100 clamp.
 class ScoringServiceTest {
 
     private static final AppProperties.Scoring DEFAULT_SCORING =
@@ -35,19 +33,23 @@ class ScoringServiceTest {
     }
 
     @Test
-    @DisplayName("errors 가 비면 100 점")
-    void emptyErrorsGivesFullScore() {
+    @DisplayName("전 항목 MATCH 면 100 점")
+    void allMatchGivesFullScore() {
         List<AlignmentOp> alignment = List.of(
                 match("HH", 0), match("AH", 1), match("L", 2), match("OW", 3));
-        assertThat(service.compute(alignment, List.of())).isEqualTo(100);
+        assertThat(service.compute(alignment)).isEqualTo(100);
     }
 
     @Test
-    @DisplayName("canonical 길이가 0 이면 0 점")
+    @DisplayName("정렬이 비면 0 점")
+    void emptyAlignmentGivesZero() {
+        assertThat(service.compute(List.of())).isZero();
+    }
+
+    @Test
+    @DisplayName("canonical 길이가 0(삽입만) 이면 0 점")
     void zeroCanonicalLengthGivesZero() {
-        List<LlmPhonemeError> errs = List.of(
-                new LlmPhonemeError(AlignmentOp.ErrorType.INSERTION, null, "X", -1));
-        assertThat(service.compute(List.of(insertion("X")), errs)).isZero();
+        assertThat(service.compute(List.of(insertion("X")))).isZero();
     }
 
     @Test
@@ -56,28 +58,19 @@ class ScoringServiceTest {
         List<AlignmentOp> alignment = List.of(
                 match("HH", 0), match("AH", 1), match("L", 2),
                 new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "R", "L", 3));
-        List<LlmPhonemeError> errs = List.of(
-                new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "R", "L", 3));
-
-        int score = service.compute(alignment, errs);
 
         // base = 3/4 * 100 = 75, penalty = 5 → 70
-        assertThat(score).isEqualTo(70);
+        assertThat(service.compute(alignment)).isEqualTo(70);
     }
 
     @Test
     @DisplayName("INSERTION 은 -3 페널티, canonical 길이 계산에선 무시")
     void insertionDocksThreeAndDoesNotInflateCanonicalLength() {
         List<AlignmentOp> alignment = List.of(
-                match("HH", 0), match("AH", 1),
-                insertion("X"));
-        List<LlmPhonemeError> errs = List.of(
-                new LlmPhonemeError(AlignmentOp.ErrorType.INSERTION, null, "X", -1));
-
-        int score = service.compute(alignment, errs);
+                match("HH", 0), match("AH", 1), insertion("X"));
 
         // base = 2/2 * 100 = 100, penalty = 3 → 97
-        assertThat(score).isEqualTo(97);
+        assertThat(service.compute(alignment)).isEqualTo(97);
     }
 
     @Test
@@ -86,13 +79,9 @@ class ScoringServiceTest {
         List<AlignmentOp> alignment = List.of(
                 match("HH", 0), match("AH", 1),
                 new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "K", "G", 2));
-        List<LlmPhonemeError> errs = List.of(
-                new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "K", "G", 2));
 
-        int score = service.compute(alignment, errs);
-
-        // base = 2/3 * 100 = 66.6..7 → 67, penalty = 0 → 67
-        assertThat(score).isEqualTo(67);
+        // base = 2/3 * 100 = 66.67 → 67, penalty = 0 → 67
+        assertThat(service.compute(alignment)).isEqualTo(67);
     }
 
     @Test
@@ -102,15 +91,9 @@ class ScoringServiceTest {
                 new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "R", "L", 0),
                 new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "TH", "S", 1),
                 new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "V", "B", 2));
-        List<LlmPhonemeError> errs = List.of(
-                new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "R", "L", 0),
-                new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "TH", "S", 1),
-                new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "V", "B", 2));
-
-        int score = service.compute(alignment, errs);
 
         // base = 0, penalty = 15 → max(0, -15) = 0
-        assertThat(score).isZero();
+        assertThat(service.compute(alignment)).isZero();
     }
 
     private static AlignmentOp match(String phoneme, int idx) {

@@ -4,6 +4,7 @@ import com.capstoneecho.echo_back.challenge.dto.ChallengeAttemptResponse;
 import com.capstoneecho.echo_back.challenge.entity.DailyChallenge;
 import com.capstoneecho.echo_back.challenge.entity.DailyChallengeAttempt;
 import com.capstoneecho.echo_back.challenge.repository.DailyChallengeAttemptRepository;
+import com.capstoneecho.echo_back.external.llm.AlignmentOp;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
@@ -19,6 +20,7 @@ import com.capstoneecho.echo_back.global.config.StatsZoneProvider;
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.PhonemeAligner;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringService;
 import com.capstoneecho.echo_back.pronunciation.recording.support.RecordingStorage;
@@ -109,16 +111,21 @@ public class ChallengeAttemptService {
                 phonemeRecognizer.recognize(audioBytes, () -> canonicalWords);
         TranscribeResult transcribe = recognized.transcribe();
         List<String> canonicalPhonemes = recognized.canonicalPhonemes();
+        // 결정적 정렬 — LLM grounding 입력이자 점수의 단일 출처.
+        List<AlignmentOp> referenceAlignment =
+                PhonemeAligner.align(canonicalPhonemes, transcribe.perceived());
 
-        // Call 2 — 채점 + 피드백. canonical 단어열을 LLM 컨텍스트로 전달.
+        // Call 2 — 채점 + 피드백. canonical 단어열 + 결정적 정렬(grounding)을 LLM 컨텍스트로 전달.
         LlmStepContext context = new LlmStepContext(
                 "오늘의 챌린지",
                 challenge.getTargetText(),
                 canonicalWords,
                 transcribe.perceived(),
-                List.of());
+                List.of(),
+                referenceAlignment);
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
-        double score = scoringService.compute(feedback.alignment(), feedback.errors());
+        // 점수는 결정적 정렬에서만 계산 (화면 표시는 LLM 정렬 사용).
+        double score = scoringService.compute(referenceAlignment);
 
         Double previousBest = attemptRepository.findUserBestScore(challenge.getId(), userId);
         boolean isNewBest = previousBest == null || score > previousBest;

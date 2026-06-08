@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.pronunciation.recording.service;
 
+import com.capstoneecho.echo_back.external.llm.AlignmentOp;
 import com.capstoneecho.echo_back.external.llm.LlmClient;
 import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
@@ -24,6 +25,7 @@ import com.capstoneecho.echo_back.learning.session.repository.SessionRepository;
 import com.capstoneecho.echo_back.learning.session.repository.SessionSentenceRepository;
 import com.capstoneecho.echo_back.member.entity.User;
 import com.capstoneecho.echo_back.member.repository.UserRepository;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.PhonemeAligner;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringService;
 import com.capstoneecho.echo_back.pronunciation.recording.dto.RecordingUploadRequest;
@@ -154,18 +156,22 @@ public class RecordingService {
         TranscribeResult transcribe = recognized.transcribe();
         List<CanonicalWord> canonicalWords = recognized.canonicalWords();
         List<String> canonicalPhonemes = recognized.canonicalPhonemes();
+        // 결정적 정렬 — LLM grounding 입력이자 점수의 단일 출처(화면 표시는 LLM 정렬을 쓰되 이를 근거로 둔다).
+        List<AlignmentOp> referenceAlignment =
+                PhonemeAligner.align(canonicalPhonemes, transcribe.perceived());
 
-        // (3) Call 2 — 채점 + 피드백.
+        // (3) Call 2 — 채점 + 피드백. 결정적 정렬을 근거(grounding)로 함께 feed 한다.
         LlmStepContext context = new LlmStepContext(
                 prepared.chapterTitle(),
                 prepared.targetText(),
                 canonicalWords,
                 transcribe.perceived(),
-                prepared.priorAttempts());
+                prepared.priorAttempts(),
+                referenceAlignment);
         LlmStepFeedback feedback = llmClient.stepFeedback(context);
 
-        // (4) 백엔드 결정적 점수.
-        int stepScore = scoringService.compute(feedback.alignment(), feedback.errors());
+        // (4) 백엔드 결정적 점수 — 위 결정적 정렬에서만 계산해 재현 가능하게 한다.
+        int stepScore = scoringService.compute(referenceAlignment);
 
         // (5) 쓰기 단계.
         return writeTx.execute(status ->

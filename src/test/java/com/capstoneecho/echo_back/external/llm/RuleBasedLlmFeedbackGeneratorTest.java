@@ -42,6 +42,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
                 "", "Hello",
                 List.of(new CanonicalWord("hello", List.of("HH", "AH", "L", "OW"))),
                 List.of("HH", "AH", "L", "OW"),
+                List.of(),
                 List.of());
 
         LlmStepFeedback result = generator.stepFeedback(context);
@@ -59,6 +60,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
                 "", "",
                 List.of(),
                 List.of("HH", "AH", "L", "OW"),
+                List.of(),
                 List.of());
 
         LlmStepFeedback result = generator.stepFeedback(context);
@@ -77,6 +79,7 @@ class RuleBasedLlmFeedbackGeneratorTest {
                 "the",
                 List.of(new CanonicalWord("the", List.of("DH", "AH"))),
                 List.of("DH", "AH"),
+                List.of(),
                 List.of());
         LlmComprehensiveContext comp = new LlmComprehensiveContext(
                 "", "", List.of(), List.of(), null, 75.0);

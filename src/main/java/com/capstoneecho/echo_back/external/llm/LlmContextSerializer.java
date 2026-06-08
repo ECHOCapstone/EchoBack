@@ -18,6 +18,23 @@ public final class LlmContextSerializer {
         return String.join(" ", values);
     }
 
+    // 결정적 정렬을 프롬프트에 끼울 텍스트로 직렬화한다. canonical 순서대로 한 줄씩.
+    //   [i] canonical = perceived (MATCH) / [i] canonical → perceived (SUBSTITUTION)
+    //   [i] canonical → (없음) (DELETION) / [-] (없음) → perceived (INSERTION)
+    public static String alignment(List<AlignmentOp> ops) {
+        if (ops == null || ops.isEmpty()) {
+            return "(없음)";
+        }
+        return ops.stream().map(op -> {
+            String idx = op.canonicalIndex() == null || op.canonicalIndex() < 0
+                    ? "-" : op.canonicalIndex().toString();
+            String can = nullable(op.canonical());
+            String per = nullable(op.perceived());
+            String arrow = op.errorType() == AlignmentOp.ErrorType.MATCH ? "=" : "→";
+            return String.format("  [%s] %s %s %s (%s)", idx, can, arrow, per, op.errorType().name());
+        }).collect(Collectors.joining("\n"));
+    }
+
     // 채점용 canonical 을 프롬프트 본문에 끼울 텍스트로 직렬화한다. 단어 → 음소 라벨 줄로 나열한다.
     public static String canonicalWords(List<CanonicalWord> words) {
         if (words == null || words.isEmpty()) {

@@ -26,7 +26,7 @@ class DispatchingLlmClientTest {
     }
 
     private static LlmStepContext context() {
-        return new LlmStepContext(null, null, null, null, null);
+        return new LlmStepContext(null, null, null, null, null, null);
     }
 
     @Test

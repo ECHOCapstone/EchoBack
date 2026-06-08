@@ -34,6 +34,7 @@ import com.capstoneecho.echo_back.pronunciation.feedback.entity.PronunciationFee
 import com.capstoneecho.echo_back.pronunciation.feedback.entity.RetryAttempt;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.FeedbackRepository;
 import com.capstoneecho.echo_back.pronunciation.feedback.repository.RetryAttemptRepository;
+import com.capstoneecho.echo_back.pronunciation.feedback.support.PhonemeAligner;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.PriorAttemptAssembler;
 import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringService;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
@@ -269,14 +270,18 @@ public class FeedbackService {
         List<CanonicalWord> canonicalWords = recognized.canonicalWords();
         List<String> canonicalPhonemes = recognized.canonicalPhonemes();
         List<String> perceived = recognized.transcribe().perceived();
+        // 결정적 정렬 — LLM grounding 입력이자 점수의 단일 출처.
+        List<AlignmentOp> referenceAlignment = PhonemeAligner.align(canonicalPhonemes, perceived);
 
         LlmRetryContext context = new LlmRetryContext(
                 plan.word(),
                 canonicalWords,
                 perceived,
-                plan.priorAttempts());
+                plan.priorAttempts(),
+                referenceAlignment);
         LlmRetryFeedback llm = llmClient.retryFeedback(context);
-        int score = scoringService.compute(llm.alignment(), llm.errors());
+        // 점수는 결정적 정렬에서만 계산 (화면 표시는 LLM 정렬 사용).
+        int score = scoringService.compute(referenceAlignment);
         boolean passed = score >= settings.passThreshold();
 
         int finalScore = score;

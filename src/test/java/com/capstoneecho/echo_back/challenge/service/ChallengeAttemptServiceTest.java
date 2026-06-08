@@ -179,7 +179,7 @@ class ChallengeAttemptServiceTest {
                 .thenReturn(recognized(List.of("DH", "AH", "IH", "V", "EH", "N", "T")));
         LlmStepFeedback feedback = stepFeedback(false);
         when(llmClient.stepFeedback(any(LlmStepContext.class))).thenReturn(feedback);
-        when(scoringService.compute(any(), any())).thenReturn(85);
+        when(scoringService.compute(any())).thenReturn(85);
         when(attemptRepository.findUserBestScore(eq(42L), eq(1L))).thenReturn(null);
         User u1 = user(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
@@ -192,7 +192,7 @@ class ChallengeAttemptServiceTest {
         assertThat(response.isMyNewBest()).isTrue();
         assertThat(response.attemptsLimit()).isEqualTo(5);
         assertThat(response.passThreshold()).isEqualTo(75.0);
-        verify(scoringService).compute(any(), any());
+        verify(scoringService).compute(any());
         verify(attemptRepository).save(any(DailyChallengeAttempt.class));
     }
 
@@ -206,7 +206,7 @@ class ChallengeAttemptServiceTest {
         when(phonemeRecognizer.recognize(any(byte[].class), any()))
                 .thenReturn(recognized(List.of("DH", "AH")));
         when(llmClient.stepFeedback(any(LlmStepContext.class))).thenReturn(stepFeedback(false));
-        when(scoringService.compute(any(), any())).thenReturn(70);
+        when(scoringService.compute(any())).thenReturn(70);
         when(attemptRepository.findUserBestScore(eq(42L), eq(1L))).thenReturn(90.0);
         User u1 = user(1L);
         when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
@@ -229,7 +229,7 @@ class ChallengeAttemptServiceTest {
         when(phonemeRecognizer.recognize(any(byte[].class), any()))
                 .thenReturn(recognized(List.of("DH", "AH")));
         when(llmClient.stepFeedback(any(LlmStepContext.class))).thenReturn(stepFeedback(false));
-        when(scoringService.compute(any(), any())).thenReturn(50);
+        when(scoringService.compute(any())).thenReturn(50);
         when(attemptRepository.findUserBestScore(any(), any())).thenReturn(null);
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
