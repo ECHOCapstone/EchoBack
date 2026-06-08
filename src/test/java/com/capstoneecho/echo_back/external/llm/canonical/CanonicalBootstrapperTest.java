@@ -124,6 +124,163 @@ class CanonicalBootstrapperTest {
         assertThat(challenge.getCanonicalCachedJson()).contains("the").contains("DH").contains("IY");
     }
 
+    @Test
+    @DisplayName("runAll: steps 페이지가 1개 처리 후 다음 호출에서 비면 sentences/challenges 로 진행")
+    void runAllIteratesAllThreeDomains() {
+        Script script = mock(Script.class);
+        LearningStep step = LearningStep.record(script, "say", "the");
+        // 첫 호출 = 1건 페이지, 두번째 호출 = 빈 페이지 → step pipeline 종료.
+        when(stepRepository.findByKindAndCanonicalCachedJsonIsNullOrderByIdAsc(eq(StepKind.RECORD), any()))
+                .thenReturn(new PageImpl<>(List.of(step)))
+                .thenReturn(emptyStepPage());
+        SessionSentence sentence = SessionSentenceTestFactory.create("event");
+        when(sentenceRepository.findByCanonicalCachedJsonIsNullOrderByIdAsc(any()))
+                .thenReturn(new PageImpl<>(List.of(sentence)))
+                .thenReturn(emptySentencePage());
+        DailyChallenge challenge = DailyChallenge.create("hi", "안녕");
+        when(challengeRepository.findByCanonicalCachedJsonIsNullOrderByIdAsc(any()))
+                .thenReturn(new PageImpl<>(List.of(challenge)))
+                .thenReturn(emptyChallengePage());
+
+        when(generator.generate(anyString())).thenAnswer(inv -> {
+            String text = inv.getArgument(0);
+            return new CanonicalResult(List.of(new CanonicalWord(text, List.of("X"))));
+        });
+        when(stepRepository.save(any(LearningStep.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(sentenceRepository.save(any(SessionSentence.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(challengeRepository.save(any(DailyChallenge.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        bootstrapper(true).runAll();
+
+        verify(generator, times(1)).generate("the");
+        verify(generator, times(1)).generate("event");
+        verify(generator, times(1)).generate("hi");
+        verify(stepRepository, times(2))
+                .findByKindAndCanonicalCachedJsonIsNullOrderByIdAsc(eq(StepKind.RECORD), any());
+        verify(sentenceRepository, times(2)).findByCanonicalCachedJsonIsNullOrderByIdAsc(any());
+        verify(challengeRepository, times(2)).findByCanonicalCachedJsonIsNullOrderByIdAsc(any());
+    }
+
+    @Test
+    @DisplayName("runAll: steps 첫 페이지가 전부 실패 → 다음 페이지 안 부르고 sentences/challenges 진행")
+    void runAllAbortsStepPipelineWhenWholePageFails() {
+        Script script = mock(Script.class);
+        LearningStep failing = LearningStep.record(script, "say", "boom");
+        when(stepRepository.findByKindAndCanonicalCachedJsonIsNullOrderByIdAsc(eq(StepKind.RECORD), any()))
+                .thenReturn(new PageImpl<>(List.of(failing)));
+        when(sentenceRepository.findByCanonicalCachedJsonIsNullOrderByIdAsc(any()))
+                .thenReturn(emptySentencePage());
+        when(challengeRepository.findByCanonicalCachedJsonIsNullOrderByIdAsc(any()))
+                .thenReturn(emptyChallengePage());
+
+        when(generator.generate("boom")).thenThrow(
+                new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED, "down"));
+
+        bootstrapper(true).runAll();
+
+        // steps 페이지는 1회만 조회된다 (전체 실패 후 abort).
+        verify(stepRepository, times(1))
+                .findByKindAndCanonicalCachedJsonIsNullOrderByIdAsc(eq(StepKind.RECORD), any());
+        verify(sentenceRepository, times(1)).findByCanonicalCachedJsonIsNullOrderByIdAsc(any());
+        verify(challengeRepository, times(1)).findByCanonicalCachedJsonIsNullOrderByIdAsc(any());
+    }
+
+    @Test
+    @DisplayName("persistSentencePage: 행 한 건 처리 후 entity 에 canonical JSON 이 채워진다")
+    void persistSentencePageWritesCanonical() {
+        SessionSentence sentence = SessionSentenceTestFactory.create("hello");
+        Page<SessionSentence> page = new PageImpl<>(List.of(sentence));
+
+        when(generator.generate("hello")).thenReturn(new CanonicalResult(
+                List.of(new CanonicalWord("hello", List.of("HH", "AH", "L", "OW")))));
+        when(sentenceRepository.save(any(SessionSentence.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        int success = bootstrapper(true).persistSentencePage(page);
+
+        assertThat(success).isEqualTo(1);
+        assertThat(sentence.getCanonicalCachedJson()).contains("HH").contains("L");
+    }
+
+    @Test
+    @DisplayName("persistSentencePage: generator 실패 시 다음 행으로 계속 (success 카운트만 줄어듦)")
+    void persistSentencePageSkipsFailures() {
+        SessionSentence ok = SessionSentenceTestFactory.create("ok");
+        SessionSentence bad = SessionSentenceTestFactory.create("bad");
+        Page<SessionSentence> page = new PageImpl<>(List.of(ok, bad));
+        when(generator.generate("ok")).thenReturn(new CanonicalResult(
+                List.of(new CanonicalWord("ok", List.of("OW", "K")))));
+        when(generator.generate("bad")).thenThrow(
+                new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED, "fail"));
+        when(sentenceRepository.save(any(SessionSentence.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        int success = bootstrapper(true).persistSentencePage(page);
+
+        assertThat(success).isEqualTo(1);
+        assertThat(ok.getCanonicalCachedJson()).isNotNull();
+        assertThat(bad.getCanonicalCachedJson()).isNull();
+    }
+
+    @Test
+    @DisplayName("persistChallengePage: generator 실패 시 다음 행으로 계속 진행")
+    void persistChallengePageSkipsFailures() {
+        DailyChallenge ok = DailyChallenge.create("ok", "오케이");
+        DailyChallenge bad = DailyChallenge.create("bad", "배드");
+        Page<DailyChallenge> page = new PageImpl<>(List.of(bad, ok));
+        when(generator.generate("ok")).thenReturn(new CanonicalResult(
+                List.of(new CanonicalWord("ok", List.of("OW", "K")))));
+        when(generator.generate("bad")).thenThrow(
+                new BusinessException(ErrorCode.CANONICAL_GENERATION_FAILED, "fail"));
+        when(challengeRepository.save(any(DailyChallenge.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        int success = bootstrapper(true).persistChallengePage(page);
+
+        assertThat(success).isEqualTo(1);
+        assertThat(ok.getCanonicalCachedJson()).isNotNull();
+        assertThat(bad.getCanonicalCachedJson()).isNull();
+    }
+
+    @Test
+    @DisplayName("page size 토큰 음수 / 너무 큰 값은 1..200 범위로 clamp 되어 PageRequest 호출이 깨지지 않는다")
+    void pageSizeIsClamped() {
+        AppProperties.Canonical cfg = new AppProperties.Canonical(true, 999);
+        AppProperties props = new AppProperties(
+                null, null, null, null, null, null, null, null,
+                null,
+                null, null, null, null, null, null,
+                null,
+                cfg);
+        CanonicalBootstrapper b = new CanonicalBootstrapper(
+                generator, canonicalJson, stepRepository, sentenceRepository,
+                challengeRepository, props);
+        when(stepRepository.findByKindAndCanonicalCachedJsonIsNullOrderByIdAsc(eq(StepKind.RECORD), any()))
+                .thenReturn(emptyStepPage());
+        when(sentenceRepository.findByCanonicalCachedJsonIsNullOrderByIdAsc(any()))
+                .thenReturn(emptySentencePage());
+        when(challengeRepository.findByCanonicalCachedJsonIsNullOrderByIdAsc(any()))
+                .thenReturn(emptyChallengePage());
+
+        b.runAll();
+        // 호출이 깨지지 않으면 OK.
+    }
+
+    @Test
+    @DisplayName("AppProperties.canonical 이 null 이면 기본값 (disabled) — onReady noop")
+    void nullCanonicalCfgDisables() {
+        AppProperties props = new AppProperties(
+                null, null, null, null, null, null, null, null,
+                null,
+                null, null, null, null, null, null,
+                null,
+                null);
+        CanonicalBootstrapper b = new CanonicalBootstrapper(
+                generator, canonicalJson, stepRepository, sentenceRepository,
+                challengeRepository, props);
+
+        b.onReady();
+
+        verify(generator, never()).generate(anyString());
+    }
+
     private static Page<LearningStep> emptyStepPage() {
         return new PageImpl<>(List.of(), Pageable.unpaged(), 0);
     }
@@ -134,5 +291,23 @@ class CanonicalBootstrapperTest {
 
     private static Page<DailyChallenge> emptyChallengePage() {
         return new PageImpl<>(List.of(), Pageable.unpaged(), 0);
+    }
+
+    // SessionSentence 의 패키지 비공개 factory 를 우회하기 위해 mock 으로 text / canonical 캐시만 흉내낸다.
+    // applyCanonical 은 spy 가 아닌 mock 이라 직접 동작하지 않으므로, 호출 시점에 setter 같은 동작을 흉내내도록
+    // doAnswer 를 건다.
+    private static final class SessionSentenceTestFactory {
+        static SessionSentence create(String text) {
+            SessionSentence s = mock(SessionSentence.class);
+            when(s.getText()).thenReturn(text);
+            final String[] holder = new String[1];
+            when(s.getCanonicalCachedJson()).thenAnswer(inv -> holder[0]);
+            org.mockito.Mockito.doAnswer(inv -> {
+                String value = inv.getArgument(0);
+                holder[0] = (value == null || value.isBlank()) ? null : value;
+                return null;
+            }).when(s).applyCanonical(org.mockito.ArgumentMatchers.any());
+            return s;
+        }
     }
 }
