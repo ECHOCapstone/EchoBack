@@ -1,6 +1,7 @@
 package com.capstoneecho.echo_back.global.common;
 
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -22,6 +23,10 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    // 모든 요청 실패 로그의 단일 포맷. 본문은 절대 남기지 않고 요청 메타데이터만 기록한다.
+    private static final String LOG_FORMAT =
+            "request_failed method={} uri={} query={} clientIp={} userId={} code={} status={} ex={} msg={}";
+
     private final ObjectProvider<RuntimeSettings> settingsProvider;
 
     public GlobalExceptionHandler(ObjectProvider<RuntimeSettings> settingsProvider) {
@@ -41,27 +46,35 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(
+            BusinessException ex, HttpServletRequest request) {
         ErrorCode code = ex.getCode();
+        logFailure(request, code.name(), code.getStatus(), ex.getMessage(), ex);
         return ResponseEntity
                 .status(code.getStatus())
                 .body(ApiResponse.failure(code, ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleValidationException(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(this::formatFieldError)
                 .orElse(ErrorCode.VALIDATION_FAILED.getDefaultMessage());
+        logFailure(request, ErrorCode.VALIDATION_FAILED.name(),
+                ErrorCode.VALIDATION_FAILED.getStatus(), message, ex);
         return ResponseEntity
                 .status(ErrorCode.VALIDATION_FAILED.getStatus())
                 .body(ApiResponse.failure(ErrorCode.VALIDATION_FAILED, message));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(
+            MaxUploadSizeExceededException ex, HttpServletRequest request) {
         // 업로드 크기 초과는 의미상 413 Payload Too Large. 본문 코드는 클라이언트 메시지 매핑을 위해 유지한다.
+        logFailure(request, ErrorCode.INVALID_REQUEST.name(),
+                HttpStatus.PAYLOAD_TOO_LARGE, ex.getMessage(), ex);
         return ResponseEntity
                 .status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(ApiResponse.failure(ErrorCode.INVALID_REQUEST, uploadTooLargeMessage()));
@@ -72,9 +85,10 @@ public class GlobalExceptionHandler {
     // FE 의 에러 매핑 사전에 새 코드 추가 없이 처리되도록 한다.
     // 특정 제약 (활성 챌린지 단일성 등) 은 원인이 명확한 경우 사용자용 안내 메시지를 보강한다.
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
         String causeMsg = ex.getMostSpecificCause().toString();
-        log.warn("Data integrity violation: {}", causeMsg);
+        logFailure(request, ErrorCode.INVALID_REQUEST.name(), HttpStatus.CONFLICT, causeMsg, ex);
         String userMessage = resolveDataIntegrityMessage(causeMsg);
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
@@ -101,9 +115,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception ex) {
-        // 운영에서 원인 추적이 가능하도록 stacktrace 를 함께 남긴다 — 그 외 사용자 응답은 단일 메시지.
-        log.error("Unhandled exception", ex);
+    public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(
+            Exception ex, HttpServletRequest request) {
+        // 5xx 이므로 logFailure 가 stacktrace 를 함께 남긴다 — 그 외 사용자 응답은 단일 메시지.
+        logFailure(request, ErrorCode.INTERNAL_ERROR.name(),
+                ErrorCode.INTERNAL_ERROR.getStatus(), ex.getMessage(), ex);
         return ResponseEntity
                 .status(ErrorCode.INTERNAL_ERROR.getStatus())
                 .body(ApiResponse.failure(ErrorCode.INTERNAL_ERROR, null));
@@ -112,5 +128,22 @@ public class GlobalExceptionHandler {
     private String formatFieldError(FieldError error) {
         String message = error.getDefaultMessage();
         return error.getField() + ": " + (message == null ? "invalid" : message);
+    }
+
+    // 모든 핸들러가 공유하는 실패 로깅 단일 출처. 5xx 는 stacktrace 와 함께 ERROR,
+    // 4xx 는 노이즈 억제를 위해 stacktrace 없이 WARN 으로 한 줄 남긴다.
+    private void logFailure(
+            HttpServletRequest request, String codeName, HttpStatus status, String detail, Exception ex) {
+        String query = RequestContextLogFormatter.safeQuery(request.getQueryString());
+        String clientIp = RequestContextLogFormatter.clientIp(request);
+        Object userId = RequestContextLogFormatter.orDash(RequestContextLogFormatter.currentUserId());
+        String exClass = ex.getClass().getSimpleName();
+        if (status.is5xxServerError()) {
+            log.error(LOG_FORMAT, request.getMethod(), request.getRequestURI(), query, clientIp,
+                    userId, codeName, status.value(), exClass, detail, ex);
+        } else {
+            log.warn(LOG_FORMAT, request.getMethod(), request.getRequestURI(), query, clientIp,
+                    userId, codeName, status.value(), exClass, detail);
+        }
     }
 }
