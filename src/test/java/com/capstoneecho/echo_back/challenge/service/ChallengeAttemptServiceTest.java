@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -23,7 +22,7 @@ import com.capstoneecho.echo_back.external.llm.LlmStepContext;
 import com.capstoneecho.echo_back.external.llm.LlmStepFeedback;
 import com.capstoneecho.echo_back.external.llm.PronunciationGuide;
 import com.capstoneecho.echo_back.external.llm.canonical.CanonicalJson;
-import com.capstoneecho.echo_back.external.modelserver.ModelServerClient;
+import com.capstoneecho.echo_back.external.modelserver.PhonemeRecognizer;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
 import com.capstoneecho.echo_back.global.common.BusinessException;
@@ -64,7 +63,7 @@ class ChallengeAttemptServiceTest {
     private DailyChallengeAttemptRepository attemptRepository;
     private UserRepository userRepository;
     private WavHeaderValidator wavHeaderValidator;
-    private ModelServerClient modelServerClient;
+    private PhonemeRecognizer phonemeRecognizer;
     private LlmClient llmClient;
     private CanonicalJson canonicalJson;
     private ScoringService scoringService;
@@ -81,7 +80,7 @@ class ChallengeAttemptServiceTest {
         attemptRepository = mock(DailyChallengeAttemptRepository.class);
         userRepository = mock(UserRepository.class);
         wavHeaderValidator = mock(WavHeaderValidator.class);
-        modelServerClient = mock(ModelServerClient.class);
+        phonemeRecognizer = mock(PhonemeRecognizer.class);
         llmClient = mock(LlmClient.class);
         canonicalJson = new CanonicalJson(new ObjectMapper());
         scoringService = mock(ScoringService.class);
@@ -109,7 +108,7 @@ class ChallengeAttemptServiceTest {
 
         service = new ChallengeAttemptService(
                 challengeService, attemptRepository, userRepository, wavHeaderValidator,
-                modelServerClient, llmClient, canonicalJson, scoringService, recordingStorage,
+                phonemeRecognizer, llmClient, canonicalJson, scoringService, recordingStorage,
                 priorAttemptAssembler, statsZoneProvider, settings, props, txManager);
 
         // registerStorageCleanupOnNonCommit 가 TransactionSynchronizationManager 에 동기화를 등록하므로
@@ -151,7 +150,7 @@ class ChallengeAttemptServiceTest {
         assertThatThrownBy(() -> service.submit(1L, VALID_WAV))
                 .isInstanceOfSatisfying(BusinessException.class,
                         ex -> assertThat(ex.getCode()).isEqualTo(ErrorCode.CANONICAL_GENERATION_FAILED));
-        verify(modelServerClient, never()).transcribe(any(), anyString());
+        verify(phonemeRecognizer, never()).recognize(any(), any());
     }
 
     @Test
@@ -165,7 +164,7 @@ class ChallengeAttemptServiceTest {
         assertThatThrownBy(() -> service.submit(1L, VALID_WAV))
                 .isInstanceOfSatisfying(BusinessException.class,
                         ex -> assertThat(ex.getCode()).isEqualTo(ErrorCode.CHALLENGE_ATTEMPT_LIMIT_EXCEEDED));
-        verify(modelServerClient, never()).transcribe(any(), anyString());
+        verify(phonemeRecognizer, never()).recognize(any(), any());
     }
 
     @Test
@@ -176,8 +175,8 @@ class ChallengeAttemptServiceTest {
         when(challengeService.requireActive()).thenReturn(c);
         when(attemptRepository.countByUser_IdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 anyLong(), any(), any())).thenReturn(0L);
-        when(modelServerClient.transcribe(any(byte[].class), eq("")))
-                .thenReturn(transcribeResult(List.of("DH", "AH", "IH", "V", "EH", "N", "T")));
+        when(phonemeRecognizer.recognize(any(byte[].class), any()))
+                .thenReturn(recognized(List.of("DH", "AH", "IH", "V", "EH", "N", "T")));
         LlmStepFeedback feedback = stepFeedback(false);
         when(llmClient.stepFeedback(any(LlmStepContext.class))).thenReturn(feedback);
         when(scoringService.compute(any(), any())).thenReturn(85);
@@ -204,8 +203,8 @@ class ChallengeAttemptServiceTest {
         when(challengeService.requireActive()).thenReturn(c);
         when(attemptRepository.countByUser_IdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 anyLong(), any(), any())).thenReturn(0L);
-        when(modelServerClient.transcribe(any(byte[].class), anyString()))
-                .thenReturn(transcribeResult(List.of("DH", "AH")));
+        when(phonemeRecognizer.recognize(any(byte[].class), any()))
+                .thenReturn(recognized(List.of("DH", "AH")));
         when(llmClient.stepFeedback(any(LlmStepContext.class))).thenReturn(stepFeedback(false));
         when(scoringService.compute(any(), any())).thenReturn(70);
         when(attemptRepository.findUserBestScore(eq(42L), eq(1L))).thenReturn(90.0);
@@ -227,8 +226,8 @@ class ChallengeAttemptServiceTest {
         when(challengeService.requireActive()).thenReturn(c);
         when(attemptRepository.countByUser_IdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 anyLong(), any(), any())).thenReturn(0L);
-        when(modelServerClient.transcribe(any(byte[].class), anyString()))
-                .thenReturn(transcribeResult(List.of("DH", "AH")));
+        when(phonemeRecognizer.recognize(any(byte[].class), any()))
+                .thenReturn(recognized(List.of("DH", "AH")));
         when(llmClient.stepFeedback(any(LlmStepContext.class))).thenReturn(stepFeedback(false));
         when(scoringService.compute(any(), any())).thenReturn(50);
         when(attemptRepository.findUserBestScore(any(), any())).thenReturn(null);
@@ -298,6 +297,12 @@ class ChallengeAttemptServiceTest {
                 1.0,
                 "echo-baseline",
                 "echo");
+    }
+
+    // PhonemeRecognizer.recognize 의 결과. 챌린지 canonical 은 서비스가 자체 보유하므로
+    // canonicalWords 는 비워도 되고, 검증에는 perceived(transcribe)만 쓰인다.
+    private static PhonemeRecognizer.Recognized recognized(List<String> perceived) {
+        return new PhonemeRecognizer.Recognized(transcribeResult(perceived), List.of(), List.of());
     }
 
     private static LlmStepFeedback stepFeedback(boolean retry) {
