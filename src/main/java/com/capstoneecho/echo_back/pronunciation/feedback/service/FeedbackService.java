@@ -41,12 +41,19 @@ import com.capstoneecho.echo_back.pronunciation.feedback.support.ScoringService;
 import com.capstoneecho.echo_back.pronunciation.recording.entity.Recording;
 import com.capstoneecho.echo_back.pronunciation.recording.repository.RecordingRepository;
 import com.capstoneecho.echo_back.pronunciation.recording.support.WavHeaderValidator;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -59,6 +66,8 @@ import tools.jackson.databind.ObjectMapper;
 // 읽기 → HTTP → 쓰기 세 단계로 트랜잭션을 분리한다. 그 외 단순 조회/완료 토글은 메서드 단위 @Transactional.
 @Service
 public class FeedbackService {
+
+    private static final Logger log = LoggerFactory.getLogger(FeedbackService.class);
 
     private final UserRepository userRepository;
     private final ScriptRepository scriptRepository;
@@ -131,6 +140,20 @@ public class FeedbackService {
         }
         List<Long> recordingIds = request.recordingIds();
 
+        // 멱등 키 = (script|session):parentId + 정렬된 recordingIds 의 SHA-256. 같은 녹음 집합으로 generate 를
+        // 반복 호출해도 피드백이 한 개만 생기게 한다 (각 피드백을 complete 해 경험치를 복제하던 우회 차단).
+        Long parentId = hasScript ? request.scriptId() : request.sessionId();
+        String recordingIdsHash = idempotencyKey(hasScript, parentId, recordingIds);
+
+        // 빠른 경로: 같은 (user, 녹음 집합) 으로 이미 만든 피드백이 있으면 비싼 LLM 호출 없이 그대로 반환.
+        FeedbackDetailResponse cached = readTx.execute(status ->
+                feedbackRepository.findByUser_IdAndRecordingIdsHash(userId, recordingIdsHash)
+                        .map(fb -> FeedbackDetailResponse.from(fb, objectMapper))
+                        .orElse(null));
+        if (cached != null) {
+            return cached;
+        }
+
         // (1) 읽기 단계: 녹음 일괄 조회·검증 + 집계 (약점 음소·step 요약) 를 트랜잭션 안에서 끝낸다.
         GeneratePlan plan = readTx.execute(status -> {
             userRepository.findById(userId)
@@ -160,30 +183,60 @@ public class FeedbackService {
                 callComprehensive(plan.chapterTitle(), plan.chapterContent(), plan.aggregated());
 
         // (3) 쓰기 단계: 부모 엔티티를 다시 조회해 PronunciationFeedback 을 영속화.
-        return writeTx.execute(status -> {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-            String practiceWord = pickPracticeWord(plan.seededPracticeWord(), llm);
-            Aggregated aggregated = plan.aggregated();
-            PronunciationFeedback feedback;
-            if (plan.hasScript()) {
-                Script script = scriptRepository.findById(request.scriptId())
-                        .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
-                feedback = PronunciationFeedback.forScript(
-                        user, script, plan.chapterTitle(), aggregated.accuracy(),
-                        aggregated.weakPhoneme(), practiceWord, llm.summaryKr());
-            } else {
-                Session session = sessionRepository.findByIdAndUser_Id(request.sessionId(), userId)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-                feedback = PronunciationFeedback.forSession(
-                        user, session, plan.chapterTitle(), aggregated.accuracy(),
-                        aggregated.weakPhoneme(), practiceWord, llm.summaryKr());
+        try {
+            return writeTx.execute(status -> {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+                String practiceWord = pickPracticeWord(plan.seededPracticeWord(), llm);
+                Aggregated aggregated = plan.aggregated();
+                PronunciationFeedback feedback;
+                if (plan.hasScript()) {
+                    Script script = scriptRepository.findById(request.scriptId())
+                            .orElseThrow(() -> new BusinessException(ErrorCode.SCRIPT_NOT_FOUND));
+                    feedback = PronunciationFeedback.forScript(
+                            user, script, plan.chapterTitle(), aggregated.accuracy(),
+                            aggregated.weakPhoneme(), practiceWord, llm.summaryKr());
+                } else {
+                    Session session = sessionRepository.findByIdAndUser_Id(request.sessionId(), userId)
+                            .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+                    feedback = PronunciationFeedback.forSession(
+                            user, session, plan.chapterTitle(), aggregated.accuracy(),
+                            aggregated.weakPhoneme(), practiceWord, llm.summaryKr());
+                }
+                feedback.assignRecordingIdsHash(recordingIdsHash);
+                applyComprehensive(feedback, llm);
+                attachAggregatedErrors(feedback, aggregated.aggregatedErrors());
+                PronunciationFeedback saved = feedbackRepository.save(feedback);
+                return FeedbackDetailResponse.from(saved, objectMapper);
+            });
+        } catch (DataIntegrityViolationException e) {
+            // 동시 generate 레이스: 다른 요청이 같은 (user, 녹음 집합) 으로 먼저 저장해 유니크 제약에 걸렸다.
+            // 빠른 경로에서 못 본 그 피드백을 다시 읽어 반환한다. 해시 충돌이 아닌 다른 무결성 오류면 그대로 전파.
+            return readTx.execute(status ->
+                    feedbackRepository.findByUser_IdAndRecordingIdsHash(userId, recordingIdsHash)
+                            .map(fb -> FeedbackDetailResponse.from(fb, objectMapper))
+                            .orElseThrow(() -> e));
+        }
+    }
+
+    // generate 멱등 키. recordingIds 는 순서 무관하므로 정렬해 같은 집합이면 같은 해시가 나오게 한다.
+    // scriptId/sessionId 를 prefix 로 섞어 서로 다른 콘텐츠가 우연히 같은 해시를 갖는 일을 막는다.
+    private static String idempotencyKey(boolean hasScript, Long parentId, List<Long> recordingIds) {
+        List<Long> sorted = new ArrayList<>(recordingIds);
+        sorted.sort(Comparator.nullsFirst(Comparator.naturalOrder()));
+        String raw = (hasScript ? "script:" : "session:") + parentId + "|" + sorted;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : digest) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
             }
-            applyComprehensive(feedback, llm);
-            attachAggregatedErrors(feedback, aggregated.aggregatedErrors());
-            PronunciationFeedback saved = feedbackRepository.save(feedback);
-            return FeedbackDetailResponse.from(saved, objectMapper);
-        });
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private record GeneratePlan(
@@ -336,6 +389,11 @@ public class FeedbackService {
     private record CompletionOutcome(boolean awarded, UserResponse fallbackUserResponse) {}
 
     private void resetProgressForFeedback(Long userId, Long scriptId, Long sessionId) {
+        // 부모 콘텐츠가 이미 사라진 (V23 SET NULL) 피드백은 진행 상태를 되돌릴 대상이 없다 — 명시 로깅 후 skip.
+        if (scriptId == null && sessionId == null) {
+            log.info("feedback complete: 부모 script/session 모두 NULL — progress reset 생략 (user={})", userId);
+            return;
+        }
         if (scriptId != null) {
             progressService.resetChapter(userId, scriptId);
         }

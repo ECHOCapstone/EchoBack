@@ -13,6 +13,9 @@ public interface FeedbackRepository extends JpaRepository<PronunciationFeedback,
 
     Optional<PronunciationFeedback> findByIdAndUser_Id(Long id, Long userId);
 
+    // generate 멱등성 조회 — 같은 (user, 녹음 집합 해시) 로 이미 만들어진 피드백이 있으면 재사용한다.
+    Optional<PronunciationFeedback> findByUser_IdAndRecordingIdsHash(Long userId, String recordingIdsHash);
+
     List<PronunciationFeedback> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
 
     long countByUser_IdAndCompletedTrue(Long userId);

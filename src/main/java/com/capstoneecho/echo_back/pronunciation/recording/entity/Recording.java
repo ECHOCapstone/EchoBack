@@ -51,24 +51,25 @@ public class Recording {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // 부모 콘텐츠가 삭제되어도 학습자의 녹음과 target_text_snapshot / canonical / perceived 스냅샷은 살린다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "script_id")
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     private Script script;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "step_id")
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     private LearningStep step;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     private Session session;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_sentence_id")
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     private SessionSentence sessionSentence;
 
     @Column(name = "audio_path", nullable = false, length = 500)

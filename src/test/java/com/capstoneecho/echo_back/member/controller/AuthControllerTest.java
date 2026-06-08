@@ -34,7 +34,11 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                   "username": "alice",
                   "email": "alice@test.com",
                   "password": "Password1!",
-                  "nickname": "Alice"
+                  "nickname": "Alice",
+                  "agreedTerms": true,
+                  "agreedPrivacy": true,
+                  "agreedAgeOver14": true,
+                  "agreedMarketing": false
                 }
                 """;
 
@@ -65,7 +69,11 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                   "username": "alice",
                   "email": "alice-new@test.com",
                   "password": "Password1!",
-                  "nickname": "Alice2"
+                  "nickname": "Alice2",
+                  "agreedTerms": true,
+                  "agreedPrivacy": true,
+                  "agreedAgeOver14": true,
+                  "agreedMarketing": false
                 }
                 """;
 
@@ -88,7 +96,11 @@ class AuthControllerTest extends AbstractControllerIntegrationTest {
                   "username": "newuser",
                   "email": "dup@test.com",
                   "password": "Password1!",
-                  "nickname": "NewUser"
+                  "nickname": "NewUser",
+                  "agreedTerms": true,
+                  "agreedPrivacy": true,
+                  "agreedAgeOver14": true,
+                  "agreedMarketing": false
                 }
                 """;
 

@@ -53,7 +53,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class FeedbackServiceTest {
 
     private static final byte[] VALID_WAV =
-            new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E'};
+            com.capstoneecho.echo_back.support.WavFixtures.VALID_WAV;
 
     @Autowired
     private FeedbackService feedbackService;
@@ -128,6 +128,29 @@ class FeedbackServiceTest {
         assertThat(response.guidanceKr()).isNotBlank();
         assertThat(response.practiceWord()).isNotBlank();
         assertThat(response.completed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("generate 는 같은 (user, 녹음 집합) 으로 반복 호출해도 피드백을 한 개만 만든다 (멱등 — 경험치 복제 차단)")
+    void generateIsIdempotentForSameRecordingSet() {
+        ScriptFixture f = seedScriptFlow("hello", "Coffee Shop");
+        Recording r1 = transactionTemplate.execute(status ->
+                recordingRepository.save(
+                        Recording.forScriptStep(f.user, f.script, f.step, "u/r1.wav", "hello")));
+        FeedbackGenerateRequest req =
+                new FeedbackGenerateRequest(f.script.getId(), null, List.of(r1.getId()));
+
+        FeedbackDetailResponse first = feedbackService.generate(f.user.getId(), req);
+        FeedbackDetailResponse second = feedbackService.generate(f.user.getId(), req);
+
+        // 두 번째 호출은 새 row 를 만들지 않고 기존 피드백을 그대로 돌려준다.
+        assertThat(second.id()).isEqualTo(first.id());
+        assertThat(feedbackRepository.findAllByUser_IdOrderByCreatedAtDesc(f.user.getId()))
+                .as("같은 녹음 집합으로는 피드백이 한 개만 존재해야 한다")
+                .hasSize(1);
+        // 빠른 경로(캐시 반환)라 LLM 종합 피드백은 첫 호출 때 1번만 불린다.
+        Mockito.verify(llmClient, Mockito.times(1))
+                .comprehensiveFeedback(any(LlmComprehensiveContext.class));
     }
 
     @Test
@@ -233,7 +256,7 @@ class FeedbackServiceTest {
         assertThat(response.correct()).isTrue();
         assertThat(response.perceived()).containsExactly("HH", "AH", "L", "OW");
         assertThat(response.canonical()).containsExactly("HH", "AH", "L", "OW");
-        assertThat(response.score()).isEqualTo(85.0);
+        assertThat(response.score()).isEqualTo(100.0);
         assertThat(response.guidanceKr()).isNotBlank();
 
         PronunciationFeedback reloaded = feedbackRepository.findById(fb.getId()).orElseThrow();

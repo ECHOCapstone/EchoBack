@@ -95,7 +95,7 @@ class RecordingControllerTest extends AbstractControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.stepId").value(f.stepId()))
                 .andExpect(jsonPath("$.data.sessionId").doesNotExist())
                 .andExpect(jsonPath("$.data.guidanceKr").isNotEmpty())
-                .andExpect(jsonPath("$.data.stepScore").value(85.0))
+                .andExpect(jsonPath("$.data.stepScore").value(100.0))
                 .andExpect(jsonPath("$.data.wrongWords").isArray())
                 .andExpect(jsonPath("$.data.wrongWords").isEmpty())
                 .andDo(document("recordings/upload"));

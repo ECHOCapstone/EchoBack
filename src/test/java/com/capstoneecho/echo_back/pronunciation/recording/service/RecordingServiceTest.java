@@ -61,7 +61,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class RecordingServiceTest {
 
     private static final byte[] VALID_WAV =
-            new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E'};
+            com.capstoneecho.echo_back.support.WavFixtures.VALID_WAV;
 
     @Autowired
     private RecordingService recordingService;

@@ -62,14 +62,14 @@ class MemberControllerTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/members/me 토큰의 userId 가 미존재 → 404 USER_NOT_FOUND")
-    void getMeWithMissingUserReturns404() throws Exception {
+    @DisplayName("GET /api/members/me 토큰의 userId 가 미존재 → 401 + USER_NOT_FOUND (JwtAuthFilter 가 익명화)")
+    void getMeWithMissingUserReturns401() throws Exception {
         String token = jwtProvider.issue(999_999L,
                 Map.of("username", "ghost", "email", "ghost@test.com"));
 
         mockMvc.perform(get("/api/members/me")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("USER_NOT_FOUND"));
     }
 
