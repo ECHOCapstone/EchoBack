@@ -10,8 +10,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.capstoneecho.echo_back.global.security.JwtAuthenticationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -137,12 +139,10 @@ class GlobalExceptionHandlerSliceTest {
         assertThat(event.getLevel()).isEqualTo(Level.WARN);
         assertThat(event.getThrowableProxy()).isNull();
         assertThat(event.getFormattedMessage())
-                .contains("request_failed")
-                .contains("method=GET")
-                .contains("uri=/__test/business/USER_NOT_FOUND")
-                .contains("userId=-")
-                .contains("code=USER_NOT_FOUND")
-                .contains("status=404");
+                .contains("HTTP 요청 처리 실패")
+                .contains("[GET /__test/business/USER_NOT_FOUND]")
+                .contains("→ 404 USER_NOT_FOUND")
+                .contains("userId=-");
     }
 
     @Test
@@ -155,8 +155,7 @@ class GlobalExceptionHandlerSliceTest {
         assertThat(event.getLevel()).isEqualTo(Level.ERROR);
         assertThat(event.getThrowableProxy()).isNotNull();
         assertThat(event.getFormattedMessage())
-                .contains("code=MODEL_SERVER_UNAVAILABLE")
-                .contains("status=503");
+                .contains("→ 503 MODEL_SERVER_UNAVAILABLE");
     }
 
     @Test
@@ -169,8 +168,7 @@ class GlobalExceptionHandlerSliceTest {
         assertThat(event.getLevel()).isEqualTo(Level.ERROR);
         assertThat(event.getThrowableProxy()).isNotNull();
         assertThat(event.getFormattedMessage())
-                .contains("code=INTERNAL_ERROR")
-                .contains("status=500")
+                .contains("→ 500 INTERNAL_ERROR")
                 .contains("ex=IllegalStateException");
     }
 
@@ -186,8 +184,7 @@ class GlobalExceptionHandlerSliceTest {
         assertThat(event.getLevel()).isEqualTo(Level.WARN);
         assertThat(event.getThrowableProxy()).isNull();
         assertThat(event.getFormattedMessage())
-                .contains("code=VALIDATION_FAILED")
-                .contains("status=400")
+                .contains("→ 400 VALIDATION_FAILED")
                 .contains("name");
     }
 
@@ -201,8 +198,7 @@ class GlobalExceptionHandlerSliceTest {
         assertThat(event.getLevel()).isEqualTo(Level.WARN);
         assertThat(event.getThrowableProxy()).isNull();
         assertThat(event.getFormattedMessage())
-                .contains("code=INVALID_REQUEST")
-                .contains("status=413");
+                .contains("→ 413 INVALID_REQUEST");
     }
 
     @Test
@@ -213,6 +209,40 @@ class GlobalExceptionHandlerSliceTest {
                 .andExpect(status().isNotFound());
 
         assertThat(singleEvent().getFormattedMessage()).contains("clientIp=203.0.113.7");
+    }
+
+    @Test
+    @DisplayName("JwtAuthenticationException → 401 + INVALID_TOKEN 봉투, WARN 한 줄(트레이스 없음)")
+    void mapsJwtAuthenticationTo401() throws Exception {
+        mockMvc.perform(get("/__test/unauthorized"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_TOKEN.name()))
+                .andExpect(jsonPath("$.error.message").value(ErrorCode.INVALID_TOKEN.getDefaultMessage()));
+
+        ILoggingEvent event = singleEvent();
+        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+        assertThat(event.getThrowableProxy()).isNull();
+        assertThat(event.getFormattedMessage())
+                .contains("→ 401 INVALID_TOKEN")
+                .contains("ex=JwtAuthenticationException");
+    }
+
+    @Test
+    @DisplayName("AccessDeniedException → 403 + FORBIDDEN 봉투, WARN 한 줄(트레이스 없음)")
+    void mapsAccessDeniedTo403() throws Exception {
+        mockMvc.perform(get("/__test/forbidden"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.FORBIDDEN.name()))
+                .andExpect(jsonPath("$.error.message").value(ErrorCode.FORBIDDEN.getDefaultMessage()));
+
+        ILoggingEvent event = singleEvent();
+        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+        assertThat(event.getThrowableProxy()).isNull();
+        assertThat(event.getFormattedMessage())
+                .contains("→ 403 FORBIDDEN")
+                .contains("ex=AccessDeniedException");
     }
 
     @RestController
@@ -236,6 +266,16 @@ class GlobalExceptionHandlerSliceTest {
         @GetMapping("/__test/boom")
         public void boom() {
             throw new IllegalStateException("unexpected");
+        }
+
+        @GetMapping("/__test/unauthorized")
+        public void unauthorized() {
+            throw new JwtAuthenticationException(ErrorCode.INVALID_TOKEN);
+        }
+
+        @GetMapping("/__test/forbidden")
+        public void forbidden() {
+            throw new AccessDeniedException("denied");
         }
     }
 

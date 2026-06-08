@@ -7,6 +7,7 @@ import com.capstoneecho.echo_back.global.security.oauth2.CustomOAuth2UserService
 import com.capstoneecho.echo_back.global.security.oauth2.CustomOidcUserService;
 import com.capstoneecho.echo_back.global.security.oauth2.OAuth2LoginFailureHandler;
 import com.capstoneecho.echo_back.global.security.oauth2.OAuth2LoginSuccessHandler;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -17,7 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 @Configuration
 public class SecurityConfig {
@@ -32,9 +33,18 @@ public class SecurityConfig {
         return new JwtAuthFilter(jwtProvider, userRepository);
     }
 
+    // 인증/인가 실패를 ControllerAdvice 로 전파하기 위해 MVC 공용 HandlerExceptionResolver 에 위임한다.
+    // WebMvc 가 등록하는 "handlerExceptionResolver" 합성 빈을 주입받아 @ExceptionHandler 로 디스패치한다.
     @Bean
-    public JwtAuthEntryPoint jwtAuthEntryPoint(ObjectMapper objectMapper) {
-        return new JwtAuthEntryPoint(objectMapper);
+    public JwtAuthEntryPoint jwtAuthEntryPoint(
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
+        return new JwtAuthEntryPoint(resolver);
+    }
+
+    @Bean
+    public JwtAccessDeniedHandler jwtAccessDeniedHandler(
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
+        return new JwtAccessDeniedHandler(resolver);
     }
 
     @Bean
@@ -42,6 +52,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthFilter jwtAuthFilter,
             JwtAuthEntryPoint jwtAuthEntryPoint,
+            JwtAccessDeniedHandler jwtAccessDeniedHandler,
             CustomOAuth2AuthorizationRequestResolver customAuthorizationRequestResolver,
             CustomOAuth2UserService customOAuth2UserService,
             CustomOidcUserService customOidcUserService,
@@ -79,7 +90,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthEntryPoint))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(jwtAuthEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler))
                 .oauth2Login(oauth2 -> oauth2
                         // 시작 경로를 /api/auth/oauth2/{registrationId}/authorization 으로 노출.
                         .authorizationEndpoint(endpoint ->

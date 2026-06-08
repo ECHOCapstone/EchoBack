@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.global.common;
 
+import com.capstoneecho.echo_back.global.security.JwtAuthenticationException;
 import com.capstoneecho.echo_back.global.settings.RuntimeSettings;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,8 +26,9 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // 모든 요청 실패 로그의 단일 포맷. 본문은 절대 남기지 않고 요청 메타데이터만 기록한다.
+    // [메서드 경로] → 상태 코드 (상세) 형태로 요청→결과 흐름이 한눈에 보이게 한다.
     private static final String LOG_FORMAT =
-            "request_failed method={} uri={} query={} clientIp={} userId={} code={} status={} ex={} msg={}";
+            "HTTP 요청 처리 실패: [{} {}] → {} {} (clientIp={}, userId={}, query={}, ex={}, msg={})";
 
     private final ObjectProvider<RuntimeSettings> settingsProvider;
 
@@ -53,6 +56,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(code.getStatus())
                 .body(ApiResponse.failure(code, ex.getMessage()));
+    }
+
+    // 필터단 인증 실패(401). JwtAuthEntryPoint 가 HandlerExceptionResolver 로 위임해 여기까지 도달한다.
+    // ErrorCode 는 예외에 객체로 실려 오므로 request attribute 를 다시 읽지 않는다.
+    // WWW-Authenticate 헤더는 엔트리포인트에서 이미 세팅돼 보존된다.
+    @ExceptionHandler(JwtAuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJwtAuthentication(
+            JwtAuthenticationException ex, HttpServletRequest request) {
+        ErrorCode code = ex.getErrorCode();
+        logFailure(request, code.name(), code.getStatus(), ex.getMessage(), ex);
+        return ResponseEntity
+                .status(code.getStatus())
+                .body(ApiResponse.failure(code, null));
+    }
+
+    // 필터단 인가 실패(403). JwtAccessDeniedHandler 가 HandlerExceptionResolver 로 위임해 도달한다.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            AccessDeniedException ex, HttpServletRequest request) {
+        logFailure(request, ErrorCode.FORBIDDEN.name(), ErrorCode.FORBIDDEN.getStatus(), ex.getMessage(), ex);
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.failure(ErrorCode.FORBIDDEN, null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -139,11 +165,11 @@ public class GlobalExceptionHandler {
         Object userId = RequestContextLogFormatter.orDash(RequestContextLogFormatter.currentUserId());
         String exClass = ex.getClass().getSimpleName();
         if (status.is5xxServerError()) {
-            log.error(LOG_FORMAT, request.getMethod(), request.getRequestURI(), query, clientIp,
-                    userId, codeName, status.value(), exClass, detail, ex);
+            log.error(LOG_FORMAT, request.getMethod(), request.getRequestURI(), status.value(),
+                    codeName, clientIp, userId, query, exClass, detail, ex);
         } else {
-            log.warn(LOG_FORMAT, request.getMethod(), request.getRequestURI(), query, clientIp,
-                    userId, codeName, status.value(), exClass, detail);
+            log.warn(LOG_FORMAT, request.getMethod(), request.getRequestURI(), status.value(),
+                    codeName, clientIp, userId, query, exClass, detail);
         }
     }
 }
