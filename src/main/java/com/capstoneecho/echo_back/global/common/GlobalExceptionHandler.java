@@ -65,9 +65,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleJwtAuthentication(
             JwtAuthenticationException ex, HttpServletRequest request) {
         ErrorCode code = ex.getErrorCode();
-        logFailure(request, code.name(), code.getStatus(), ex.getMessage(), ex);
+        // AuthenticationEntryPoint 경로는 정의상 401 이다. 사유 코드의 내재 상태(USER_NOT_FOUND=404 등)와
+        // 무관하게 401 을 반환·로깅하고, error.code 로만 사유를 노출한다.
+        logFailure(request, code.name(), HttpStatus.UNAUTHORIZED, ex.getMessage(), ex);
         return ResponseEntity
-                .status(code.getStatus())
+                .status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.failure(code, null));
     }
 

@@ -229,6 +229,22 @@ class GlobalExceptionHandlerSliceTest {
     }
 
     @Test
+    @DisplayName("JwtAuthenticationException 의 사유 코드가 404(USER_NOT_FOUND)여도 인증 실패는 401 로 강제")
+    void forcesUnauthorizedEvenWhenReasonCodeStatusIsNot401() throws Exception {
+        mockMvc.perform(get("/__test/unauthorized-missing-user"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.USER_NOT_FOUND.name()));
+
+        ILoggingEvent event = singleEvent();
+        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+        assertThat(event.getThrowableProxy()).isNull();
+        assertThat(event.getFormattedMessage())
+                .contains("→ 401 USER_NOT_FOUND")
+                .contains("ex=JwtAuthenticationException");
+    }
+
+    @Test
     @DisplayName("AccessDeniedException → 403 + FORBIDDEN 봉투, WARN 한 줄(트레이스 없음)")
     void mapsAccessDeniedTo403() throws Exception {
         mockMvc.perform(get("/__test/forbidden"))
@@ -271,6 +287,11 @@ class GlobalExceptionHandlerSliceTest {
         @GetMapping("/__test/unauthorized")
         public void unauthorized() {
             throw new JwtAuthenticationException(ErrorCode.INVALID_TOKEN);
+        }
+
+        @GetMapping("/__test/unauthorized-missing-user")
+        public void unauthorizedMissingUser() {
+            throw new JwtAuthenticationException(ErrorCode.USER_NOT_FOUND);
         }
 
         @GetMapping("/__test/forbidden")
