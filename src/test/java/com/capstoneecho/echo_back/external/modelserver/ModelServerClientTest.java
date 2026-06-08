@@ -9,6 +9,7 @@ import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.llm.canonical.PhonemeInventory;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
+import com.capstoneecho.echo_back.external.modelserver.support.ModelServerErrorTranslator;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
 import tools.jackson.databind.ObjectMapper;
@@ -83,7 +84,8 @@ class ModelServerClientTest {
         return new ModelServerClient(
                 restClient, props, settings,
                 new PhonemeNormalizer(),
-                new PhonemeMismatchInspector(new PhonemeInventory(new ObjectMapper())));
+                new PhonemeMismatchInspector(new PhonemeInventory(new ObjectMapper())),
+                new ModelServerErrorTranslator());
     }
 
     private static void respondJson(HttpExchange exchange, int status, String json) throws IOException {

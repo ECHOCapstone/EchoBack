@@ -4,10 +4,9 @@ import com.capstoneecho.echo_back.external.llm.canonical.CanonicalWord;
 import com.capstoneecho.echo_back.external.modelserver.dto.ModelCatalog;
 import com.capstoneecho.echo_back.external.modelserver.dto.SpeechRate;
 import com.capstoneecho.echo_back.external.modelserver.dto.TranscribeResult;
+import com.capstoneecho.echo_back.external.modelserver.support.ModelServerErrorTranslator;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeMismatchInspector;
 import com.capstoneecho.echo_back.external.modelserver.support.PhonemeNormalizer;
-import com.capstoneecho.echo_back.global.common.BusinessException;
-import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
 import com.capstoneecho.echo_back.global.settings.SettingsService;
 import com.fasterxml.jackson.annotation.JsonAlias;
@@ -42,18 +41,21 @@ public class ModelServerClient {
     private final SettingsService settings;
     private final PhonemeNormalizer phonemeNormalizer;
     private final PhonemeMismatchInspector phonemeMismatchInspector;
+    private final ModelServerErrorTranslator errorTranslator;
 
     public ModelServerClient(
             RestClient restClient,
             AppProperties appProperties,
             SettingsService settings,
             PhonemeNormalizer phonemeNormalizer,
-            PhonemeMismatchInspector phonemeMismatchInspector) {
+            PhonemeMismatchInspector phonemeMismatchInspector,
+            ModelServerErrorTranslator errorTranslator) {
         this.restClient = restClient;
         this.appProperties = appProperties;
         this.settings = settings;
         this.phonemeNormalizer = phonemeNormalizer;
         this.phonemeMismatchInspector = phonemeMismatchInspector;
+        this.errorTranslator = errorTranslator;
     }
 
     // 음성 인식만 받는다. canonical 은 모델 서버가 정렬에 참고할 수 있도록 함께 보내지만, alignment / errors /
@@ -80,7 +82,7 @@ public class ModelServerClient {
         }
         TranscribeWire wire = execute("/transcribe", body, TranscribeWire.class);
         if (wire == null) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, "empty response from model server");
+            throw errorTranslator.emptyResponse("/transcribe", "empty response from model server");
         }
         return toResult(wire, canonicalArpabetSpaceSep);
     }
@@ -129,12 +131,12 @@ public class ModelServerClient {
                     .retrieve()
                     .body(G2pWire.class);
         } catch (ResourceAccessException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+            throw errorTranslator.unavailable("/g2p", ex);
         } catch (RestClientResponseException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+            throw errorTranslator.responseError("/g2p", ex);
         }
         if (wire == null || wire.words() == null || wire.words().isEmpty()) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, "empty /g2p response");
+            throw errorTranslator.emptyResponse("/g2p", "empty /g2p response");
         }
         return toCanonicalWords(wire.words());
     }
@@ -157,9 +159,9 @@ public class ModelServerClient {
         try {
             return restClient.get().uri(url).retrieve().body(ModelCatalog.class);
         } catch (ResourceAccessException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+            throw errorTranslator.unavailable("/models", ex);
         } catch (RestClientResponseException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+            throw errorTranslator.responseError("/models", ex);
         }
     }
 
@@ -201,9 +203,9 @@ public class ModelServerClient {
                     .retrieve()
                     .body(responseType);
         } catch (ResourceAccessException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+            throw errorTranslator.unavailable(path, ex);
         } catch (RestClientResponseException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+            throw errorTranslator.responseError(path, ex);
         }
     }
 
