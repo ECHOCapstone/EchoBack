@@ -7,19 +7,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.capstoneecho.echo_back.global.jwt.JwtProvider;
-import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
+import com.capstoneecho.echo_back.support.AbstractAdminControllerIntegrationTest;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-class PromptAdminControllerTest extends AbstractControllerIntegrationTest {
+class PromptAdminControllerTest extends AbstractAdminControllerIntegrationTest {
 
     // 매 실행마다 새 임시 디렉터리를 편집본 위치로 둬, 이전 실행의 편집본 파일에 오염되지 않게 한다.
     private static final String CONTENT_DIR;
@@ -35,14 +32,6 @@ class PromptAdminControllerTest extends AbstractControllerIntegrationTest {
     @DynamicPropertySource
     static void contentDir(DynamicPropertyRegistry registry) {
         registry.add("app.content.dir", () -> CONTENT_DIR);
-    }
-
-    @Autowired
-    private JwtProvider jwtProvider;
-
-    private String adminToken() {
-        return jwtProvider.issue(1L,
-                Map.of("username", "admin", "email", "admin@test.com", "role", "ADMIN"));
     }
 
     @Test
@@ -96,10 +85,7 @@ class PromptAdminControllerTest extends AbstractControllerIntegrationTest {
     @Test
     @DisplayName("USER 권한 → 403")
     void userForbidden() throws Exception {
-        String userToken = jwtProvider.issue(2L,
-                Map.of("username", "u", "email", "u@test.com", "role", "USER"));
-
-        mockMvc.perform(get("/api/admin/prompts").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/admin/prompts").header("Authorization", "Bearer " + userToken()))
                 .andExpect(status().isForbidden());
     }
 }

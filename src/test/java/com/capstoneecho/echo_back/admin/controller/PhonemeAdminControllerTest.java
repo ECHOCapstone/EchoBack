@@ -7,31 +7,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.capstoneecho.echo_back.global.jwt.JwtProvider;
-import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
+import com.capstoneecho.echo_back.support.AbstractAdminControllerIntegrationTest;
 import java.util.Base64;
-import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
-class PhonemeAdminControllerTest extends AbstractControllerIntegrationTest {
+class PhonemeAdminControllerTest extends AbstractAdminControllerIntegrationTest {
 
     // 1x1 PNG.
     private static final byte[] PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAen63NgAAAAASUVORK5CYII=");
-
-    @Autowired
-    private JwtProvider jwtProvider;
-
-    private String adminToken() {
-        return jwtProvider.issue(1L,
-                Map.of("username", "admin", "email", "admin@test.com", "role", "ADMIN"));
-    }
 
     private MockMultipartFile pngFile() {
         return new MockMultipartFile("image", "r.png", "image/png", PNG);
@@ -108,12 +97,9 @@ class PhonemeAdminControllerTest extends AbstractControllerIntegrationTest {
     @Test
     @DisplayName("USER 권한 업로드 → 403")
     void userForbidden() throws Exception {
-        String userToken = jwtProvider.issue(2L,
-                Map.of("username", "u", "email", "u@test.com", "role", "USER"));
-
         mockMvc.perform(multipart("/api/admin/phonemes/R/image")
                         .file(pngFile())
-                        .header("Authorization", "Bearer " + userToken))
+                        .header("Authorization", "Bearer " + userToken()))
                 .andExpect(status().isForbidden());
     }
 }

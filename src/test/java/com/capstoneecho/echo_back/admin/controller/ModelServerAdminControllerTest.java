@@ -4,22 +4,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.capstoneecho.echo_back.global.jwt.JwtProvider;
-import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
-import java.util.Map;
+import com.capstoneecho.echo_back.support.AbstractAdminControllerIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
-class ModelServerAdminControllerTest extends AbstractControllerIntegrationTest {
-
-    @Autowired
-    private JwtProvider jwtProvider;
-
-    private String adminToken() {
-        return jwtProvider.issue(1L,
-                Map.of("username", "admin", "email", "admin@test.com", "role", "ADMIN"));
-    }
+class ModelServerAdminControllerTest extends AbstractAdminControllerIntegrationTest {
 
     @Test
     @DisplayName("GET /api/admin/model-server → 선택값 + 후보 + serverAvailable")
@@ -35,10 +24,7 @@ class ModelServerAdminControllerTest extends AbstractControllerIntegrationTest {
     @Test
     @DisplayName("USER 권한 → 403")
     void userForbidden() throws Exception {
-        String userToken = jwtProvider.issue(2L,
-                Map.of("username", "u", "email", "u@test.com", "role", "USER"));
-
-        mockMvc.perform(get("/api/admin/model-server").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/admin/model-server").header("Authorization", "Bearer " + userToken()))
                 .andExpect(status().isForbidden());
     }
 }

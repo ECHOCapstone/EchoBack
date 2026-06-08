@@ -11,36 +11,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.capstoneecho.echo_back.admin.dto.AdminStepRequest;
 import com.capstoneecho.echo_back.admin.dto.ScriptCreateRequest;
 import com.capstoneecho.echo_back.admin.service.AdminScriptService;
-import com.capstoneecho.echo_back.global.jwt.JwtProvider;
 import com.capstoneecho.echo_back.learning.script.dto.ScriptDetailResponse;
 import com.capstoneecho.echo_back.learning.script.entity.Difficulty;
 import com.capstoneecho.echo_back.learning.script.entity.StepKind;
 import com.capstoneecho.echo_back.learning.track.entity.Track;
 import com.capstoneecho.echo_back.learning.track.repository.TrackRepository;
-import com.capstoneecho.echo_back.support.AbstractControllerIntegrationTest;
+import com.capstoneecho.echo_back.support.AbstractAdminControllerIntegrationTest;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
-class AdminScriptControllerTest extends AbstractControllerIntegrationTest {
-
-    @Autowired
-    private JwtProvider jwtProvider;
+class AdminScriptControllerTest extends AbstractAdminControllerIntegrationTest {
 
     @Autowired
     private TrackRepository trackRepository;
 
     @Autowired
     private AdminScriptService adminScriptService;
-
-    private String adminToken() {
-        return jwtProvider.issue(1L,
-                Map.of("username", "admin", "email", "admin@test.com", "role", "ADMIN"));
-    }
 
     private Track newTrack() {
         return trackRepository.save(Track.create("R 트랙", "설명", 1));
@@ -180,10 +170,7 @@ class AdminScriptControllerTest extends AbstractControllerIntegrationTest {
     @Test
     @DisplayName("GET USER 권한 → 403")
     void userForbidden() throws Exception {
-        String userToken = jwtProvider.issue(2L,
-                Map.of("username", "u", "email", "u@test.com", "role", "USER"));
-
-        mockMvc.perform(get("/api/admin/scripts/1").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/admin/scripts/1").header("Authorization", "Bearer " + userToken()))
                 .andExpect(status().isForbidden());
     }
 }
