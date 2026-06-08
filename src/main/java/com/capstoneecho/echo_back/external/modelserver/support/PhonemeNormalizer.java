@@ -6,10 +6,12 @@ import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-// 모델 서버가 단일 토큰으로 출력하지만 표준 ARPABET 정답은 둘 이상의 음소로 나뉘는 경우를
-// 정답과 같은 표준 음소들로 분해한다. 예: "ts" (results, cats) → ["t", "s"].
-// 분해 시 peak_softmax 도 같은 값으로 복제해 인덱스 정합성을 유지한다 — 이후 alignment 재계산이
-// perceived 와 peak_softmax 를 같은 길이로 참조한다.
+// 모델 서버의 인식 음소를 표준 ARPABET 형태로 정규화한다.
+//   1) 단일 토큰이지만 표준 정답은 둘 이상으로 나뉘는 경우 분해한다. 예: "ts" (results, cats) → ["T", "S"].
+//      분해 시 peak_softmax 도 같은 값으로 복제해 인덱스 정합성을 유지한다 — 이후 alignment 가
+//      perceived 와 peak_softmax 를 같은 길이로 참조한다.
+//   2) 대문자로 통일한다. ARPABET 은 대문자가 표준이고 canonical 도 대문자라, 모델이 소문자로 줘도
+//      정렬·채점·표시에서 R 과 r 이 다른 음소로 취급되지 않게 한다.
 @Component
 public class PhonemeNormalizer {
 
@@ -38,16 +40,16 @@ public class PhonemeNormalizer {
             Double softmaxValue = (hasSoftmax && i < peakSoftmax.size()) ? peakSoftmax.get(i) : null;
 
             if (decomposed == null) {
-                outPhonemes.add(original);
+                outPhonemes.add(canonicalize(original));
                 if (outSoftmax != null) {
                     outSoftmax.add(softmaxValue);
                 }
             } else {
                 // 분해된 각 표준 음소에 같은 peak_softmax 값을 복제한다 — 모델 신뢰도는 원래 한 토큰에 부여된 값이라
                 // 분해 후에도 그대로 이어진다.
-                outPhonemes.addAll(decomposed);
-                if (outSoftmax != null) {
-                    for (int j = 0; j < decomposed.size(); j++) {
+                for (String part : decomposed) {
+                    outPhonemes.add(canonicalize(part));
+                    if (outSoftmax != null) {
                         outSoftmax.add(softmaxValue);
                     }
                 }
@@ -56,6 +58,11 @@ public class PhonemeNormalizer {
         return new NormalizedPhonemes(
                 outPhonemes,
                 outSoftmax == null ? List.of() : outSoftmax);
+    }
+
+    // 표준 ARPABET 케이스(대문자)로 맞춘다. null 은 그대로 둬 상위의 null 처리 규칙을 깨지 않는다.
+    private static String canonicalize(String phoneme) {
+        return phoneme == null ? null : phoneme.trim().toUpperCase(Locale.ROOT);
     }
 
     public record NormalizedPhonemes(List<String> phonemes, List<Double> peakSoftmax) {}
