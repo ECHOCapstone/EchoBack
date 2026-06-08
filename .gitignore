@@ -48,3 +48,6 @@ CLAUDE.local.md
 /data/
 # agent-side experiment artifacts
 experiments/
+
+### IntelliJ JUnit 테스트 커버리지 ###
+/htmlReport/
