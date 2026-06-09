@@ -46,6 +46,14 @@ public class MemberService {
         return UserResponse.from(user);
     }
 
+    // 온보딩 튜토리얼 완료를 영속한다. 멱등 — 이미 완료한 사용자가 다시 호출해도 안전하다.
+    @Transactional
+    public UserResponse completeOnboarding(Long userId) {
+        User user = loadUser(userId);
+        user.completeOnboarding(Instant.now());
+        return UserResponse.from(user);
+    }
+
     // 학습 완료 보상을 적용한다. EXP 가산 + streak 갱신은 도메인 객체 (User) 에 위임한다.
     @Transactional
     public UserResponse awardCompletionRewards(Long userId, int expReward) {

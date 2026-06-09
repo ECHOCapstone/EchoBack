@@ -93,6 +93,10 @@ public class User {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    // 온보딩 튜토리얼을 끝낸 시각. NULL 이면 아직 튜토리얼을 보지 않은 사용자다.
+    @Column(name = "onboarding_completed_at")
+    private Instant onboardingCompletedAt;
+
     private User(String username, String email, String passwordHash, String nickname) {
         this.username = username;
         this.email = email;
@@ -103,6 +107,7 @@ public class User {
         this.role = Role.USER;
         this.lastStudyAt = null;
         this.createdAt = Instant.now();
+        this.onboardingCompletedAt = null;
     }
 
     // 가입 시점에 모은 동의 사실을 한 번에 적용한다. 필수 3종 시각이 빠지면 가입 흐름의 사전 검증이 누락된 것.
@@ -216,6 +221,20 @@ public class User {
             return;
         }
         this.nickname = truncate(nickname, NICKNAME_MAX);
+    }
+
+    public boolean isOnboardingCompleted() {
+        return onboardingCompletedAt != null;
+    }
+
+    // 온보딩 튜토리얼 완료를 기록한다. 이미 끝낸 사용자는 최초 완료 시각을 유지한다 (멱등).
+    public void completeOnboarding(Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("now is required");
+        }
+        if (this.onboardingCompletedAt == null) {
+            this.onboardingCompletedAt = now;
+        }
     }
 
     // 학습 완료 보상. 같은 KST 일자면 streak 유지, 어제면 +1 (상한 적용), 그 외엔 1 로 재시작.

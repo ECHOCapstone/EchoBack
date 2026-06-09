@@ -107,4 +107,32 @@ class MemberServiceTest {
                 .extracting(ex -> ((BusinessException) ex).getCode())
                 .isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("신규 가입자는 온보딩 미완료이며, completeOnboarding 후 완료로 바뀐다")
+    void completeOnboardingMarksCompleted() {
+        User saved = userRepository.save(
+                User.signup("erin", "erin@example.com", VALID_BCRYPT, "Erin"));
+        assertThat(memberService.findMe(saved.getId()).onboardingCompleted()).isFalse();
+
+        UserResponse response = memberService.completeOnboarding(saved.getId());
+
+        assertThat(response.onboardingCompleted()).isTrue();
+        assertThat(userRepository.findById(saved.getId()))
+                .get()
+                .extracting(User::isOnboardingCompleted)
+                .isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("completeOnboarding 은 멱등하다 — 다시 호출해도 완료 상태를 유지한다")
+    void completeOnboardingIsIdempotent() {
+        User saved = userRepository.save(
+                User.signup("frank", "frank@example.com", VALID_BCRYPT, "Frank"));
+
+        memberService.completeOnboarding(saved.getId());
+        UserResponse second = memberService.completeOnboarding(saved.getId());
+
+        assertThat(second.onboardingCompleted()).isTrue();
+    }
 }

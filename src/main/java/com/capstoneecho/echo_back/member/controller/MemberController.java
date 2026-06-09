@@ -41,6 +41,12 @@ public class MemberController {
         return ApiResponse.success(memberService.updateNickname(principal.userId(), request));
     }
 
+    // 온보딩 튜토리얼을 마친 사용자가 호출한다. 멱등 — 이미 완료한 사용자가 다시 호출해도 안전하다.
+    @PatchMapping("/me/onboarding-completed")
+    public ApiResponse<UserResponse> completeOnboarding(@CurrentUser JwtPrincipal principal) {
+        return ApiResponse.success(memberService.completeOnboarding(principal.userId()));
+    }
+
     // 로그인된 사용자가 비밀번호를 교체한다. 현재 비밀번호 확인 + 정책 검증을 통과해야 적용된다.
     @PatchMapping("/me/password")
     public ApiResponse<Void> changePassword(
