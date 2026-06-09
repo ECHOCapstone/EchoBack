@@ -11,18 +11,21 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import tools.jackson.databind.json.JsonMapper;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class JwtAuthFilterTest {
@@ -32,6 +35,7 @@ class JwtAuthFilterTest {
 
     private JwtAuthFilter filter;
     private JwtAuthEntryPoint entryPoint;
+    private HandlerExceptionResolver resolver;
     private JwtProvider validProvider;
 
     @BeforeEach
@@ -45,7 +49,11 @@ class JwtAuthFilterTest {
                 "U");
         when(userRepository.findById(anyLong())).thenReturn(Optional.of(activeUser));
         filter = new JwtAuthFilter(validProvider, userRepository);
-        entryPoint = new JwtAuthEntryPoint(JsonMapper.builder().build());
+        // 엔트리포인트는 봉투를 직접 쓰지 않고 HandlerExceptionResolver(=ControllerAdvice 경로)로 위임한다.
+        // 여기서는 위임이 올바른 ErrorCode 를 실은 JwtAuthenticationException 으로 일어나는지만 검증하고,
+        // 실제 401 봉투/상태는 SecurityConfigIntegrationTest(full chain)에서 확인한다.
+        resolver = mock(HandlerExceptionResolver.class);
+        entryPoint = new JwtAuthEntryPoint(resolver);
     }
 
     @AfterEach
@@ -54,8 +62,8 @@ class JwtAuthFilterTest {
     }
 
     @Test
-    @DisplayName("토큰 없음 → 401 UNAUTHORIZED")
-    void missingTokenReturns401Unauthorized() throws Exception {
+    @DisplayName("토큰 없음 → 필터는 ERROR_ATTRIBUTE 미설정, 엔트리포인트는 UNAUTHORIZED 위임")
+    void missingTokenResolvesUnauthorized() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/test");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
@@ -68,16 +76,14 @@ class JwtAuthFilterTest {
         entryPoint.commence(request, response,
                 new InsufficientAuthenticationException("auth required"));
 
-        assertThat(response.getStatus()).isEqualTo(401);
-        assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
-        String body = response.getContentAsString();
-        assertThat(body).contains("\"success\":false");
-        assertThat(body).contains("\"error\":{\"code\":\"UNAUTHORIZED\"");
+        assertDelegatedWithCode(request, response, ErrorCode.UNAUTHORIZED);
+        assertThat(response.getHeader("WWW-Authenticate"))
+                .isEqualTo("Bearer realm=\"echo\", error=\"invalid_token\"");
     }
 
     @Test
-    @DisplayName("만료 토큰 → 401 INVALID_TOKEN")
-    void expiredTokenReturns401InvalidToken() throws Exception {
+    @DisplayName("만료 토큰 → 필터는 INVALID_TOKEN 설정, 엔트리포인트는 INVALID_TOKEN 위임")
+    void expiredTokenResolvesInvalidToken() throws Exception {
         JwtProvider expiredProvider = providerWithExpiration(-1_000L);
         String token = expiredProvider.issue(7L,
                 Map.of("username", "bob", "email", "bob@example.com"));
@@ -96,15 +102,12 @@ class JwtAuthFilterTest {
         entryPoint.commence(request, response,
                 new InsufficientAuthenticationException("invalid token"));
 
-        assertThat(response.getStatus()).isEqualTo(401);
-        String body = response.getContentAsString();
-        assertThat(body).contains("\"success\":false");
-        assertThat(body).contains("\"error\":{\"code\":\"INVALID_TOKEN\"");
+        assertDelegatedWithCode(request, response, ErrorCode.INVALID_TOKEN);
     }
 
     @Test
-    @DisplayName("위조 토큰 → 401 INVALID_TOKEN")
-    void tamperedTokenReturns401InvalidToken() throws Exception {
+    @DisplayName("위조 토큰 → 필터는 INVALID_TOKEN 설정, 엔트리포인트는 INVALID_TOKEN 위임")
+    void tamperedTokenResolvesInvalidToken() throws Exception {
         String token = validProvider.issue(99L,
                 Map.of("username", "carol", "email", "carol@example.com"));
         int lastDot = token.lastIndexOf('.');
@@ -128,9 +131,7 @@ class JwtAuthFilterTest {
         entryPoint.commence(request, response,
                 new InsufficientAuthenticationException("invalid token"));
 
-        assertThat(response.getStatus()).isEqualTo(401);
-        String body = response.getContentAsString();
-        assertThat(body).contains("\"error\":{\"code\":\"INVALID_TOKEN\"");
+        assertDelegatedWithCode(request, response, ErrorCode.INVALID_TOKEN);
     }
 
     @Test
@@ -153,6 +154,18 @@ class JwtAuthFilterTest {
                     assertThat(auth.getPrincipal()).isNotNull();
                 });
         assertThat(request.getAttribute(JwtAuthFilter.ERROR_ATTRIBUTE)).isNull();
+    }
+
+    // 엔트리포인트가 resolver(=ControllerAdvice 경로)로 위임할 때, 기대한 ErrorCode 를 실은
+    // JwtAuthenticationException 이 전달됐는지 검증한다.
+    private void assertDelegatedWithCode(
+            MockHttpServletRequest request, MockHttpServletResponse response, ErrorCode expected) {
+        ArgumentCaptor<Exception> captor = ArgumentCaptor.forClass(Exception.class);
+        verify(resolver).resolveException(eq(request), eq(response), isNull(), captor.capture());
+        assertThat(captor.getValue())
+                .isInstanceOf(JwtAuthenticationException.class)
+                .extracting(ex -> ((JwtAuthenticationException) ex).getErrorCode())
+                .isEqualTo(expected);
     }
 
     private JwtProvider providerWithExpiration(long expirationMs) {

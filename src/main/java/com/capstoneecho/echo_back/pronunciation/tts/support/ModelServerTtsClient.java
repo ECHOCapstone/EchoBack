@@ -1,5 +1,6 @@
 package com.capstoneecho.echo_back.pronunciation.tts.support;
 
+import com.capstoneecho.echo_back.external.modelserver.support.ModelServerErrorTranslator;
 import com.capstoneecho.echo_back.global.common.BusinessException;
 import com.capstoneecho.echo_back.global.common.ErrorCode;
 import com.capstoneecho.echo_back.global.config.AppProperties;
@@ -21,9 +22,14 @@ public class ModelServerTtsClient implements TtsClient {
 
     private final RestClient restClient;
     private final String baseUrl;
+    private final ModelServerErrorTranslator errorTranslator;
 
-    public ModelServerTtsClient(RestClient restClient, AppProperties appProperties) {
+    public ModelServerTtsClient(
+            RestClient restClient,
+            AppProperties appProperties,
+            ModelServerErrorTranslator errorTranslator) {
         this.restClient = restClient;
+        this.errorTranslator = errorTranslator;
         AppProperties.ModelServer ms = appProperties.modelServer();
         if (ms == null || ms.baseUrl() == null || ms.baseUrl().isBlank()) {
             throw new IllegalStateException("app.model-server.base-url must be configured");
@@ -47,13 +53,13 @@ public class ModelServerTtsClient implements TtsClient {
                     .retrieve()
                     .body(byte[].class);
             if (body == null || body.length == 0) {
-                throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR);
+                throw errorTranslator.emptyResponse("/tts", "empty /tts response");
             }
             return body;
         } catch (ResourceAccessException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_UNAVAILABLE, ex.getMessage());
+            throw errorTranslator.unavailable("/tts", ex);
         } catch (RestClientResponseException ex) {
-            throw new BusinessException(ErrorCode.MODEL_SERVER_ERROR, ex.getResponseBodyAsString());
+            throw errorTranslator.responseError("/tts", ex);
         }
     }
 

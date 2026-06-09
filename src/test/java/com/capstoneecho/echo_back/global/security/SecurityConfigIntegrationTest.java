@@ -56,6 +56,19 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
+    @DisplayName("잘못된 Bearer 토큰은 401 + ApiResponse(INVALID_TOKEN) 봉투 — 필터 예외가 ControllerAdvice 까지 전파")
+    void invalidTokenReturns401InvalidTokenEnvelope() throws Exception {
+        mockMvc.perform(get("/api/some-protected-resource")
+                        .header("Authorization", "Bearer not-a-valid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().string(containsString("\"success\":false")))
+                .andExpect(content().string(containsString("\"error\":{\"code\":\"INVALID_TOKEN\"")))
+                .andExpect(header().string("WWW-Authenticate",
+                        containsString("Bearer realm=\"echo\"")));
+    }
+
+    @Test
     @DisplayName("POST /api/tts 는 인증이 필요하므로 미인증이면 401")
     void postTtsRequiresAuth() throws Exception {
         mockMvc.perform(post("/api/tts")
