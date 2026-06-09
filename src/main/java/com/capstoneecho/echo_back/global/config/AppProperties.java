@@ -77,10 +77,16 @@ public record AppProperties(
 
         // models 는 어드민이 고를 수 있는 모델 후보 목록. model 은 그중 기본값.
         public record Gemini(
-                String apiKey, String model, String baseUrl, long timeoutMs, List<String> models) {
+                String apiKey, String model, String baseUrl, long timeoutMs, List<String> models,
+                int maxOutputTokens) {
 
             public List<String> safeModels() {
                 return models == null ? List.of() : models;
+            }
+
+            // 구조화 출력 JSON 이 객체 중간에서 잘리지 않도록 하는 출력 토큰 상한. 미설정/비정상이면 넉넉한 기본값.
+            public int safeMaxOutputTokens() {
+                return maxOutputTokens <= 0 ? 8192 : maxOutputTokens;
             }
         }
     }

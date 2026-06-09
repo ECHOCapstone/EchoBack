@@ -38,6 +38,7 @@ public class GeminiCallExecutor {
     private final String defaultModel;
     // 어드민이 고를 수 있는 허용 모델 집합 (app.llm.gemini.models). 런타임 설정값 검증에 쓴다.
     private final java.util.Set<String> allowedModels;
+    private final int maxOutputTokens;
     private final boolean available;
 
     public GeminiCallExecutor(
@@ -58,6 +59,7 @@ public class GeminiCallExecutor {
         this.defaultModel = (configuredModel == null || configuredModel.isBlank())
                 ? firstAllowedModel(g) : configuredModel;
         this.allowedModels = g == null ? java.util.Set.of() : java.util.Set.copyOf(g.safeModels());
+        this.maxOutputTokens = g == null ? 8192 : g.safeMaxOutputTokens();
         this.available = !this.apiKey.isBlank();
 
         Duration timeout = Duration.ofMillis(timeoutMs <= 0 ? 10_000 : timeoutMs);
@@ -154,7 +156,7 @@ public class GeminiCallExecutor {
         }
     }
 
-    private static Map<String, Object> buildBody(
+    private Map<String, Object> buildBody(
             String systemInstruction, String userPrompt, Map<String, Object> schema) {
         Map<String, Object> userContent = Map.of(
                 "role", "user",
@@ -166,7 +168,9 @@ public class GeminiCallExecutor {
         // canonical 생성은 결정성이 우선이라 더 낮은 temperature 를 쓸 수 있지만, 호출 측에서 schema 만 전달하므로
         // 공통 경로는 균형값으로 둔다. 결정성이 필요한 호출자는 별도 메서드를 추가해 override 한다.
         generationConfig.put("temperature", 0.0);
-        generationConfig.put("maxOutputTokens", 2048);
+        // 정렬·교정이 긴 발화(맞춤학습 커스텀 문장 등)에서 구조화 출력 JSON 이 객체 중간에서 잘리면
+        // (UnexpectedEndOfInput) 파싱 실패→폴백이 된다. 출력 상한을 넉넉히 둔다. (app.llm.gemini.max-output-tokens)
+        generationConfig.put("maxOutputTokens", maxOutputTokens);
         generationConfig.put("responseMimeType", "application/json");
         generationConfig.put("responseSchema", schema);
 

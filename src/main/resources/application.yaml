@@ -151,10 +151,12 @@ app:
       model: ${APP_LLM_GEMINI_MODEL:gemini-3.1-flash-lite}
       base-url: https://generativelanguage.googleapis.com
       timeout-ms: 10000
+      # 구조화 출력(정렬+교정) 상한. 긴 발화(맞춤학습 커스텀 문장)면 출력 JSON 이 길어져 2048 로는 객체 중간에서
+      # 잘려(UnexpectedEndOfInput) 파싱 실패→폴백이 된다. 넉넉히 둔다. 추론 모델은 thinking 도 이 예산을 먹으니 필수.
+      max-output-tokens: 8192
       # 어드민이 고를 수 있는 모델 후보. 구조화 출력 지원 stable 모델.
-      #   - flash-lite = 비추론(경량): thinking 토큰이 거의 없어 현재 maxOutputTokens 로 출력이 안 잘림 → 권장.
-      #   - flash      = 추론 모델: thinking 이 출력 예산을 잡아먹어, maxOutputTokens 를 넉넉히 둬야 JSON 이
-      #                  안 잘린다 (gemini-3.5-flash 를 2048 로 쓰면 MAX_TOKENS 로 폴백됨).
+      #   - flash-lite = 비추론(경량): thinking 토큰이 거의 없어 같은 max-output-tokens 로도 여유가 크다 → 권장.
+      #   - flash      = 추론 모델: thinking 이 출력 예산을 잡아먹으니 max-output-tokens 를 더 넉넉히 둬야 안 잘린다.
       models:
         - gemini-3.1-flash-lite   # 비추론 · 기본값(권장)
         - gemini-2.5-flash-lite   # 비추론 · 더 저렴
