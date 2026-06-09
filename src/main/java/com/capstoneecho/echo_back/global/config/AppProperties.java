@@ -155,16 +155,24 @@ public record AppProperties(
             String ttsTextRequired
     ) {}
 
-    // 결정적 채점 정책. ScoringService 가 이 값을 SSOT 로 본다.
-    //   weakPhonemes        : 한국인 학습자 약점 음소 (SUBSTITUTION / DELETION 마다 weakPenalty 차감).
-    //   weakPenalty         : 약점 음소 오류 1개당 -점.
-    //   insertionPenalty    : INSERTION 1개당 -점.
-    //   regularPenalty      : 약점 외 음소 SUBSTITUTION / DELETION 1개당 추가 -점 (베이스에 이미 반영되므로 보통 0).
+    // 결정적 채점 정책 (길이 정규화 + 자질거리 가중). ScoringService 가 이 값을 SSOT 로 본다.
+    //   score = 100 × (1 − Σ오류가중치 / canonical길이),  오류가중치:
+    //     SUBSTITUTION = substitutionWeight × max(distanceFloor, 자질거리) × (약점이면 weakMultiplier)
+    //     DELETION     = deletionWeight × (약점이면 weakMultiplier)
+    //     INSERTION    = insertionWeight
+    //   weakPhonemes      : 한국인 학습자 약점 음소 — 자질상 가까운 치환/삭제도 weakMultiplier 로 가중.
+    //   weakMultiplier    : 약점 음소 오류 가중 배수 (예: 1.5).
+    //   substitutionWeight: 자질거리 1.0(최대) 치환 1개의 기준 가중치.
+    //   deletionWeight    : 삭제 1개의 가중치.
+    //   insertionWeight   : 삽입 1개의 가중치 (보통 치환/삭제보다 가볍게).
+    //   distanceFloor     : 치환 자질거리의 하한 — 가까운 치환(R/L 등)도 최소 이만큼은 오류로 센다.
     public record Scoring(
             List<String> weakPhonemes,
-            int weakPenalty,
-            int insertionPenalty,
-            int regularPenalty
+            double weakMultiplier,
+            double substitutionWeight,
+            double deletionWeight,
+            double insertionWeight,
+            double distanceFloor
     ) {
         public List<String> safeWeakPhonemes() {
             return weakPhonemes == null ? List.of() : weakPhonemes;

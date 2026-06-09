@@ -8,17 +8,19 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-// ScoringService 의 결정적 점수 환산 동작을 검증한다. 입력은 결정적 정렬(AlignmentOp 리스트)뿐이며,
-// 오류는 비-MATCH 항목에서 직접 파생한다.
-//   - 오류 없으면 100.
-//   - 약점 음소 SUBSTITUTION/DELETION -5, INSERTION -3, 그 외 0.
-//   - canonical 길이는 비-INSERTION 항목 수, 점수는 0..100 clamp.
+// ScoringService 의 길이 정규화 + 자질거리 가중 점수 환산을 검증한다.
+//   score = round(100 × (1 − Σ오류가중치 / canonical 길이))
+//   SUB = subW × max(floor, 자질거리) × (약점이면 weakMult), DEL = delW × (약점이면 weakMult), INS = insW.
 class ScoringServiceTest {
 
     private static final AppProperties.Scoring DEFAULT_SCORING =
             new AppProperties.Scoring(
                     List.of("V", "R", "L", "TH", "DH", "F", "Z", "ZH", "AH", "AE", "ER"),
-                    5, 3, 0);
+                    1.5,   // weakMultiplier
+                    1.0,   // substitutionWeight
+                    1.0,   // deletionWeight
+                    0.5,   // insertionWeight
+                    0.3);  // distanceFloor
 
     private final ScoringService service = newService(DEFAULT_SCORING);
 
@@ -53,51 +55,61 @@ class ScoringServiceTest {
     }
 
     @Test
-    @DisplayName("약점 음소 SUBSTITUTION 은 -5 페널티")
-    void weakPhonemeSubstitutionDocksFive() {
+    @DisplayName("약점 음소 치환(R→L): floor 0.3 × weakMult 1.5 = 0.45 → 4길이에서 89점")
+    void weakSubstitutionUsesFloorTimesWeakMultiplier() {
         List<AlignmentOp> alignment = List.of(
-                match("HH", 0), match("AH", 1), match("L", 2),
-                new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "R", "L", 3));
-
-        // base = 3/4 * 100 = 75, penalty = 5 → 70
-        assertThat(service.compute(alignment)).isEqualTo(70);
+                match("HH", 0), match("AH", 1), match("L", 2), sub("R", "L", 3));
+        // 100 × (1 − 0.45/4) = 88.75 → 89
+        assertThat(service.compute(alignment)).isEqualTo(89);
     }
 
     @Test
-    @DisplayName("INSERTION 은 -3 페널티, canonical 길이 계산에선 무시")
-    void insertionDocksThreeAndDoesNotInflateCanonicalLength() {
-        List<AlignmentOp> alignment = List.of(
-                match("HH", 0), match("AH", 1), insertion("X"));
-
-        // base = 2/2 * 100 = 100, penalty = 3 → 97
-        assertThat(service.compute(alignment)).isEqualTo(97);
+    @DisplayName("INSERTION 은 insertionWeight 0.5, canonical 길이엔 안 들어간다")
+    void insertionUsesInsertionWeight() {
+        List<AlignmentOp> alignment = List.of(match("HH", 0), match("AH", 1), insertion("X"));
+        // 100 × (1 − 0.5/2) = 75
+        assertThat(service.compute(alignment)).isEqualTo(75);
     }
 
     @Test
-    @DisplayName("약점 외 음소 SUBSTITUTION 은 베이스 감소만 (페널티 0)")
-    void regularPhonemeSubstitutionOnlyAffectsBase() {
-        List<AlignmentOp> alignment = List.of(
-                match("HH", 0), match("AH", 1),
-                new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "K", "G", 2));
+    @DisplayName("자질거리 변별: 가까운 치환(AE→EH)이 먼 치환(AE→K)보다 높은 점수")
+    void closerSubstitutionScoresHigher() {
+        List<AlignmentOp> close = List.of(
+                match("HH", 0), match("N", 1), match("D", 2), sub("AE", "EH", 3));
+        List<AlignmentOp> far = List.of(
+                match("HH", 0), match("N", 1), match("D", 2), sub("AE", "K", 3));
 
-        // base = 2/3 * 100 = 66.67 → 67, penalty = 0 → 67
-        assertThat(service.compute(alignment)).isEqualTo(67);
+        int closeScore = service.compute(close);
+        int farScore = service.compute(far);
+
+        // close: floor 0.3 × 1.5 = 0.45 → 89,  far: 1.0 × 1.5 = 1.5 → 63
+        assertThat(closeScore).isGreaterThan(farScore);
+        assertThat(closeScore).isEqualTo(89);
+        assertThat(farScore).isEqualTo(63);
     }
 
     @Test
-    @DisplayName("점수는 0..100 으로 clamp")
+    @DisplayName("약점 외 자음 치환(K→G, 유성성 차이)은 자질거리만큼만 깎인다")
+    void regularSubstitutionUsesFeatureDistance() {
+        List<AlignmentOp> alignment = List.of(match("HH", 0), match("AH", 1), sub("K", "G", 2));
+        // K→G 거리 = (1 + 0 + 0)/3 = 0.333 → 100 × (1 − 0.333/3) = 88.9 → 89
+        assertThat(service.compute(alignment)).isEqualTo(89);
+    }
+
+    @Test
+    @DisplayName("점수는 0 으로 clamp")
     void clampToZero() {
-        List<AlignmentOp> alignment = List.of(
-                new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "R", "L", 0),
-                new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "TH", "S", 1),
-                new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, "V", "B", 2));
-
-        // base = 0, penalty = 15 → max(0, -15) = 0
+        // 먼 치환 둘(자음↔모음, 약점) → 오류질량이 길이를 넘어 음수 → 0
+        List<AlignmentOp> alignment = List.of(sub("R", "AE", 0), sub("AE", "K", 1));
         assertThat(service.compute(alignment)).isZero();
     }
 
     private static AlignmentOp match(String phoneme, int idx) {
         return new AlignmentOp(AlignmentOp.ErrorType.MATCH, phoneme, phoneme, idx);
+    }
+
+    private static AlignmentOp sub(String canonical, String perceived, int idx) {
+        return new AlignmentOp(AlignmentOp.ErrorType.SUBSTITUTION, canonical, perceived, idx);
     }
 
     private static AlignmentOp insertion(String perceived) {

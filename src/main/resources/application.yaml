@@ -235,12 +235,14 @@ app:
     upload-too-large: "업로드 가능한 파일 크기를 초과했습니다."
     tts-text-required: "text 는 비어 있을 수 없습니다."
   scoring:
-    # 한국인 학습자가 자주 틀리는 음소. SUBSTITUTION / DELETION 마다 weak-penalty 차감.
+    # 길이 정규화 + 자질거리 가중 채점: score = 100 × (1 − Σ오류가중치 / canonical 길이).
+    # 한국인 학습자 약점 음소 — 자질상 가까운 치환/삭제도 weak-multiplier 로 가중한다.
     weak-phonemes: [V, R, L, TH, DH, F, Z, ZH, AH, AE, ER]
-    weak-penalty: 5
-    insertion-penalty: 3
-    # 약점 외 음소 SUBSTITUTION / DELETION 추가 페널티. 베이스 점수에 이미 반영되므로 보통 0.
-    regular-penalty: 0
+    weak-multiplier: 1.5        # 약점 음소 오류 가중 배수
+    substitution-weight: 1.0    # 자질거리 1.0(최대) 치환 1개의 기준 가중치
+    deletion-weight: 1.0        # 삭제 1개 가중치
+    insertion-weight: 0.5       # 삽입 1개 가중치 (치환/삭제보다 가볍게)
+    distance-floor: 0.3         # 치환 자질거리 하한 (R/L 처럼 가까운 치환도 최소 이만큼은 오류)
   canonical:
     # 부팅 시 콘텐츠 (steps / sentences / challenges) 의 누락된 canonical 을 비동기 backfill.
     # 시드 직후 첫 부팅 / 모델 정책 변경 직후 한 번 켜고 끄는 운영 토글.

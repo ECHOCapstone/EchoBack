@@ -98,10 +98,10 @@ class PronunciationScenarioE2ETest {
     }
 
     @Test
-    @DisplayName("TC-02: 오발음(perceived AE→AH) → 결정적 정렬이 점수 낮춤 + LLM 재학습 권고 → passed=false / retryRecommended=true")
+    @DisplayName("TC-02: 오발음(AE→AH·P→B·L→R) → 결정적 정렬이 점수 낮춤 + LLM 재학습 권고 → passed=false / retryRecommended=true")
     void tc02_misPronunciationTriggersRetryRecommendation() {
         ScriptFlowFixture f = seedScriptFlow("apple");
-        // perceived 가 실제로 AE→AH 오발음 — 결정적 정렬이 약점음소 SUB 로 잡아 점수를 낮춘다.
+        // perceived 가 여러 군데 오발음(AE→AH·P→B·L→R) — 결정적 정렬 점수가 합격선 아래로 떨어진다.
         when(modelServerClient.transcribe(any(byte[].class), anyString()))
                 .thenReturn(misTranscribe());
         LlmPhonemeError err = new LlmPhonemeError(AlignmentOp.ErrorType.SUBSTITUTION, "AE", "AH", 0);
@@ -268,10 +268,10 @@ class PronunciationScenarioE2ETest {
                 "echo");
     }
 
-    // apple 의 첫 모음 AE 를 AH 로 잘못 발음한 인식 결과 (약점음소 SUB → 결정적 점수 차감).
+    // apple(AE P AH L) 을 여러 군데 잘못 발음한 인식 결과 (AE→AH, P→B, L→R) — 합격선 아래로 떨어진다.
     private static TranscribeResult misTranscribe() {
         return new TranscribeResult(
-                List.of("AH", "P", "AH", "L"),
+                List.of("AH", "B", "AH", "R"),
                 List.of(0.95, 0.92, 0.88, 0.9),
                 1.0,
                 SpeechRate.NORMAL,
