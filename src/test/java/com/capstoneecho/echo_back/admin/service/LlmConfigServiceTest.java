@@ -29,7 +29,7 @@ class LlmConfigServiceTest {
                 null, null, null,
                 new AppProperties.Llm("rule-based", new AppProperties.Llm.Gemini(
                         "", "gemini-3.1-flash-lite", "url", 10_000L,
-                        List.of("gemini-3.1-flash-lite", "gemini-2.5-flash"), 8192)),
+                        List.of("gemini-3.1-flash-lite", "gemini-3.5-flash"), 8192, "LOW")),
                 null, null, null, null,
                 null,
                 null, null, null, null, null, null, null, null);
@@ -48,7 +48,7 @@ class LlmConfigServiceTest {
 
         assertThat(r.provider()).isEqualTo("rule-based");
         assertThat(r.providerOptions()).containsExactly("rule-based", "gemini");
-        assertThat(r.modelOptions()).contains("gemini-2.5-flash");
+        assertThat(r.modelOptions()).contains("gemini-3.5-flash");
         assertThat(r.geminiAvailable()).isFalse();
     }
 
@@ -66,9 +66,9 @@ class LlmConfigServiceTest {
     void updateGeminiValidSetsBoth() {
         when(gemini.isAvailable()).thenReturn(true);
 
-        service().update("gemini", "gemini-2.5-flash");
+        service().update("gemini", "gemini-3.5-flash");
 
-        verify(settings).set(LlmSettingKeys.GEMINI_MODEL, "gemini-2.5-flash");
+        verify(settings).set(LlmSettingKeys.GEMINI_MODEL, "gemini-3.5-flash");
         verify(settings).set(LlmSettingKeys.PROVIDER, "gemini");
     }
 
@@ -84,7 +84,7 @@ class LlmConfigServiceTest {
     void rejectsGeminiWhenUnavailable() {
         when(gemini.isAvailable()).thenReturn(false);
 
-        assertThatThrownBy(() -> service().update("gemini", "gemini-2.5-flash"))
+        assertThatThrownBy(() -> service().update("gemini", "gemini-3.5-flash"))
                 .isInstanceOf(BusinessException.class);
     }
 

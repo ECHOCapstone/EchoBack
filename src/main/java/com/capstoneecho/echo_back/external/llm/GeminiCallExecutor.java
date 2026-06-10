@@ -39,6 +39,7 @@ public class GeminiCallExecutor {
     // 어드민이 고를 수 있는 허용 모델 집합 (app.llm.gemini.models). 런타임 설정값 검증에 쓴다.
     private final java.util.Set<String> allowedModels;
     private final int maxOutputTokens;
+    private final String thinkingLevel;
     private final boolean available;
 
     public GeminiCallExecutor(
@@ -60,6 +61,7 @@ public class GeminiCallExecutor {
                 ? firstAllowedModel(g) : configuredModel;
         this.allowedModels = g == null ? java.util.Set.of() : java.util.Set.copyOf(g.safeModels());
         this.maxOutputTokens = g == null ? 8192 : g.safeMaxOutputTokens();
+        this.thinkingLevel = g == null ? "" : g.safeThinkingLevel();
         this.available = !this.apiKey.isBlank();
 
         Duration timeout = Duration.ofMillis(timeoutMs <= 0 ? 10_000 : timeoutMs);
@@ -165,12 +167,19 @@ public class GeminiCallExecutor {
                 "parts", List.of(Map.of("text", systemInstruction == null ? "" : systemInstruction)));
 
         Map<String, Object> generationConfig = new LinkedHashMap<>();
-        // canonical 생성은 결정성이 우선이라 더 낮은 temperature 를 쓸 수 있지만, 호출 측에서 schema 만 전달하므로
-        // 공통 경로는 균형값으로 둔다. 결정성이 필요한 호출자는 별도 메서드를 추가해 override 한다.
-        generationConfig.put("temperature", 0.0);
+        // Gemini 3.x 는 temperature/top_p/top_k 를 권장하지 않는다(기본값에 맞춰 최적화됨). 결정성은 sampling
+        // 대신 시스템 프롬프트의 명시 규칙으로 확보한다. 따라서 sampling 파라미터는 보내지 않는다.
         // 정렬·교정이 긴 발화(맞춤학습 커스텀 문장 등)에서 구조화 출력 JSON 이 객체 중간에서 잘리면
         // (UnexpectedEndOfInput) 파싱 실패→폴백이 된다. 출력 상한을 넉넉히 둔다. (app.llm.gemini.max-output-tokens)
         generationConfig.put("maxOutputTokens", maxOutputTokens);
+        // 추론 수준(MINIMAL/LOW/MEDIUM/HIGH). 비우면 보내지 않아 모델별 기본값을 따른다. thinking 토큰을 줄이면
+        // 지연·비용이 낮아지고 잘림 여유도 커진다. (3.x 는 thinking_budget 대신 thinking_level 을 쓴다.)
+        if (!thinkingLevel.isBlank()) {
+            generationConfig.put("thinkingConfig", Map.of("thinkingLevel", thinkingLevel));
+        }
+        // 구조화 출력. responseFormat.text.mimeType 는 MIME 문자열이 아니라 enum 이라 v1beta generateContent
+        // 에서 "application/json" 을 거부(400 INVALID_ARGUMENT)한다. 3.x 에서도 정상 동작하고 deprecated 가
+        // 아닌 responseMimeType + responseSchema 를 사용한다.
         generationConfig.put("responseMimeType", "application/json");
         generationConfig.put("responseSchema", schema);
 

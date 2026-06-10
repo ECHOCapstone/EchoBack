@@ -151,17 +151,19 @@ app:
       model: ${APP_LLM_GEMINI_MODEL:gemini-3.1-flash-lite}
       base-url: https://generativelanguage.googleapis.com
       timeout-ms: 10000
-      # 구조화 출력(정렬+교정) 상한. 긴 발화(맞춤학습 커스텀 문장)면 출력 JSON 이 길어져 2048 로는 객체 중간에서
-      # 잘려(UnexpectedEndOfInput) 파싱 실패→폴백이 된다. 넉넉히 둔다. 추론 모델은 thinking 도 이 예산을 먹으니 필수.
-      max-output-tokens: 8192
-      # 어드민이 고를 수 있는 모델 후보. 구조화 출력 지원 stable 모델.
-      #   - flash-lite = 비추론(경량): thinking 토큰이 거의 없어 같은 max-output-tokens 로도 여유가 크다 → 권장.
-      #   - flash      = 추론 모델: thinking 이 출력 예산을 잡아먹으니 max-output-tokens 를 더 넉넉히 둬야 안 잘린다.
+      # 구조화 출력(정렬+교정) 상한. 긴 발화(맞춤학습 커스텀 문장)면 출력 JSON 이 길어져 작은 값으로는 객체
+      # 중간에서 잘려(UnexpectedEndOfInput) 파싱 실패→폴백이 된다. 추론 모델(gemini-3.5-flash 등)은 thinking
+      # 토큰도 이 예산을 함께 먹으므로, 추론 모델까지 안전하게 쓰도록 넉넉히 둔다 (3.5-flash 는 최대 65k 출력 지원).
+      max-output-tokens: 16384
+      # Gemini 3.x 추론 수준: MINIMAL | LOW | MEDIUM | HIGH. 비우면 모델별 기본값을 따른다
+      # (3.1-flash-lite=MINIMAL, 3.5-flash=MEDIUM). 발음 피드백은 글쓰기+가벼운 분석이라 LOW 가 품질 대비
+      # 지연·비용·잘림 여유에서 균형이 좋다. (3.x 는 thinking_budget 숫자 대신 이 enum 을 쓴다.)
+      thinking-level: ${APP_LLM_GEMINI_THINKING_LEVEL:LOW}
+      # 어드민이 고를 수 있는 모델 후보. 구조화 출력 지원 Gemini 3.x 텍스트 모델.
       models:
-        - gemini-3.1-flash-lite   # 비추론 · 기본값(권장)
-        - gemini-2.5-flash-lite   # 비추론 · 더 저렴
-        - gemini-3.5-flash        # 추론 · maxOutputTokens 충분해야 사용 가능
-        - gemini-2.5-flash        # 추론 · maxOutputTokens 충분해야 사용 가능
+        - gemini-3.1-flash-lite   # 비추론(경량) · stable · 기본값(권장)
+        - gemini-3.5-flash        # 추론 · stable · 품질 ↑ / 비용 ↑
+        - gemini-3.1-pro-preview  # 추론 · preview · 최고 품질(가장 비싸고 느림, 2주 공지 후 폐기 가능)
   storage:
     local-root: build/local-storage
   content:

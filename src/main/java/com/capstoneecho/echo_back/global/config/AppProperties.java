@@ -78,7 +78,7 @@ public record AppProperties(
         // models 는 어드민이 고를 수 있는 모델 후보 목록. model 은 그중 기본값.
         public record Gemini(
                 String apiKey, String model, String baseUrl, long timeoutMs, List<String> models,
-                int maxOutputTokens) {
+                int maxOutputTokens, String thinkingLevel) {
 
             public List<String> safeModels() {
                 return models == null ? List.of() : models;
@@ -87,6 +87,12 @@ public record AppProperties(
             // 구조화 출력 JSON 이 객체 중간에서 잘리지 않도록 하는 출력 토큰 상한. 미설정/비정상이면 넉넉한 기본값.
             public int safeMaxOutputTokens() {
                 return maxOutputTokens <= 0 ? 8192 : maxOutputTokens;
+            }
+
+            // Gemini 3.x 추론 제어값(MINIMAL/LOW/MEDIUM/HIGH). 대문자 enum 으로 정규화하며, 비우면 보내지 않아
+            // 모델별 기본 추론 수준을 따른다(예: 3.1-flash-lite=MINIMAL, 3.5-flash=MEDIUM).
+            public String safeThinkingLevel() {
+                return thinkingLevel == null ? "" : thinkingLevel.trim().toUpperCase(java.util.Locale.ROOT);
             }
         }
     }
