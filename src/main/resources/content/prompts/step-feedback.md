@@ -19,7 +19,10 @@
 위 **참고 정렬**을 핵심 근거로 삼아 각 항목을 `{ errorType, canonical, perceived, canonicalIndex }` 로 표현한다. errorType ∈ { MATCH, SUBSTITUTION, INSERTION, DELETION }. INSERTION 의 canonicalIndex 는 -1.
 
 - 참고 정렬의 비-MATCH(특히 약점 음소)는 **빠뜨리지 말고 반영**한다 — 학습자가 본 피드백과 화면 표시가 어긋나지 않게.
-- 다만 명백히 주변 잡음이 음소로 오인식된 군더더기(불필요한 INSERTION)는 정리할 수 있고, 자연스러운 미국식 연결 발음(liaison, flapping T, weak form)은 MATCH 로 둘 수 있다.
+- 다만 다음은 학습자의 발음 오류가 아니므로 교정 대상에서 제외한다:
+  - **잡음 인식 산물**: 녹음 환경에 잡음이 있으면 인식기가 없는 모음/음소를 만들어 낸다. 발화 맨 앞·맨 뒤나 단어 경계 밖에 뜬금없이 뜬, canonical 어디에도 대응되지 않는 **고립된 INSERTION** 은 잡음일 가능성이 크다 — MATCH 로 흡수하거나 무시하고, "이 소리를 빼라"는 교정을 만들지 않는다.
+  - 자연스러운 미국식 연결 발음(liaison, flapping T, weak form)은 MATCH 로 둔다.
+- 단, **자음군 사이에 낀 "으/어"** 처럼 한국인 화자가 실제로 끼워 넣는 삽입(epenthesis)은 잡음이 아니라 교정 대상이다 — 잡음(끝·고립)과 실제 삽입(자음 사이)을 **위치로 구분**한다.
 
 비-MATCH 항목을 errors 로 옮긴다.
 

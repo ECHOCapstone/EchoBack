@@ -28,10 +28,15 @@ public class TranslationService {
 
     private final TranslationCacheRepository repository;
     private final TranslationClient client;
+    private final TranslationCacheWriter cacheWriter;
 
-    public TranslationService(TranslationCacheRepository repository, TranslationClient client) {
+    public TranslationService(
+            TranslationCacheRepository repository,
+            TranslationClient client,
+            TranslationCacheWriter cacheWriter) {
         this.repository = repository;
         this.client = client;
+        this.cacheWriter = cacheWriter;
     }
 
     public TranslationResponse translate(List<String> rawTexts) {
@@ -119,12 +124,15 @@ public class TranslationService {
         }
     }
 
-    // 동시 요청으로 같은 hash 가 동시에 들어와 PK 충돌이 발생하는 race 만 무시한다.
+    // 캐시 저장은 호출 측 트랜잭션과 분리된 REQUIRES_NEW 로 수행한다(TranslationCacheWriter).
+    // 그래야 동시 요청의 PK 충돌이 이 INSERT 시점에 즉시 터져 여기서 잡히고, 호출 측(예: 세션 PATCH)
+    // 트랜잭션을 함께 롤백시키지 않는다. (같은 트랜잭션 + 지연 flush 였다면 충돌이 커밋 시점에 터져
+    // 호출 측까지 409 로 실패했다.)
     // 다른 종류의 실패 (컬럼 길이 초과, DB 권한 등) 는 silent 로 삼키면 다음 요청에서 같은 외부 호출이
     // 반복되어 비용 / 지연이 누적되므로 로그로 노출해 운영자가 인지할 수 있게 한다.
     private void persistQuietly(String sourceText, String targetText) {
         try {
-            repository.save(TranslationCache.of(sourceText, targetText));
+            cacheWriter.persist(sourceText, targetText);
         } catch (DataIntegrityViolationException race) {
             // 같은 hash 를 다른 요청이 먼저 저장한 경우 — 응답에는 영향 없으므로 무시.
         } catch (RuntimeException ex) {
