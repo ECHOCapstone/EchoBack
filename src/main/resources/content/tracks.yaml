@@ -1018,3 +1018,518 @@ tracks:
             kind: "RECORD"
             prompt: "녹음 버튼을 누르고 It was really nice running into you again 를 발음해 보세요."
             targetText: "It was really nice running into you again"
+
+  - title: "토익 LC 쉐도잉"
+    description: "토익 리스닝에 나오는 실전 문장을 듣고 그대로 따라 말하며 발음·억양·끊어 읽기를 익히는 쉐도잉 트랙."
+    displayOrder: 5
+    chapters:
+      - chapterOrder: 0
+        title: "쉐도잉 1: 묘사와 부탁"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "broom"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A man is sweeping a walkway with a broom."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Can you give me a hand with this advertising campaign this afternoon?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Sorry, I need to finish this report today."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We've had some difficulties collecting feedback from our members."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Stay tuned for an exclusive interview with author James Connor."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A rug is lying in front of an armchair."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you think we should hire some temporary workers to finish this project?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "That would be very helpful."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "You should pack a first-aid kit and any medication you need."
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We hope you have enjoyed your flight with us and wish you a very safe journey to your final destination."
+      - chapterOrder: 1
+        title: "쉐도잉 2: 사무실과 공지"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "photocopier"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A speaker is adjusting a microphone."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I have no idea how to operate this photocopier."
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Here, I'll show you."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm having trouble revising our company's employee handbook."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We have completed the first phase of a Central Station expansion project."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Some of the chairs are unoccupied."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "The traffic is unusually heavy tonight."
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "The Victoria Bridge has been closed for emergency repair."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm supposed to lead a training session on the new assembly line equipment."
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Welcome to Ace Chemical's new employee orientation."
+      - chapterOrder: 2
+        title: "쉐도잉 3: 회의와 예약"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "merchandise"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A customer is paying for some merchandise."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "What time does the editorial meeting start?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "It's been canceled."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We're closing the museum early today for some maintenance work."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "As a safety precaution, please stand behind the yellow line."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A lamp has been positioned next to a window."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Can't we hire a different caterer for Mr. Martin's retirement party?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Let's talk about it tomorrow."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Can you put me through to extension 102, please?"
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We recommend that you do not purchase food from street vendors."
+      - chapterOrder: 3
+        title: "쉐도잉 4: 구인과 협업"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "collaborating"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "People are playing musical instruments."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "The new marketing manager was supposed to start today, wasn't he?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Yes, I saw him at the sales meeting this morning."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm looking for a company to supply file cabinets for my office."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I want to inform you that our store has recently relocated."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "There is a pile of books on the floor."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Let's take a short break to get some fresh air."
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I wish I could."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Could you tell me all the details about a workshop on sales techniques?"
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm very excited about the possibility of collaborating with you soon."
+      - chapterOrder: 4
+        title: "쉐도잉 5: 문화와 일정"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "gallery"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "They are strolling along the beach."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Did you know that a new art gallery will be opening on Kensington Street?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "No. When will it be?"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you still need the cost estimate for tomorrow's meeting?"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Singer-songwriter Carol Brown will be joining us shortly."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A woman is gazing at a painting hung on the wall."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Could you make ten copies of this document?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you want them to be printed on both sides?"
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Ms. Brown will be attending a book fair in late September."
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "My name is Grace, and I'll be leading you on today's walking tour."
+      - chapterOrder: 5
+        title: "쉐도잉 6: 전화와 안내"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "consultation"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A woman is hanging up a poster on the wall."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you want me to retype this document?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I would appreciate it."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you offer a designated parking area for guests?"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Call us today to set up your individual consultation."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "He is passing through a doorway."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Why has the company outing been rescheduled?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "They're predicting rain."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Did you hear that Mr. Henderson won the lifetime achievement award?"
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "You have reached the voice mail of Chuck Robinson."
+      - chapterOrder: 6
+        title: "쉐도잉 7: 주문과 채용"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "representative"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A staircase leads to an entrance of a building."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Which flavor of ice cream would you like, chocolate or strawberry?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you have vanilla?"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm calling about the fund-raising event to be held this September."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "If you'd like to speak to a customer service representative, please press one now."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "He's browsing through some magazines."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Don't forget to pay the utility bill."
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I've already done it."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Mr. Fernando has been promoted to senior vice-president of Human Resources."
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm glad that you find the future of our firm promising."
+      - chapterOrder: 7
+        title: "쉐도잉 8: 재고와 배송"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "maintenance"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A woman is holding onto a railing."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "How may I help you?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Well, there's something wrong with my internet connection."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "The product is out of stock and won't be available for another three weeks."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We'll be going over the sales reports for the last quarter."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Spectators have gathered in a stadium."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Isn't the furniture for the staff lounge being delivered this afternoon?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "The delivery's been delayed."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I want you to go over this new maintenance contract with Ace Properties."
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Our hours of operation are 9 to 7, Tuesday through Saturday."
+      - chapterOrder: 8
+        title: "쉐도잉 9: 마감과 마케팅"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "aggressively"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A woman is sipping from a coffee mug."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "The deadline for the Penndale project's been moved up."
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Is there anything I can help you with?"
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I think we need to advertise our grocery store more aggressively."
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "This is Ray Chandler with the traffic update for our listeners."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "There are streetlamps on both sides of the road."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "How do you plan to market your new speech recognition software?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We're developing a strategy."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Our flight from San Jose didn't arrive on time, so we missed our connection."
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "I'm sorry to announce that tonight's book club event has been canceled."
+      - chapterOrder: 9
+        title: "쉐도잉 10: 안전과 요청"
+        content: "토익 리스닝 실전 문장 10개를 듣고 그대로 따라 말하며 발음과 억양을 익힙니다."
+        difficulty: "MEDIUM"
+        practiceWord: "promotional"
+        masteryBadgeName: null
+        steps:
+          - orderIndex: 0
+            kind: "INTRO"
+            prompt: "문장을 듣고 그대로 따라 말해 보세요. 소리·억양·끊어 읽기까지 흉내 내면 좋아요."
+            targetText: null
+          - orderIndex: 1
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "A woman is pushing a button on the vending machine."
+          - orderIndex: 2
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Should I wait here or follow you back to the warehouse?"
+          - orderIndex: 3
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Please come with me."
+          - orderIndex: 4
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Do you have any promotional offers available now?"
+          - orderIndex: 5
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Please remember that protective gear must be worn at all times."
+          - orderIndex: 6
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Some people are standing around the fountain."
+          - orderIndex: 7
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "How far is the nearest library from here?"
+          - orderIndex: 8
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "It's two blocks away."
+          - orderIndex: 9
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "Can you ask Naomi to expedite the payment process for this, please?"
+          - orderIndex: 10
+            kind: "RECORD"
+            prompt: "듣고 따라 말해 보세요."
+            targetText: "We'll keep you posted with any updates, so stay tuned."
