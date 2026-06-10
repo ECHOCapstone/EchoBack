@@ -31,6 +31,7 @@ public class ScoringService {
     private final double deletionWeight;
     private final double insertionWeight;
     private final double distanceFloor;
+    private final double severityExponent;
 
     public ScoringService(AppProperties appProperties) {
         AppProperties.Scoring scoring = appProperties.scoring();
@@ -51,6 +52,7 @@ public class ScoringService {
         this.deletionWeight = scoring == null ? 1.0 : scoring.deletionWeight();
         this.insertionWeight = scoring == null ? 0.5 : scoring.insertionWeight();
         this.distanceFloor = scoring == null ? 0.3 : scoring.distanceFloor();
+        this.severityExponent = scoring == null ? 1.0 : scoring.safeSeverityExponent();
     }
 
     public int compute(List<AlignmentOp> alignment) {
@@ -75,7 +77,10 @@ public class ScoringService {
                 }
             }
         }
-        int raw = (int) Math.round(100.0 * (1.0 - errorMass / canonicalLen));
+        // 오류율을 길이로 정규화한 뒤 엄격도 지수를 적용한다. 지수가 1보다 작으면 작은 오류율도 더 크게
+        // 깎여(예: 6음소 중 1개 오류가 7.5% → 더 큰 감점) 후한 채점이 완화된다. 1.0 이면 선형(기존).
+        double rate = Math.min(1.0, errorMass / canonicalLen);
+        int raw = (int) Math.round(100.0 * (1.0 - Math.pow(rate, severityExponent)));
         return Math.max(0, Math.min(100, raw));
     }
 

@@ -20,7 +20,8 @@ class ScoringServiceTest {
                     1.0,   // substitutionWeight
                     1.0,   // deletionWeight
                     0.5,   // insertionWeight
-                    0.3);  // distanceFloor
+                    0.3,   // distanceFloor
+                    1.0);  // severityExponent (선형 — 기존 동작)
 
     private final ScoringService service = newService(DEFAULT_SCORING);
 
@@ -102,6 +103,18 @@ class ScoringServiceTest {
         // 먼 치환 둘(자음↔모음, 약점) → 오류질량이 길이를 넘어 음수 → 0
         List<AlignmentOp> alignment = List.of(sub("R", "AE", 0), sub("AE", "K", 1));
         assertThat(service.compute(alignment)).isZero();
+    }
+
+    @Test
+    @DisplayName("severityExponent < 1 이면 같은 오류라도 더 엄격하게(낮게) 채점한다")
+    void lowerSeverityExponentScoresStricter() {
+        // K→G(약점 아님) 치환 1개, 길이 3 — 선형(지수 1.0)에서는 89.
+        List<AlignmentOp> alignment = List.of(match("HH", 0), match("AH", 1), sub("K", "G", 2));
+        int linear = service.compute(alignment);
+        AppProperties.Scoring strict = new AppProperties.Scoring(
+                List.of(), 1.5, 1.0, 1.0, 0.5, 0.3, 0.5); // severityExponent 0.5
+        int strictScore = newService(strict).compute(alignment);
+        assertThat(strictScore).isLessThan(linear);
     }
 
     private static AlignmentOp match(String phoneme, int idx) {

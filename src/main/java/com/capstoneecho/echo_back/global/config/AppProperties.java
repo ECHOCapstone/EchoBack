@@ -184,10 +184,17 @@ public record AppProperties(
             double substitutionWeight,
             double deletionWeight,
             double insertionWeight,
-            double distanceFloor
+            double distanceFloor,
+            double severityExponent
     ) {
         public List<String> safeWeakPhonemes() {
             return weakPhonemes == null ? List.of() : weakPhonemes;
+        }
+
+        // 오류율(0~1)에 적용하는 엄격도 지수. 1.0 = 선형(완만), 1.0 보다 작을수록 작은 오류도 더 크게 깎여
+        // 점수가 엄격해진다. 미설정/비정상이면 선형(1.0).
+        public double safeSeverityExponent() {
+            return severityExponent <= 0 ? 1.0 : severityExponent;
         }
     }
 
